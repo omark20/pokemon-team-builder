@@ -58,7 +58,7 @@ function TeamHeader({ team, onRename, onDelete }: Omit<HalfProps, "pokemonById" 
   return (
     <div className="half-header">
       <h2 className="half-title">{team.name}</h2>
-      <span className="half-count">{team.pokemon_ids.length} of 6</span>
+      <span className="half-count">{team.pokemon_ids.length} of {TEAM_SIZE}</span>
       <button type="button" className="link-button" ref={renameButton} onClick={() => setEditing(true)}>
         Rename
       </button>

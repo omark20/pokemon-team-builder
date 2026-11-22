@@ -55,8 +55,8 @@ test.each([
   },
   {
     change: "a halved multiplier",
-    alert: alert({ pokemon_id: null, attacker: "fire", defender: "water", field: "multiplier", old_value: 0.5, new_value: 0.25 }),
-    row: { oldValue: "½×", newValue: "¼×" },
+    alert: alert({ pokemon_id: null, attacker: "fire", defender: "water", field: "multiplier", old_value: 1, new_value: 0.5 }),
+    row: { oldValue: "1×", newValue: "½×" },
   },
 ])("an alert for $change reads as expected", ({ alert: change, row }) => {
   expect(describeAlert(change, TEAMS, BY_ID)).toMatchObject(row);

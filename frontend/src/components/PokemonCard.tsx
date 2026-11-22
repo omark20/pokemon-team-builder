@@ -2,6 +2,7 @@
 // type's colour, its name, a pill per type, its six base stats as bars, and a
 // button that adds it to the team being edited.
 import { typeStyle } from "../colours";
+import { TEAM_SIZE } from "../teamMoves";
 import { displayName, STAT_LABELS, type Pokemon } from "../types";
 import { Sprite } from "./Sprite";
 
@@ -52,7 +53,7 @@ export function PokemonCard({ pokemon, onAdd, teamFull }: CardProps) {
         ))}
       </div>
       <button type="button" className="card-add" disabled={teamFull} onClick={() => onAdd(pokemon)}>
-        {teamFull ? "Team full (6/6)" : "Add to team"}
+        {teamFull ? `Team full (${TEAM_SIZE}/${TEAM_SIZE})` : "Add to team"}
       </button>
     </article>
   );

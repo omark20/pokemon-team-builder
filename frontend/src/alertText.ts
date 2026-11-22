@@ -12,7 +12,7 @@ interface AlertRow {
   affects: string; // which teams, or for a chart change which of your Pokémon
 }
 
-const WRITTEN_MULTIPLIERS: Record<string, string> = { "0": "0×", "0.25": "¼×", "0.5": "½×", "1": "1×", "2": "2×", "4": "4×" };
+const WRITTEN_MULTIPLIERS: Record<string, string> = { "0": "0×", "0.5": "½×", "1": "1×", "2": "2×" };
 
 // Column names as words a reader knows; any other field shows its own name.
 const FIELD_NAMES: Record<string, string> = {

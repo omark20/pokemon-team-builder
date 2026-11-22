@@ -1,6 +1,6 @@
 // The optional account: who this browser is signed in as, the account dialog,
 // and the notice that teams are kept in this browser only. A visitor who never
-// signs up stays anonymous, exactly as before.
+// signs up stays anonymous.
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut } from "./api";

@@ -49,14 +49,12 @@ export interface Team {
   pokemon_ids: number[];
 }
 
-// One counter in GET /api/teams/{id}/counter: the opponent it answers and the
-// numbers behind the choice.
+// One counter in GET /api/teams/{id}/counter: the opponent it answers, its
+// matchup against that opponent and the sentence saying why it was picked.
 export interface CounterPick {
   opponent: { id: number; name: string };
   counter: { id: number; name: string };
   matchup: number; // points: how hard it hits minus how hard it is hit, -5 to 5
-  coverage: number; // its matchups against every opponent, added up
-  base_stats: number;
   reason: string;
 }
 

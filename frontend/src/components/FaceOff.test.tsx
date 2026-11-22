@@ -69,7 +69,7 @@ test.each(CHANGES)("%s clears the counter team", async (_change, act) => {
   expect(primary().textContent).toBe("Build counter team");
 });
 
-test("the details open on request: each pick with its label but no reason, and a table whose rows add up to coverage", async () => {
+test("the details open on request: each pick with its label but no reason, and a table whose rows add up", async () => {
   await start();
   await build();
   expect(document.querySelector(".counter-details")).toBeNull();
@@ -84,7 +84,7 @@ test("the details open on request: each pick with its label but no reason, and a
   const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];
   expect(rows.map((row) => row.querySelectorAll("td:not(.row-sum)").length)).toEqual([3, 3, 3]);
   const sums = rows.map((row) => Number(row.querySelector(".row-sum")!.textContent));
-  expect(sums).toEqual(COUNTER.picks.map((pick) => pick.coverage));
+  expect(sums).toEqual([3, 1, 2]); // the fixture grid's rows: 3 - 1 + 1, -1 + 3 - 1, -1 + 0 + 3
   // Each cell gives a word and the number; the fixture's first row is +3, -1, +1.
   expect([...rows[0]!.querySelectorAll("td:not(.row-sum)")].map((cell) => cell.textContent)).toEqual([
     "Strong +3", "Weak -1", "Good +1",

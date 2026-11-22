@@ -1,5 +1,5 @@
 // The visitor's change alerts: loaded once when the page opens, and dismissed
-// one at a time with the existing per-alert call. "Dismiss all" makes that
+// one at a time with POST /api/alerts/{id}/dismiss. "Dismiss all" makes that
 // call for each alert in turn and stops at the first refusal, leaving the rest.
 // While a dismissal is in flight a second click does nothing.
 import { useCallback, useEffect, useRef, useState } from "react";
