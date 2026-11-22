@@ -6,6 +6,7 @@ starts empty with every new window, so it cannot grow without bound. Over the li
 line per address per bucket per window, so a script being refused cannot flood the log.
 """
 
+import ipaddress
 import logging
 import math
 import threading
@@ -74,7 +75,20 @@ class RateLimiter:
 
 
 def client_address(request: Request) -> str:
-    """The address a visitor is counted under. The one place that decides it."""
+    """The address a visitor is counted under. The one place that decides it.
+
+    On the host, requests arrive from changing proxy nodes, and the left end of
+    X-Forwarded-For is whatever the visitor sent; CF-Connecting-IP held the visitor's true
+    address on every request that arrived, and the edge refused requests that set it
+    themselves (probes of the deployed site, 2026-11-22). Without a valid one (local use,
+    tests, the host's own health checks), the connecting address is used.
+    """
+    forwarded = request.headers.get("cf-connecting-ip")
+    if forwarded is not None:
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            pass
     return request.client.host if request.client else "unknown"
 
 

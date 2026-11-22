@@ -3,9 +3,10 @@
 import logging
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
-from app.limits import Limit, RateLimiter
+from app.limits import Limit, RateLimiter, client_address
 
 READ_ENDPOINTS = ["/api/scan/status", "/api/teams", "/api/pokemon"]
 
@@ -74,3 +75,25 @@ def test_refusals_are_logged_once_per_address_per_window(
             full_read_bucket.get("/api/pokemon")
     [line] = [message for message in caplog.messages if "rate_limited" in message]
     assert line.endswith("route=/api/pokemon bucket=read")
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({"cf-connecting-ip": "203.0.113.5"}, "203.0.113.5"),
+        ({}, "10.27.253.135"),
+        ({"cf-connecting-ip": "not-an-address"}, "10.27.253.135"),
+        ({"x-forwarded-for": "203.0.113.77, 198.51.100.9"}, "10.27.253.135"),
+    ],
+    ids=["edge-header", "no-header", "header-not-an-address", "forwarded-for"],
+)
+def test_a_visitor_is_counted_under_the_edges_address_header(
+    headers: dict[str, str], expected: str
+) -> None:
+    # 10.27.253.135 is one of the host's proxy nodes, as seen on the deployed site.
+    scope = {
+        "type": "http",
+        "headers": [(name.encode(), value.encode()) for name, value in headers.items()],
+        "client": ("10.27.253.135", 50000),
+    }
+    assert client_address(Request(scope)) == expected
