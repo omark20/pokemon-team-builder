@@ -72,9 +72,27 @@ def create_app(settings: Settings) -> FastAPI:
     return app
 
 
-def healthz() -> dict[str, bool]:
+def healthz(request: Request) -> dict[str, bool]:
     """Says the process is up. Touches no database, so it costs nothing to call."""
+    if request.headers.get("x-probe") == "1":
+        log_address_probe(request)
     return {"ok": True}
+
+
+# TEMPORARY, to be removed with the limiter change: shows which header carries the
+# visitor's address behind the host's proxy (risk R2). Logs only on an explicit probe.
+PROBE_HEADERS = ("x-forwarded-for", "cf-connecting-ip", "true-client-ip")
+
+
+def log_address_probe(request: Request) -> None:
+    seen = {
+        name.replace("-", "_"): logs.outside(request.headers[name])
+        if name in request.headers
+        else "absent"
+        for name in PROBE_HEADERS
+    }
+    client = logs.outside(request.client.host) if request.client else "absent"
+    logs.log_event(logger, logging.INFO, "address_probe", client_host=client, **seen)
 
 
 async def guard_request(
