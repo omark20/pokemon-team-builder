@@ -7,8 +7,6 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-# The frontend's type check covers its tests, which read captured responses here.
-COPY samples/ /src/samples/
 RUN npm run build
 
 # Stage 2: the backend, installed from its lock file, plus the built frontend.

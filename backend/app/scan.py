@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
-from app import db, logs, scan_store
+from app import db, logs, pokemon_list, scan_store
 from app.config import load_settings
 from app.domain.diff import ParseError, PokemonRecord, parse_pokemon
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
@@ -98,6 +98,9 @@ def run_scan(
     except Exception as exc:
         log_exception(logger, "scan_crashed", exc, run_id=run_id)
         status = "failed"
+    finally:
+        if run.wrote_pokemon:
+            pokemon_list.clear("scan", run_id=run_id)
     _finish(conn, run, status)
     return status
 

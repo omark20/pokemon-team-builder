@@ -5,7 +5,7 @@
 include .env
 export
 
-.PHONY: db dev lint sync test
+.PHONY: db dev lint smoke sync test
 
 # Local settings with freshly generated secrets. Git-ignored; never committed.
 .env:
@@ -28,6 +28,11 @@ dev: db
 # One full scan of PokéAPI into the local database.
 sync: db
 	cd backend && uv run python -m app.scan
+
+# Drive the real app through its API, scanning the live PokéAPI. Not part of `make test`:
+# it needs the network and takes over a minute.
+smoke: db
+	cd backend && uv run python scripts/smoke.py
 
 lint:
 	cd backend && uv run ruff check .

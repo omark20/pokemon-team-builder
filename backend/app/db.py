@@ -29,14 +29,14 @@ def apply_schema(conn: psycopg.Connection[Any]) -> None:
     conn.execute(SCHEMA_FILE.read_bytes())
 
 
-def request_connection(request: Request) -> Iterator[psycopg.Connection[Any]]:
-    """Give a route one connection, committed before the response is sent.
+def connect_for_request(request: Request) -> psycopg.Connection[Any]:
+    """Open a connection for a request, or answer 503.
 
     A failure to connect is logged by error class only (its message can name the host
     or the user) and the visitor gets a plain 503.
     """
     try:
-        conn = connect(request.app.state.settings.database_url)
+        return connect(request.app.state.settings.database_url)
     except psycopg.OperationalError as exc:
         log_event(
             logger,
@@ -46,7 +46,11 @@ def request_connection(request: Request) -> Iterator[psycopg.Connection[Any]]:
             error_class=type(exc).__name__,
         )
         raise HTTPException(503, "Service unavailable") from None
-    with conn:
+
+
+def request_connection(request: Request) -> Iterator[psycopg.Connection[Any]]:
+    """Give a route one connection, committed before the response is sent."""
+    with connect_for_request(request) as conn:
         yield conn
 
 

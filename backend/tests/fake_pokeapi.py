@@ -11,7 +11,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+import psycopg
+
 from app.pokeapi import BASE_URL
+from app.scan import run_scan, start_run, utc_now
 
 SAMPLES = Path(__file__).resolve().parents[2] / "samples"
 TYPE_LIST = "type?limit=100"
@@ -63,3 +66,10 @@ class FakePokeApi:
             {"name": payload["name"], "url": BASE_URL + pokemon_path(pokemon_id)}
         )
         listing["count"] += 1
+
+
+def run_fake_scan(conn: psycopg.Connection, source: FakePokeApi, **options: Any) -> tuple[int, str]:
+    """Start and run one scan against the fake, with no waits between retries."""
+    scope = "full" if options.get("pokemon_ids") is None else "subset"
+    run_id = start_run(conn, scope, utc_now())
+    return run_id, run_scan(conn, source, run_id, retry_waits=(0, 0, 0), **options)

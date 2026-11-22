@@ -6,7 +6,7 @@ import pytest
 from conftest import SCAN_TOKEN
 from fastapi.testclient import TestClient
 
-from app import db, scan
+from app import scan
 from app.config import Settings
 from app.main import create_app
 
@@ -14,14 +14,12 @@ BOOM_MESSAGE = "secret-looking text postgresql://user:pw@host/db"
 
 
 def test_healthz_answers_without_touching_the_database(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, connect_calls: list[str]
 ) -> None:
-    calls = []
-    monkeypatch.setattr(db, "connect", lambda url: calls.append(url))
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"ok": True}
-    assert calls == []
+    assert connect_calls == []
 
 
 def test_security_headers_on_every_response(client: TestClient) -> None:

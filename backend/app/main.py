@@ -13,13 +13,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import psycopg
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import db, logs
+from app import db, limits, logs
 from app.config import Settings, load_settings
-from app.routes import admin
+from app.routes import admin, pokemon
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +53,20 @@ def create_app(settings: Settings) -> FastAPI:
             raise RuntimeError("database unreachable at start-up") from None
         yield
 
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=apply_schema_at_start)
+    app = FastAPI(
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=apply_schema_at_start,
+        dependencies=[Depends(limits.limit_reads)],
+    )
     app.state.settings = settings
+    app.state.limiter = limits.RateLimiter()
     app.middleware("http")(guard_request)
+    app.add_middleware(GZipMiddleware)
     app.get("/healthz")(healthz)
     app.include_router(admin.router)
+    app.include_router(pokemon.router)
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
     return app

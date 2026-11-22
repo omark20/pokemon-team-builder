@@ -9,9 +9,11 @@ from collections.abc import Iterator
 
 import psycopg
 import pytest
+from fake_pokeapi import FakePokeApi
 from fastapi.testclient import TestClient
 from psycopg.conninfo import make_conninfo
 
+from app import db, pokemon_list
 from app.config import Settings
 from app.main import create_app
 
@@ -57,3 +59,29 @@ def conn(database_url: str, client: TestClient) -> Iterator[psycopg.Connection]:
     """A direct connection for arranging and inspecting rows, after the schema exists."""
     with psycopg.connect(database_url, autocommit=True) as connection:
         yield connection
+
+
+@pytest.fixture(autouse=True)
+def empty_list_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The in-memory Pokémon list is process-wide; every test starts without it."""
+    monkeypatch.setattr(pokemon_list, "_body", None)
+
+
+@pytest.fixture
+def connect_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every database connection the app opens from now on, recorded and then opened."""
+    calls: list[str] = []
+    real_connect = db.connect
+
+    def counting_connect(database_url: str) -> psycopg.Connection:
+        calls.append(database_url)
+        return real_connect(database_url)
+
+    monkeypatch.setattr(db, "connect", counting_connect)
+    return calls
+
+
+@pytest.fixture
+def source() -> FakePokeApi:
+    """A fake PokéAPI answering from samples/; tests change its answers."""
+    return FakePokeApi()

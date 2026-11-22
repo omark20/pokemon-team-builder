@@ -48,6 +48,7 @@ class Run:
     failed: int = 0
     filled: int = 0  # Pokémon that had a new column filled for the first time
     complete: bool = True  # false once the chart or the removals had to be left alone
+    wrote_pokemon: bool = False  # a Pokémon row was inserted, updated or flagged
     missing: list[int] = field(default_factory=list)  # candidates for removal
 
 
@@ -84,6 +85,7 @@ def save_pokemon(conn: Conn, run: Run, record: PokemonRecord) -> None:
         stored = conn.cursor(row_factory=dict_row).execute(SELECT_ROW, (record.id,)).fetchone()
         if stored is None:
             conn.execute(INSERT_ROW, values)
+            run.wrote_pokemon = True
         else:
             _update_if_changed(conn, run, stored, record, values)
     run.scanned += 1
@@ -99,6 +101,7 @@ def _update_if_changed(
         log_event(logger, logging.INFO, "pokemon_restored", run_id=run.run_id, pokemon_id=record.id)
     if rows or diff.filled:
         conn.execute(UPDATE_ROW, [*values, run.now(), record.id])
+        run.wrote_pokemon = True
     insert_changes(conn, run, rows)
     run.filled += bool(diff.filled)
 
@@ -131,6 +134,7 @@ def apply_removals(conn: Conn, run: Run) -> None:
                 (run.now(), run.now(), pokemon_id),
             ).fetchone()
             if flagged:
+                run.wrote_pokemon = True
                 insert_changes(conn, run, [ChangeRow("status", "available", "removed", pokemon_id)])
                 log_event(
                     logger,
