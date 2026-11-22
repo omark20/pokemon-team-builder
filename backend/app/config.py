@@ -19,12 +19,20 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    """Read the settings. An unset or empty token keeps its endpoints closed."""
+    """Read the settings. An unset or blank token keeps its endpoints closed.
+
+    The two tokens must differ: the scheduler holds SCAN_TOKEN, and if it equalled
+    ADMIN_TOKEN a leak from the scheduler could change what the site shows.
+    """
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not set")
-    return Settings(
-        database_url=database_url,
-        scan_token=os.environ.get("SCAN_TOKEN") or None,
-        admin_token=os.environ.get("ADMIN_TOKEN") or None,
-    )
+    scan_token, admin_token = _token("SCAN_TOKEN"), _token("ADMIN_TOKEN")
+    if scan_token is not None and scan_token == admin_token:
+        raise RuntimeError("SCAN_TOKEN and ADMIN_TOKEN must be different values")
+    return Settings(database_url=database_url, scan_token=scan_token, admin_token=admin_token)
+
+
+def _token(name: str) -> str | None:
+    """The token without surrounding whitespace, or None if it is unset or blank."""
+    return os.environ.get(name, "").strip() or None
