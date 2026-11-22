@@ -68,11 +68,14 @@ test.each(CHANGES)("%s clears the counter team", async (_change, act) => {
   expect(primary().textContent).toBe("Build counter team");
 });
 
-test("the details open on request with the team-level view only: a table whose rows add up to coverage", async () => {
+test("the details open on request: each pick with its label but no reason, and a table whose rows add up to coverage", async () => {
   await start();
   await build();
   expect(document.querySelector(".counter-details")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+  expect([...document.querySelectorAll(".pick-list li")].map((line) => line.textContent)).toEqual([
+    "Archeops beats Charizard Strong +3", "Hydrapple beats Blastoise Strong +3", "Celesteela beats Venusaur Strong +3",
+  ]);
   const details = document.querySelector(".counter-details")!.textContent;
   expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]); // reasons are on the cards
   const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];

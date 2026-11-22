@@ -574,6 +574,33 @@ button:disabled {
   font-size: 13px;
 }
 
+.pick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 0 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick-list li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.muted {
+  font-weight: 400;
+  color: var(--text-soft);
+}
+
+/* A pick's matchup label in the details. */
+.matchup {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Cells stand apart with a small gap, so two neighbours of the same colour
    still read as two cells. */
 .matchups {
@@ -642,6 +669,7 @@ button:disabled {
 }
 
 /* The matchup scale's colours come from colours.ts as custom properties. */
+.matchup,
 .matchup-cell {
   background: var(--matchup-fill);
   color: var(--matchup-text);
