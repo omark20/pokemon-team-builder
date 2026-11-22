@@ -34,6 +34,11 @@ lint:
 		npm --prefix frontend run lint && npm --prefix frontend run typecheck; \
 	fi
 
+# uv installs the backend's locked packages on first use; the frontend's are installed
+# from its lock file only when missing, as in a clean clone.
 test: db
 	cd backend && uv run pytest
-	@if [ -f frontend/package.json ]; then npm --prefix frontend test; fi
+	@if [ -f frontend/package.json ]; then \
+		[ -d frontend/node_modules ] || npm --prefix frontend ci; \
+		npm --prefix frontend test; \
+	fi
