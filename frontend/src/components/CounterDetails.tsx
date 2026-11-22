@@ -95,7 +95,7 @@ function MatchupTable({ counter }: { counter: CounterResult }) {
                 {displayName(pick.opponent.name)}
               </th>
             ))}
-            <th scope="col">Coverage</th>
+            <th scope="col">Whole team</th>
           </tr>
         </thead>
         <tbody>
@@ -126,7 +126,7 @@ function Totals({ counter }: { counter: CounterResult }) {
       <dl className="totals">
         <dt>Matchup points against assigned opponents</dt>
         <dd>{signed(totals.assigned_points)}</dd>
-        <dt>Coverage, all matchups added up</dt>
+        <dt>Against your whole team, all matchups added up</dt>
         <dd>{signed(totals.coverage)}</dd>
         <dt>Base stats, added up</dt>
         <dd>{totals.base_stats.toLocaleString("en-US")}</dd>
