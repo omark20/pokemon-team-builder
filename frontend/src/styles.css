@@ -605,10 +605,13 @@ button:disabled {
   font-weight: 600;
 }
 
+/* Cells stand apart with a small gap, so two neighbours of the same colour
+   still read as two cells. */
 .matchups {
   width: 100%;
   margin-top: 10px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 4px;
   table-layout: fixed;
 }
 
@@ -622,7 +625,6 @@ button:disabled {
 .matchups td {
   padding: 5px 3px;
   overflow: hidden;
-  border-top: 1px solid var(--border);
   font-size: 12px;
   text-align: center;
   text-overflow: ellipsis;
@@ -630,6 +632,10 @@ button:disabled {
 }
 
 /* In a cell the word sits above the number, so narrow columns keep both whole. */
+.matchups .matchup-cell {
+  border-radius: 6px;
+}
+
 .matchups td .matchup-word {
   display: block;
   font-size: 11px;
@@ -657,7 +663,6 @@ button:disabled {
 }
 
 .matchups thead th {
-  border-top: none;
   font-weight: 400;
   color: var(--text-soft);
 }

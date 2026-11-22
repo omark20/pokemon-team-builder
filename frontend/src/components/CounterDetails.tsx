@@ -55,13 +55,17 @@ function Reasons({ counter }: { counter: CounterResult }) {
   );
 }
 
+// The narrowest a column may get before the table scrolls inside its box
+// instead: enough for "Strong" above its number.
+const MIN_COLUMN_WIDTH = 50;
+
 // Each cell carries its word and number; the colour, greener the stronger,
 // only repeats them.
 function MatchupTable({ counter }: { counter: CounterResult }) {
   return (
     // On a narrow screen the table scrolls sideways inside its own box, never the page.
     <div className="matchups-scroll">
-      <table className="matchups">
+      <table className="matchups" style={{ minWidth: (counter.picks.length + 2) * MIN_COLUMN_WIDTH }}>
         <caption>Every counter against every one of your Pokémon</caption>
         <thead>
           <tr>
