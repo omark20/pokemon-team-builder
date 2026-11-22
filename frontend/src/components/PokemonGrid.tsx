@@ -110,12 +110,29 @@ export function PokemonGrid({ pokemon, onAdd, teamFull }: GridProps) {
 }
 
 // Grey cards in the grid's shape, shown until the list arrives.
-export function GridPlaceholder() {
+function GridPlaceholder() {
   return (
     <div className="grid" aria-busy="true" aria-label="Loading Pokémon">
       {Array.from({ length: 12 }, (_, index) => (
         <div key={index} className="card card-placeholder" />
       ))}
+    </div>
+  );
+}
+
+export type ListState = { status: "loading" } | { status: "failed" } | { status: "ready"; pokemon: Pokemon[] };
+
+// The grid, or what stands in for it while the list loads or if it failed.
+export function GridArea({ list, retry, ...grid }: Omit<GridProps, "pokemon"> & { list: ListState; retry: () => void }) {
+  if (list.status === "loading") return <GridPlaceholder />;
+  if (list.status === "ready") return <PokemonGrid pokemon={list.pokemon} {...grid} />;
+  return (
+    <div className="notice" role="alert">
+      <strong>Couldn't load Pokémon</strong>
+      <p>Check your connection and try again.</p>
+      <button type="button" onClick={retry}>
+        Try again
+      </button>
     </div>
   );
 }

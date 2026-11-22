@@ -16,9 +16,9 @@ test("shows placeholder cards, then the grid loaded from the app's own API", asy
   render(<App />);
   expect(screen.getByLabelText("Loading Pokémon")).toBeTruthy();
   expect((await count()).textContent).toBe("Showing 60 of 1,351");
-  // The four reads the page makes on opening, and nothing else.
+  // The five reads the page makes on opening, and nothing else.
   expect(server.calls.map((call) => call.path).sort()).toEqual([
-    "/api/alerts", "/api/pokemon", "/api/scan/status", "/api/teams",
+    "/api/alerts", "/api/pokemon", "/api/scan/status", "/api/session", "/api/teams",
   ]);
 });
 

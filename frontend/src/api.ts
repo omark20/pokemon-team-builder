@@ -71,3 +71,20 @@ export const dismissAlert = (changeId: number) =>
 
 // The most recent runs of the scan, newest first.
 export const fetchScanStatus = () => request<{ runs: ScanRun[] }>("GET", "/api/scan/status");
+
+// Who this browser is signed in as, or null for an anonymous visitor.
+export const fetchSession = () => request<{ username: string | null }>("GET", "/api/session");
+
+export interface SignedIn {
+  username: string;
+  teams_added: number; // this browser's teams moved into the account
+  teams_not_added: number; // this browser's teams beyond the account's 20, not kept
+}
+
+export const createAccount = (username: string, password: string) =>
+  request<{ username: string }>("POST", "/api/account", { username, password });
+
+export const signIn = (username: string, password: string) =>
+  request<SignedIn>("POST", "/api/session", { username, password });
+
+export const signOut = () => request<void>("DELETE", "/api/session");

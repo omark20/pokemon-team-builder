@@ -70,8 +70,10 @@ export class TeamStore {
     return this.state.teams.find((team) => team.id === this.state.activeId);
   }
 
+  // Loads the visitor's teams; also used after signing in or out, when the
+  // teams on screen belong to someone else.
   async load(): Promise<void> {
-    this.update({ status: "loading" });
+    this.update({ status: "loading", ...this.clearCounter() });
     try {
       const teams = await fetchTeams();
       for (const team of teams) this.confirmed.set(team.id, team.pokemon_ids);
@@ -87,6 +89,11 @@ export class TeamStore {
 
   dismissNotice(): void {
     this.update({ notice: null });
+  }
+
+  // Shows a message from elsewhere on the page in the same notice bar.
+  inform(notice: Notice): void {
+    this.update({ notice });
   }
 
   // The "New team" tab: an empty team with the next free name, selected.

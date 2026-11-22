@@ -1,0 +1,119 @@
+// The optional account: who this browser is signed in as, the account dialog,
+// and the notice that teams are kept in this browser only. A visitor who never
+// signs up stays anonymous, exactly as before.
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { ApiError, createAccount, fetchSession, signIn, signOut } from "./api";
+import type { Notice } from "./teamStore";
+
+export type DialogMode = "create" | "signin";
+
+// After signing in: what happened to the teams this browser had.
+export function signedInText(username: string, added: number, notAdded: number): string {
+  const teams = (count: number) => `${count} ${count === 1 ? "team" : "teams"}`;
+  const parts = [`Signed in as ${username}.`];
+  if (added > 0) parts.push(`${teams(added)} from this browser added to your account.`);
+  if (notAdded > 0) parts.push(`${teams(notAdded)} not kept: an account holds at most 20.`);
+  return parts.join(" ");
+}
+
+// How long to wait, from a Retry-After header in seconds.
+function waitText(seconds: number): string {
+  if (seconds < 60) return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+// The sentence the dialog shows for a refusal: the server's own words (the
+// name is taken, the rule a password broke, wrong username or password), and
+// for too many attempts when to try again.
+export function accountErrorText(error: unknown): string {
+  if (!(error instanceof ApiError)) return "Couldn't reach the server. Try again.";
+  if (error.status !== 429) return error.detail ?? "Something went wrong. Try again.";
+  const wait = error.retryAfter > 0 ? ` Try again in ${waitText(error.retryAfter)}.` : " Try again later.";
+  return `${error.detail ?? "Too many attempts."}${wait}`;
+}
+
+interface AccountEvents {
+  reload: () => Promise<void>; // the teams and alerts on screen now belong to someone else
+  notify: (notice: Notice) => void;
+}
+
+// Signs up or in: the account's name, and the sentence that reports it.
+async function enter(mode: DialogMode, name: string, password: string) {
+  if (mode === "create") {
+    const made = await createAccount(name, password);
+    return { username: made.username, text: `Account created. Signed in as ${made.username}.` };
+  }
+  const done = await signIn(name, password);
+  return { username: done.username, text: signedInText(done.username, done.teams_added, done.teams_not_added) };
+}
+
+// Asks the server once who this browser is; undefined until it answers.
+function useUsername() {
+  const [username, setUsername] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    fetchSession().then(
+      (session) => setUsername(session.username),
+      () => setUsername(null),
+    );
+  }, []);
+  return [username, setUsername] as const;
+}
+
+// Which form the dialog shows, if any. Closing it puts focus back on what
+// opened it, or on the account links when that is gone (the notice goes once
+// the visitor is signed in).
+function useDialog() {
+  const [dialog, setDialog] = useState<DialogMode | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  function open(mode: DialogMode) {
+    if (!dialog) opener.current = document.activeElement as HTMLElement | null;
+    setDialog(mode);
+  }
+  function close() {
+    flushSync(() => setDialog(null));
+    const back = opener.current?.isConnected ? opener.current : document.querySelector<HTMLElement>(".account-links button");
+    back?.focus();
+  }
+  return { dialog, open, close };
+}
+
+export function useAccount({ reload, notify }: AccountEvents) {
+  const [username, setUsername] = useUsername();
+  const { dialog, open, close } = useDialog();
+  const [noticeClosed, setNoticeClosed] = useState(false);
+  // Signs up or in; returns the sentence to show in the dialog, or null when done.
+  async function submit(mode: DialogMode, name: string, password: string): Promise<string | null> {
+    try {
+      const entered = await enter(mode, name, password);
+      setUsername(entered.username);
+      close();
+      await reload();
+      notify({ kind: "info", text: entered.text });
+      return null;
+    } catch (error) {
+      return accountErrorText(error);
+    }
+  }
+  async function leave() {
+    try {
+      await signOut();
+    } catch {
+      return notify({ kind: "error", text: "Couldn't sign out. Try again." });
+    }
+    await reload(); // no teams now, so the links, not the notice, show next
+    flushSync(() => {
+      setUsername(null);
+      setNoticeClosed(false);
+    });
+    document.querySelector<HTMLElement>(".account-links button")?.focus(); // Sign out is gone
+  }
+  function closeNotice() {
+    flushSync(() => setNoticeClosed(true));
+    document.querySelector<HTMLElement>(".account-links button")?.focus(); // the actions moved there
+  }
+  return { username, dialog, noticeClosed, open, close, submit, signOut: leave, closeNotice };
+}
+
+export type Account = ReturnType<typeof useAccount>;
