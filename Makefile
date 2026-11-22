@@ -5,7 +5,7 @@
 include .env
 export
 
-.PHONY: db dev lint test
+.PHONY: db dev lint sync test
 
 # Local settings with freshly generated secrets. Git-ignored; never committed.
 .env:
@@ -24,6 +24,10 @@ db:
 # Run the backend on http://127.0.0.1:8000 with reload.
 dev: db
 	cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --no-server-header
+
+# One full scan of PokéAPI into the local database.
+sync: db
+	cd backend && uv run python -m app.scan
 
 lint:
 	cd backend && uv run ruff check .

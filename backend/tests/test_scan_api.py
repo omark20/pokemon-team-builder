@@ -7,6 +7,7 @@ import pytest
 from conftest import ADMIN_TOKEN, SCAN_TOKEN
 from fastapi.testclient import TestClient
 
+from app import scan
 from app.config import Settings
 from app.main import create_app
 
@@ -41,22 +42,33 @@ def test_trigger_with_wrong_token_is_401_and_never_logs_it(
     assert "Authorization" not in caplog.text
 
 
-def test_trigger_with_token_records_a_run(client: TestClient, conn: psycopg.Connection) -> None:
-    response = client.post(SCAN, headers=BEARER)
+@pytest.fixture
+def started_scans(monkeypatch: pytest.MonkeyPatch) -> list[tuple[object, ...]]:
+    """Scans the trigger hands to the background, recorded instead of run against PokéAPI."""
+    started: list[tuple[object, ...]] = []
+    monkeypatch.setattr(scan, "scan_with_pokeapi", lambda *args: started.append(args))
+    return started
+
+
+@pytest.mark.parametrize(
+    ("body", "scope", "pokemon_ids"),
+    [(None, "full", None), ({"pokemon_ids": [6, 25]}, "subset", [6, 25])],
+)
+def test_trigger_with_token_starts_a_run(
+    client: TestClient,
+    conn: psycopg.Connection,
+    started_scans: list[tuple[object, ...]],
+    body: dict[str, list[int]] | None,
+    scope: str,
+    pokemon_ids: list[int] | None,
+) -> None:
+    response = client.post(SCAN, headers=BEARER, json=body)
     assert response.status_code == 202
     run_id = response.json()["run_id"]
-    row = conn.execute("SELECT status, scope, finished_at FROM scan_runs WHERE id = %s", (run_id,))
-    status, scope, finished_at = row.fetchone()
-    assert (status, scope) == ("ok", "full")
-    assert finished_at is not None
-
-
-def test_trigger_with_pokemon_ids_is_a_subset_run(
-    client: TestClient, conn: psycopg.Connection
-) -> None:
-    response = client.post(SCAN, headers=BEARER, json={"pokemon_ids": [6, 25]})
-    assert response.status_code == 202
-    assert conn.execute("SELECT scope FROM scan_runs").fetchone() == ("subset",)
+    row = conn.execute("SELECT status, scope FROM scan_runs WHERE id = %s", (run_id,))
+    assert row.fetchone() == ("running", scope)
+    [(_, started_run_id, started_ids)] = started_scans
+    assert (started_run_id, started_ids) == (run_id, pokemon_ids)
 
 
 @pytest.mark.parametrize(

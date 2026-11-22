@@ -17,3 +17,48 @@ CREATE TABLE IF NOT EXISTS scan_runs (
 -- At most one run in progress. A second trigger fails on this index, which is the 409.
 CREATE UNIQUE INDEX IF NOT EXISTS scan_runs_one_running
     ON scan_runs (status) WHERE status = 'running';
+
+-- The stored copy of PokéAPI. One column per field of PokemonRecord (domain/diff.py),
+-- same names; a new field is a new column added nullable with no default, with an
+-- ALTER TABLE ... ADD COLUMN IF NOT EXISTS line here. Rows are never deleted.
+CREATE TABLE IF NOT EXISTS pokemon (
+    id integer PRIMARY KEY,
+    name text NOT NULL,
+    is_default boolean NOT NULL,
+    types text[] NOT NULL CHECK (cardinality(types) BETWEEN 1 AND 2),
+    hp smallint NOT NULL CHECK (hp >= 0),
+    attack smallint NOT NULL CHECK (attack >= 0),
+    defense smallint NOT NULL CHECK (defense >= 0),
+    special_attack smallint NOT NULL CHECK (special_attack >= 0),
+    special_defense smallint NOT NULL CHECK (special_defense >= 0),
+    speed smallint NOT NULL CHECK (speed >= 0),
+    sprite_url text,
+    removed_at timestamptz,  -- set when PokéAPI stops serving the entry
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- The 18 x 18 type chart: how much each attacking type multiplies damage to each defender.
+CREATE TABLE IF NOT EXISTS type_effectiveness (
+    attacker text NOT NULL,
+    defender text NOT NULL,
+    multiplier real NOT NULL CHECK (multiplier IN (0, 0.5, 1, 2)),
+    PRIMARY KEY (attacker, defender)
+);
+
+-- One row per changed field of a Pokémon, or per changed chart cell. Values are JSON,
+-- so a sprite going to or from none is the JSON value null, not SQL NULL.
+CREATE TABLE IF NOT EXISTS changes (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    pokemon_id integer REFERENCES pokemon (id),
+    attacker text,
+    defender text,
+    field text NOT NULL,  -- a pokemon column, 'status', or 'multiplier'
+    old_value jsonb NOT NULL,
+    new_value jsonb NOT NULL,
+    detected_at timestamptz NOT NULL,
+    scan_run_id bigint NOT NULL REFERENCES scan_runs (id),
+    is_demo boolean NOT NULL DEFAULT false,
+    CHECK ((pokemon_id IS NULL) <> (attacker IS NULL)),
+    CHECK ((attacker IS NULL) = (defender IS NULL))
+);
+CREATE INDEX IF NOT EXISTS changes_detected_at ON changes (detected_at);

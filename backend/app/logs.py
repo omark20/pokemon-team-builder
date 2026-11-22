@@ -24,6 +24,8 @@ def configure() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     logging.basicConfig(level=logging.INFO, handlers=[handler])
+    # httpx writes a line per request at INFO, about 1,370 per scan; the scan logs its own.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def outside(value: str) -> str:

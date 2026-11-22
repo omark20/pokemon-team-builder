@@ -45,10 +45,11 @@ def trigger_scan(
     body: ScanRequest | None = None,
 ) -> dict[str, int]:
     """Start a scan in the background and answer at once; the caller polls the status."""
-    scope = "full" if body is None else "subset"
+    pokemon_ids = None if body is None else body.pokemon_ids
     try:
-        run_id = scan.start_run(conn, scope)
+        run_id = scan.start_run(conn, "full" if body is None else "subset", scan.utc_now())
     except psycopg.errors.UniqueViolation:
         raise HTTPException(409, "A scan is already running") from None
-    background.add_task(scan.finish_run, request.app.state.settings.database_url, run_id)
+    database_url = request.app.state.settings.database_url
+    background.add_task(scan.scan_with_pokeapi, database_url, run_id, pokemon_ids)
     return {"run_id": run_id}

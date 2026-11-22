@@ -65,7 +65,7 @@ def test_get_with_foreign_origin_is_not_refused(client: TestClient) -> None:
 def test_unhandled_error_gives_generic_500_and_logs_class_not_message(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    def fail(conn: object, scope: str) -> int:
+    def fail(*args: object) -> int:
         raise ValueError(BOOM_MESSAGE)
 
     monkeypatch.setattr(scan, "start_run", fail)
