@@ -88,7 +88,10 @@ test("Rename saves the trimmed name", async () => {
   const server = new FakeServer([team(1, "Team 1")]);
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Team name" }), { target: { value: "  Rain team " } });
+  const box = screen.getByRole("textbox", { name: "Team name" }) as HTMLInputElement;
+  // The old name is selected, so typing replaces it rather than adding to it.
+  expect([box.selectionStart, box.selectionEnd]).toEqual([0, "Team 1".length]);
+  fireEvent.change(box, { target: { value: "  Rain team " } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByRole("heading", { name: "Rain team" })).toBeTruthy();
   expect(server.writes()).toEqual([["PATCH /api/teams/1", { name: "Rain team" }]]);

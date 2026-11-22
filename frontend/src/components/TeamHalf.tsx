@@ -28,7 +28,14 @@ function TeamHeader({ team, onRename, onDelete }: Omit<HalfProps, "pokemonById" 
   if (editing) {
     return (
       <form className="half-header" onSubmit={submit}>
-        <input name="name" aria-label="Team name" defaultValue={team.name} maxLength={50} autoFocus />
+        <input
+          name="name"
+          aria-label="Team name"
+          defaultValue={team.name}
+          maxLength={50}
+          autoFocus
+          onFocus={(event) => event.target.select()} // typing replaces the old name
+        />
         <button type="submit">Save</button>
         <button type="button" onClick={() => setEditing(false)}>
           Cancel

@@ -8,7 +8,10 @@ export default defineConfig({
   plugins: [react()],
   build: { sourcemap: false },
   server: {
-    proxy: { "/api": "http://127.0.0.1:8000" },
+    // The Host header is passed through unchanged (Vite's string shorthand would
+    // rewrite it to the target), so it still matches the page's Origin and the
+    // backend's same-origin check on writes lets the request through.
+    proxy: { "/api": { target: "http://127.0.0.1:8000", changeOrigin: false } },
     // Tests read their fixtures from the captured PokéAPI data in ../samples.
     fs: { allow: [".", "../samples"] },
   },
