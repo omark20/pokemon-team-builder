@@ -48,6 +48,7 @@ def test_trigger_with_token_starts_a_run(
         {"pokemon_ids": [0]},
         {"pokemon_ids": [2_147_483_648]},
         {"pokemon_ids": ["six"]},
+        {"pokemon_ids": ["6"]},
         {"pokemon_ids": [6], "user_id": 1},
     ],
 )

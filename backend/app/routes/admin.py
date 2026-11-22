@@ -16,7 +16,7 @@ router = APIRouter()
 class ScanRequest(BaseModel):
     """Optional body of the trigger: scan only these Pokémon."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
     pokemon_ids: list[PokemonId] = Field(min_length=1, max_length=50)
 
 
