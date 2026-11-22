@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 # The frontend build, at the same place relative to this file locally and in the image.
 STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
+# A team write, a dismissal or a scan trigger is well under a kilobyte; the demo's
+# overrides document has its own, larger limit (routes/demo_controls.py).
+MAX_BODY_BYTES = 16 * 1024
+
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; img-src 'self' https://raw.githubusercontent.com data:; "
@@ -72,12 +76,10 @@ def create_app(settings: Settings) -> FastAPI:
     app.middleware("http")(guard_request)
     app.add_middleware(GZipMiddleware)
     app.get("/healthz")(healthz)
-    app.include_router(admin.router)
-    app.include_router(pokemon.router)
-    app.include_router(teams.router)
-    app.include_router(counter.router)
-    app.include_router(alerts.router)
-    app.include_router(demo_controls.router)
+    # Bodies over the limit are refused with 413 while being read: before they are parsed
+    # or any token is checked. Set per route, so the refusal passes the middleware above.
+    for routes in (admin, pokemon, teams, counter, alerts, demo_controls):
+        app.include_router(routes.router, max_body_size=MAX_BODY_BYTES)
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
     return app

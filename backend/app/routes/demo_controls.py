@@ -24,6 +24,8 @@ from app.routes.params import MAX_ID
 
 router = APIRouter(prefix="/api/admin/demo", dependencies=[Depends(auth.require_admin_token)])
 STRICT = ConfigDict(extra="forbid", strict=True)
+# 20 Pokémon patches and all 324 chart cells come to about 25 KB.
+OVERRIDES_MAX_BODY_BYTES = 64 * 1024
 
 
 def _standard_type(name: str) -> str:
@@ -87,7 +89,7 @@ class OverridesBody(BaseModel):
     type_chart: list[CellPatch] = Field(default_factory=list, max_length=18 * 18)
 
 
-@router.put("/overrides")
+@router.put("/overrides", max_body_size=OVERRIDES_MAX_BODY_BYTES)
 def put_overrides(request: Request, body: OverridesBody) -> dict[str, Any]:
     """Store the document, replacing any earlier one, and return it as stored."""
     with db.connection_for(request) as conn:

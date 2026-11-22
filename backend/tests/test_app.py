@@ -1,6 +1,7 @@
 """Rules every request passes: health check, headers, origin check, hidden errors."""
 
 import threading
+from collections.abc import Iterator
 
 import anyio.to_thread
 import pytest
@@ -116,3 +117,30 @@ def test_healthz_answers_while_every_worker_thread_is_busy(
     for reader in readers:
         reader.join(timeout=10)
     assert answered_while_busy == [200]
+
+
+def _chunks(total: int) -> Iterator[bytes]:
+    """A body sent in pieces with no Content-Length, as a chunked upload is."""
+    yield b'{"name": "'
+    for _ in range(total // 1024):
+        yield b"x" * 1024
+    yield b'"}'
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "size"),
+    [
+        ("POST", "/api/teams", 20 * 1024),
+        ("POST", "/api/admin/scan", 20 * 1024),  # no token: refused before the token check
+        ("PUT", "/api/admin/demo/overrides", 80 * 1024),
+    ],
+)
+@pytest.mark.parametrize("chunked", [False, True], ids=["content-length", "chunked"])
+def test_an_oversized_body_is_refused_with_413_before_it_is_read(
+    client: TestClient, method: str, path: str, size: int, chunked: bool
+) -> None:
+    body: bytes | Iterator[bytes] = _chunks(size) if chunked else b"x" * size
+    headers = {"Content-Type": "application/json"}
+    response = client.request(method, path, content=body, headers=headers)
+    assert response.status_code == 413
+    assert response.headers["x-content-type-options"] == "nosniff"
