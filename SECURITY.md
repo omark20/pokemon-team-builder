@@ -104,7 +104,7 @@ Admin only. Its changes are tagged and reset removes exactly them; both controls
 - Without an account, losing the cookie loses the teams; with or without one, anyone holding the cookie holds them until it ends.
 - Passwords need only 8 characters. OWASP calls fewer than 15 weak where there is no second factor, and there is none.
 - There is no email and no password reset: a forgotten password loses the account. A password cannot be changed; its owner can delete the account and make a new one.
-- A session lasts 30 days with no time-out for inactivity, and there is no "sign out everywhere".
+- A session lasts 30 days with no time-out for inactivity. A password cannot be changed and there is no "sign out everywhere", so a leaked password or a stolen session can be stopped only by deleting the account.
 - Sign-up says when a name is taken, so names can be tested, 5 an hour per address.
 - Someone who keeps trying a username can keep its owner from signing in, 15 minutes at a time, and can try 960 passwords a day against it.
 - There is no anti-forgery token: requests from other sites are stopped by the `Origin` check and SameSite only, two layers where OWASP also recommends a token.
