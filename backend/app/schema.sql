@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     failed integer NOT NULL DEFAULT 0,
     note text  -- internal only, never returned by the API
 );
+-- Who started the run: 'api' for the scheduler's call, 'app' for the app's own start
+-- (self_scan.py); null for older runs and for `make sync`.
+ALTER TABLE scan_runs ADD COLUMN IF NOT EXISTS started_by text;
 
 -- At most one run in progress. A second trigger fails on this index, which is the 409.
 CREATE UNIQUE INDEX IF NOT EXISTS scan_runs_one_running

@@ -43,9 +43,10 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def start_run(conn: Conn, scope: str, now: datetime) -> int:
+def start_run(conn: Conn, scope: str, now: datetime, started_by: str | None = None) -> int:
     """Record a new running run and return its ID, after failing runs cut off by a restart.
 
+    `started_by` is 'api' for the trigger endpoint and 'app' for the app's own start.
     Raises psycopg.errors.UniqueViolation if another run is in progress.
     """
     conn.execute(
@@ -54,8 +55,9 @@ def start_run(conn: Conn, scope: str, now: datetime) -> int:
         (now, now - STALE_AFTER),
     )
     row = conn.execute(
-        "INSERT INTO scan_runs (status, scope, started_at) VALUES ('running', %s, %s) RETURNING id",
-        (scope, now),
+        "INSERT INTO scan_runs (status, scope, started_at, started_by)"
+        " VALUES ('running', %s, %s, %s) RETURNING id",
+        (scope, now, started_by),
     ).fetchone()
     assert row is not None  # INSERT ... RETURNING always returns the new row
     run_id: int = row[0]

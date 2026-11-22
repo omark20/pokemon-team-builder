@@ -27,8 +27,8 @@ def scan_status(request: Request) -> dict[str, Any]:
         runs = (
             conn.cursor(row_factory=dict_row)
             .execute(
-                "SELECT id, started_at, finished_at, status, scope, scanned, changed, failed"
-                " FROM scan_runs ORDER BY id DESC LIMIT 5"
+                "SELECT id, started_at, finished_at, status, scope, scanned, changed, failed,"
+                " started_by FROM scan_runs ORDER BY id DESC LIMIT 5"
             )
             .fetchall()
         )
@@ -49,7 +49,8 @@ def trigger_scan(
     with db.connection_for(request) as conn:
         pokemon_ids = None if body is None else body.pokemon_ids
         try:
-            run_id = scan.start_run(conn, "full" if body is None else "subset", scan.utc_now())
+            scope = "full" if body is None else "subset"
+            run_id = scan.start_run(conn, scope, scan.utc_now(), started_by="api")
         except psycopg.errors.UniqueViolation:
             raise HTTPException(409, "A scan is already running") from None
         database_url = request.app.state.settings.database_url

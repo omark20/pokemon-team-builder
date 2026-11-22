@@ -48,7 +48,8 @@ export ADMIN_TOKEN=...  # from .env
    curl -X POST "$APP_URL/api/admin/demo/reset" -H "Authorization: Bearer $ADMIN_TOKEN"
    ```
 
-`GET /api/scan/status` reports `"demo_active": true` from step 2 until the reset. The demo
+`GET /api/scan/status` reports `"demo_active": true` from step 2 until the reset, and
+until then the app starts no scan of its own: only the scans you trigger run. The demo
 endpoints refuse `SCAN_TOKEN`, so the scheduler's token cannot change data.
 
 `make smoke` runs these same steps by script against a local setup and checks each result.

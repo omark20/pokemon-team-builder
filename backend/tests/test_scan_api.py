@@ -81,5 +81,5 @@ def test_status_lists_five_newest_runs_with_public_fields_only(
     assert body["demo_active"] is False
     assert [run["id"] for run in body["runs"]] == [7, 6, 5, 4, 3]
     expected = {"id", "started_at", "finished_at", "status", "scope", "scanned", "changed"}
-    assert set(body["runs"][0]) == expected | {"failed"}
+    assert set(body["runs"][0]) == expected | {"failed", "started_by"}
     assert "internal" not in str(body)

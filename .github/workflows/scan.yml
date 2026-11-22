@@ -5,8 +5,9 @@ name: scan
 
 on:
   schedule:
-    # Every six hours during the build weekend, at 17 minutes past to avoid the busy
-    # top of the hour. To be switched to daily ("17 9 * * *").
+    # Every six hours, at 17 minutes past to avoid the busy top of the hour. GitHub may
+    # run it late or skip it; the app then starts its own scan once the last finished
+    # one is over seven hours old.
     - cron: "17 */6 * * *"
   workflow_dispatch:
 

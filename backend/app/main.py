@@ -7,12 +7,16 @@ class and frames and answered with a generic 500 carrying only a request ID the 
 can quote.
 """
 
+import asyncio
+import contextlib
 import logging
 import secrets
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 import psycopg
@@ -21,9 +25,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from psycopg_pool import PoolTimeout
+from psycopg_pool import ConnectionPool, PoolTimeout
 
-from app import db, limits, logs
+from app import db, limits, logs, scan, self_scan
 from app.config import Settings, load_settings
 from app.routes import admin, alerts, counter, demo_controls, pokemon, sessions, teams
 
@@ -63,7 +67,12 @@ def create_app(settings: Settings) -> FastAPI:
             logs.log_event(logger, logging.ERROR, "db_unreachable", error_class=type(exc).__name__)
             raise RuntimeError("database unreachable at start-up") from None
         app.state.pool = pool
+        # The app's own scan start (self_scan.py): its first look is ten minutes from now.
+        looking = asyncio.create_task(self_scan.keep_scanned(partial(_look, pool, settings)))
         yield
+        looking.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await looking
         pool.close()
 
     app = FastAPI(
@@ -88,6 +97,15 @@ def create_app(settings: Settings) -> FastAPI:
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
     return app
+
+
+def _look(pool: ConnectionPool[Any], settings: Settings) -> None:
+    """One look by the app's own scan start, scanning the real PokéAPI if one is due."""
+
+    def run(run_id: int) -> str:
+        return scan.scan_with_pokeapi(settings.database_url, run_id, None)
+
+    self_scan.look(pool, scan.utc_now(), run)
 
 
 async def healthz() -> dict[str, bool]:

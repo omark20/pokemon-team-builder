@@ -2,7 +2,7 @@
 
 **Live site:** https://pokemon-team-builder-c97p.onrender.com · **Setup:** [SETUP.md](SETUP.md) · **Demo:** [DEMO.md](DEMO.md) · **Security:** [SECURITY.md](SECURITY.md)
 
-FastAPI, Postgres and React in one Docker image on Render; GitHub Actions schedules the scan.
+FastAPI, Postgres and React in one Docker image on Render. GitHub Actions requests a scan every six hours; since it skipped and delayed runs, the app scans when the last is over seven hours old.
 
 ## Key decisions
 
@@ -18,7 +18,7 @@ FastAPI, Postgres and React in one Docker image on Render; GitHub Actions schedu
 
 The search is exact over the pool in use: 1,025, or 931 with the filter. The last rule sees only a candidate's weakness pattern, so keeping each slot's n best per pattern cannot lose the best team: every unkept pick has a kept twin scoring no worse. Tests check it against brute force. A limit of 250,000 steps per strictness level bounds each request; no trial team, of 5,251 in either pool, reached it. Moves are left out. With every Pokémon allowed, 42.0% of picks on random teams are legendary or mythical by PokéAPI's flags; a checkbox leaves them out at about 0.05 matchup points per counter (3.029 to 2.981), and about 6% of picks still have a stat total of 600 or more.
 
-**Change detection.** Each scan diffs every stored field and chart cell, recording old and new values. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches a Pokémon on your teams now, or one of its types. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale.
+**Change detection.** Each scan diffs every stored field and chart cell, recording old and new values. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches a Pokémon on your teams, or one of its types. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale.
 
 **Staying up under load.** Four reused database connections and at most two counter searches at once; `make burst` checks a read burst ends in 429s.
 
@@ -26,9 +26,7 @@ The search is exact over the pool in use: 1,025, or 931 with the filter. The las
 
 ## Known limits
 
-- GitHub Actions schedules are best effort.
 - While a demo is active, every visitor sees its values.
-- No migration tool: tables change by hand.
 - Two tabs on one team: last save wins.
 - At most 10 new visitors a minute and 50,000 in all; beyond, newcomers cannot save until some are deleted by hand.
-- Passwords need only 8 characters (OWASP asks 15); sessions last 30 days; blocking a username takes ten or more addresses.
+- Passwords need only 8 characters (OWASP asks 15); blocking a username takes ten or more addresses.
