@@ -629,6 +629,33 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* In a cell the word sits above the number, so narrow columns keep both whole. */
+.matchups td .matchup-word {
+  display: block;
+  font-size: 11px;
+}
+
+.matchups-scroll {
+  overflow-x: auto;
+}
+
+.how-chosen {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--track);
+}
+
+.how-chosen h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.how-chosen p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+}
+
 .matchups thead th {
   border-top: none;
   font-weight: 400;

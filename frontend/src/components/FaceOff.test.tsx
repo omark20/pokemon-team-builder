@@ -78,6 +78,11 @@ test("the details open on request: one reason per pick and a table whose rows ad
   expect(rows.map((row) => row.querySelectorAll("td:not(.row-sum)").length)).toEqual([3, 3, 3]);
   const sums = rows.map((row) => Number(row.querySelector(".row-sum")!.textContent));
   expect(sums).toEqual(COUNTER.picks.map((pick) => pick.coverage));
+  // Each cell gives a word and the number; the fixture's first row is +3, -1, +1.
+  expect([...rows[0]!.querySelectorAll("td:not(.row-sum)")].map((cell) => cell.textContent)).toEqual([
+    "Strong +3", "Weak -1", "Good +1",
+  ]);
+  expect(screen.getByRole("heading", { name: "How this team was chosen" })).toBeTruthy();
 });
 
 test.each([
