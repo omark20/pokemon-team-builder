@@ -26,6 +26,9 @@ def configure() -> None:
     logging.basicConfig(level=logging.INFO, handlers=[handler])
     # httpx writes a line per request at INFO, about 1,370 per scan; the scan logs its own.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # psycopg and its pool log every borrowed connection at INFO, and warnings that quote
+    # connection details and server messages; the app logs its own db_unreachable line.
+    logging.getLogger("psycopg").setLevel(logging.ERROR)
 
 
 def outside(value: str) -> str:

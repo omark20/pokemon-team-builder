@@ -68,16 +68,16 @@ def empty_list_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def connect_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Every database connection the app opens from now on, recorded and then opened."""
-    calls: list[str] = []
-    real_connect = db.connect
+def connect_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """Every database connection a request borrows from now on, recorded, then lent."""
+    calls: list[object] = []
+    real_connection_for = db.connection_for
 
-    def counting_connect(database_url: str) -> psycopg.Connection:
-        calls.append(database_url)
-        return real_connect(database_url)
+    def counting_connection_for(request: object) -> object:
+        calls.append(request)
+        return real_connection_for(request)
 
-    monkeypatch.setattr(db, "connect", counting_connect)
+    monkeypatch.setattr(db, "connection_for", counting_connection_for)
     return calls
 
 

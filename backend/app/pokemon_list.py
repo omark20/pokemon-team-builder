@@ -12,6 +12,7 @@ import json
 import logging
 import threading
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Any
 
 import psycopg
@@ -31,8 +32,8 @@ LIST_QUERY = """
 """
 
 
-def get(connect: Callable[[], psycopg.Connection[Any]]) -> bytes:
-    """The serialised list, built with one query through `connect` if not held."""
+def get(connect: Callable[[], AbstractContextManager[psycopg.Connection[Any]]]) -> bytes:
+    """The serialised list, built with one query on a connection from `connect` if not held."""
     global _body
     with _lock:
         if _body is None:

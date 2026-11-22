@@ -5,7 +5,6 @@ test_scan.py. Charizard (6) is fire and flying, Venusaur (3) grass and poison, P
 (25) electric (the captured responses in samples/).
 """
 
-from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -27,9 +26,9 @@ def visitor(client: TestClient, conn: psycopg.Connection, source: FakePokeApi) -
 
 
 @pytest.fixture
-def other(visitor: TestClient) -> Iterator[TestClient]:
-    with TestClient(visitor.app, base_url="https://testserver") as other_visitor:
-        yield other_visitor
+def other(visitor: TestClient) -> TestClient:
+    """A second visitor: the same running app, a separate cookie jar."""
+    return TestClient(visitor.app, base_url="https://testserver")
 
 
 def team_with(client: TestClient, pokemon_ids: list[int]) -> int:
@@ -147,10 +146,10 @@ def test_a_chart_change_reaches_visitors_with_either_type_only(
 ) -> None:
     team_with(visitor, [6])  # fire
     team_with(other, [3])  # grass
-    with TestClient(visitor.app, base_url="https://testserver") as third:
-        team_with(third, [25])  # electric
-        add_change(conn, cell=("fire", "grass"))
-        assert third.get(ALERTS).json() == []
+    third = TestClient(visitor.app, base_url="https://testserver")
+    team_with(third, [25])  # electric
+    add_change(conn, cell=("fire", "grass"))
+    assert third.get(ALERTS).json() == []
     assert [alert["your_pokemon"] for alert in visitor.get(ALERTS).json()] == [[6]]
     assert [alert["your_pokemon"] for alert in other.get(ALERTS).json()] == [[3]]
 

@@ -12,8 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from psycopg.rows import dict_row
 
-from app import auth, limits
-from app.db import Connection
+from app import auth, db, limits
 from app.routes.params import PathId
 
 router = APIRouter(prefix="/api/alerts")
@@ -44,27 +43,29 @@ ALERTS_QUERY = """
 """
 
 
-def alerts_for(conn: Connection, user_id: int, now: datetime) -> list[dict[str, Any]]:
+def alerts_for(conn: db.Conn, user_id: int, now: datetime) -> list[dict[str, Any]]:
     """The visitor's undismissed alerts newer than 7 days before `now`, newest first."""
     params = {"user_id": user_id, "now": now, "limit": MAX_ALERTS}
     return conn.cursor(row_factory=dict_row).execute(ALERTS_QUERY, params).fetchall()
 
 
 @router.get("")
-def list_alerts(request: Request, conn: Connection) -> list[dict[str, Any]]:
-    user_id = auth.current_user(request, conn)
-    return [] if user_id is None else alerts_for(conn, user_id, datetime.now(UTC))
+def list_alerts(request: Request) -> list[dict[str, Any]]:
+    with db.connection_for(request) as conn:
+        user_id = auth.current_user(request, conn)
+        return [] if user_id is None else alerts_for(conn, user_id, datetime.now(UTC))
 
 
 @router.post("/{change_id}/dismiss", status_code=204, dependencies=[Depends(limits.limit_writes)])
-def dismiss(change_id: PathId, request: Request, conn: Connection) -> Response:
+def dismiss(change_id: PathId, request: Request) -> Response:
     """Hide this alert for this visitor for good. Repeating it is harmless."""
-    user_id = auth.current_user(request, conn)
-    known = conn.execute("SELECT 1 FROM changes WHERE id = %s", (change_id,)).fetchone()
-    if user_id is None or known is None:
-        raise HTTPException(404, "Alert not found")
-    conn.execute(
-        "INSERT INTO dismissals (user_id, change_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-        (user_id, change_id),
-    )
-    return Response(status_code=204)
+    with db.connection_for(request) as conn:
+        user_id = auth.current_user(request, conn)
+        known = conn.execute("SELECT 1 FROM changes WHERE id = %s", (change_id,)).fetchone()
+        if user_id is None or known is None:
+            raise HTTPException(404, "Alert not found")
+        conn.execute(
+            "INSERT INTO dismissals (user_id, change_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (user_id, change_id),
+        )
+        return Response(status_code=204)

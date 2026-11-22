@@ -15,5 +15,5 @@ def list_pokemon(request: Request) -> Response:
 
     Opens a database connection only when the in-memory copy has to be built.
     """
-    body = pokemon_list.get(partial(db.connect_for_request, request))
+    body = pokemon_list.get(partial(db.connection_for, request))
     return Response(body, media_type="application/json")

@@ -4,7 +4,7 @@ services:
   db:
     # The one place the Postgres version is written. Keep it on the same major
     # version as the deployed database.
-    image: postgres:18
+    image: &postgres-image postgres:18
     environment:
       POSTGRES_USER: pokemon
       POSTGRES_DB: pokemon
@@ -23,6 +23,34 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # For `make burst` only: a throwaway database held to the deployed database's size
+  # (0.1 CPU, 256 MB) and reached over TLS, as the deployed one is. No volume: every run
+  # starts empty. The certificate is the self-signed one the image ships with.
+  db-burst:
+    image: *postgres-image
+    profiles: [burst]
+    cpus: 0.1
+    mem_limit: 256m
+    environment:
+      POSTGRES_USER: pokemon
+      POSTGRES_DB: pokemon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run "make .env" first}
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+      - -c
+      - ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+    ports:
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokemon -d pokemon"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
 
 volumes:
   pgdata:

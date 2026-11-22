@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg_pool import PoolTimeout
 
 from app import db, limits, logs
 from app.config import Settings, load_settings
@@ -44,14 +45,18 @@ def create_app(settings: Settings) -> FastAPI:
 
     @asynccontextmanager
     async def apply_schema_at_start(_: FastAPI) -> AsyncIterator[None]:
+        pool = db.open_pool(settings.database_url)
         try:
             with db.connect(settings.database_url) as conn:
                 db.apply_schema(conn)
-        except psycopg.OperationalError as exc:
+            pool.open(wait=True, timeout=db.CONNECT_TIMEOUT_SECONDS * 2)
+        except (psycopg.OperationalError, PoolTimeout) as exc:
             # Re-raised without its message, which can name the host or the user.
             logs.log_event(logger, logging.ERROR, "db_unreachable", error_class=type(exc).__name__)
             raise RuntimeError("database unreachable at start-up") from None
+        app.state.pool = pool
         yield
+        pool.close()
 
     app = FastAPI(
         docs_url=None,
@@ -76,8 +81,9 @@ def create_app(settings: Settings) -> FastAPI:
     return app
 
 
-def healthz() -> dict[str, bool]:
-    """Says the process is up. Touches no database, so it costs nothing to call."""
+async def healthz() -> dict[str, bool]:
+    """Says the process is up. Touches no database and, being async, needs no worker
+    thread, so it answers even while every worker thread is waiting on the database."""
     return {"ok": True}
 
 

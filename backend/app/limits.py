@@ -111,17 +111,17 @@ def enforce(request: Request, bucket: str) -> None:
     raise HTTPException(429, "Too many requests", headers=headers)
 
 
-def limit_reads(request: Request) -> None:
+async def limit_reads(request: Request) -> None:
     """App-wide dependency: every GET under /api counts against the read bucket."""
     if request.method == "GET" and request.url.path.startswith("/api/"):
         enforce(request, "read")
 
 
-def limit_writes(request: Request) -> None:
+async def limit_writes(request: Request) -> None:
     """Route dependency for the visitor's own writes: teams, and dismissing alerts."""
     enforce(request, "write")
 
 
-def limit_counter(request: Request) -> None:
+async def limit_counter(request: Request) -> None:
     """Route dependency for the counter-team search, the costliest request."""
     enforce(request, "counter")

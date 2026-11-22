@@ -4,7 +4,6 @@ The stored Pokémon are the 14 captured in samples/ (ids 3, 6, 9, 25, 34, 59, 76
 131, 135, 149, 248, 10034, 10264); 7 is not among them.
 """
 
-from collections.abc import Iterator
 from typing import Any
 
 import psycopg
@@ -24,10 +23,9 @@ def visitor(client: TestClient, conn: psycopg.Connection, source: FakePokeApi) -
 
 
 @pytest.fixture
-def other_visitor(visitor: TestClient) -> Iterator[TestClient]:
-    """Visitor B: the same app, a separate cookie jar."""
-    with TestClient(visitor.app, base_url="https://testserver") as other:
-        yield other
+def other_visitor(visitor: TestClient) -> TestClient:
+    """Visitor B: the same running app, a separate cookie jar."""
+    return TestClient(visitor.app, base_url="https://testserver")
 
 
 def new_team(client: TestClient, name: str = "Team 1") -> dict[str, Any]:

@@ -42,9 +42,9 @@ def test_an_empty_team_gets_a_message_instead_of_counters(visitor: TestClient) -
 
 def test_another_visitors_team_is_404(visitor: TestClient) -> None:
     team_id = team_with(visitor, [6])
-    with TestClient(visitor.app, base_url="https://testserver") as other:
-        other.post(TEAMS, json={"name": "Theirs"})
-        assert other.get(f"{TEAMS}/{team_id}/counter").status_code == 404
+    other = TestClient(visitor.app, base_url="https://testserver")
+    other.post(TEAMS, json={"name": "Theirs"})
+    assert other.get(f"{TEAMS}/{team_id}/counter").status_code == 404
 
 
 def test_an_unloaded_type_chart_is_503(visitor: TestClient, conn: psycopg.Connection) -> None:

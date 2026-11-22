@@ -1,10 +1,13 @@
 """Rules every request passes: health check, headers, origin check, hidden errors."""
 
+import threading
+
+import anyio.to_thread
 import pytest
 from conftest import SCAN_TOKEN
 from fastapi.testclient import TestClient
 
-from app import scan
+from app import auth, scan
 from app.config import Settings
 from app.main import create_app
 
@@ -80,3 +83,36 @@ def test_unreachable_database_at_start_up_is_logged_without_its_message(
         pass
     assert "db_unreachable error_class=OperationalError" in caplog.text
     assert "hunter2" not in caplog.text and "someone" not in caplog.text
+
+
+def test_healthz_answers_while_every_worker_thread_is_busy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The host restarts a service whose health check stops answering, so /healthz must
+    not need a worker thread: here every one is held inside a database route."""
+    threads = 2
+    held, release = threading.Semaphore(0), threading.Event()
+
+    def blocked_current_user(*args: object) -> None:
+        held.release()
+        release.wait(timeout=10)
+
+    def set_thread_limit() -> None:
+        anyio.to_thread.current_default_thread_limiter().total_tokens = threads
+
+    monkeypatch.setattr(auth, "current_user", blocked_current_user)
+    client.portal.call(set_thread_limit)  # type: ignore[union-attr]
+    readers = [threading.Thread(target=client.get, args=("/api/teams",)) for _ in range(threads)]
+    for reader in readers:
+        reader.start()
+    for _ in range(threads):
+        assert held.acquire(timeout=5)  # both worker threads are now inside a route
+    health: list[int] = []
+    probe = threading.Thread(target=lambda: health.append(client.get("/healthz").status_code))
+    probe.start()
+    probe.join(timeout=5)
+    answered_while_busy = list(health)  # read before the worker threads are let go
+    release.set()
+    for reader in readers:
+        reader.join(timeout=10)
+    assert answered_while_busy == [200]

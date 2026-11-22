@@ -18,7 +18,6 @@ from pydantic import (
 )
 
 from app import auth, db, demo, pokemon_list
-from app.db import Connection
 from app.domain.diff import MAX_BASE_STAT, SPRITE_PREFIX
 from app.domain.types import STANDARD_TYPES
 from app.routes.params import MAX_ID
@@ -89,26 +88,27 @@ class OverridesBody(BaseModel):
 
 
 @router.put("/overrides")
-def put_overrides(body: OverridesBody, conn: Connection) -> dict[str, Any]:
+def put_overrides(request: Request, body: OverridesBody) -> dict[str, Any]:
     """Store the document, replacing any earlier one, and return it as stored."""
-    wanted = {int(key) for key in body.pokemon}
-    found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
-    if max(wanted, default=0) > MAX_ID or {pid for (pid,) in found} != wanted:
-        raise HTTPException(422, "Unknown Pokémon ID")
-    doc = {
-        "pokemon": {
-            key: patch.model_dump(exclude_unset=True) for key, patch in body.pokemon.items()
-        },
-        "type_chart": [cell.model_dump() for cell in body.type_chart],
-    }
-    demo.store(conn, doc)
-    return doc
+    with db.connection_for(request) as conn:
+        wanted = {int(key) for key in body.pokemon}
+        found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
+        if max(wanted, default=0) > MAX_ID or {pid for (pid,) in found} != wanted:
+            raise HTTPException(422, "Unknown Pokémon ID")
+        doc = {
+            "pokemon": {
+                key: patch.model_dump(exclude_unset=True) for key, patch in body.pokemon.items()
+            },
+            "type_chart": [cell.model_dump() for cell in body.type_chart],
+        }
+        demo.store(conn, doc)
+        return doc
 
 
 @router.post("/reset")
 def reset(request: Request) -> dict[str, int]:
     """Undo every demo change and drop the document; then clear the list held in memory."""
-    with db.connect_for_request(request) as conn:
+    with db.connection_for(request) as conn:
         result = demo.reset(conn)
     # Cleared only after the commit, so a rebuild cannot pick up the patched values.
     pokemon_list.clear("demo_reset")

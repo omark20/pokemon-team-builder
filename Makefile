@@ -5,7 +5,7 @@
 include .env
 export
 
-.PHONY: db dev lint smoke sync test
+.PHONY: burst db dev lint smoke sync test
 
 # Local settings with freshly generated secrets. Git-ignored; never committed.
 .env:
@@ -33,6 +33,14 @@ sync: db
 # it needs the network and takes over a minute.
 smoke: db
 	cd backend && uv run python scripts/smoke.py
+
+# Bursts of reads against a throwaway database held to the deployed size, checking that
+# the app refuses with 429 and keeps its health check answering. Not part of `make test`:
+# it takes about a minute.
+burst: .env
+	docker compose --profile burst up --detach --wait db-burst
+	cd backend && uv run python scripts/burst.py; status=$$?; \
+		cd .. && docker compose --profile burst rm --stop --force db-burst; exit $$status
 
 lint:
 	cd backend && uv run ruff check .
