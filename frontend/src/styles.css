@@ -786,22 +786,10 @@ button:disabled {
   text-align: center;
 }
 
-/* Under the grid: how many cards are on screen, and the button for the next batch. */
+/* Under the grid: the button for the next batch of cards. */
 
 .show-more {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 16px;
-}
-
-.show-more p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-soft);
-}
-
-.show-more button {
+  display: block;
   min-width: 200px;
+  margin: 16px auto 0;
 }

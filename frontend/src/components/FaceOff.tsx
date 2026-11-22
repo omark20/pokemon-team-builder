@@ -16,8 +16,8 @@ interface FaceOffProps {
   alertTeamIds: Set<number>;
 }
 
-// The wording of the legendary filter's checkbox, in one place while the
-// operator decides it (it may also move; see LegendaryToggle).
+// The legendary filter's checkbox label, kept in one place so the wording can
+// change without touching the markup.
 export const LEAVE_OUT_LABEL = "Leave out legendary and mythical Pokémon";
 
 function statusLine(team: Team, counter: CounterResult | null): string {

@@ -2,7 +2,7 @@
 // whole list is in memory; cards are drawn 60 at a time, and a button under
 // them draws the next 60, so the page never builds 1,351 cards at once.
 import { useMemo, useState } from "react";
-import { filterPokemon, listedPokemon, NO_FILTERS, type GridFilters } from "../search";
+import { filterPokemon, NO_FILTERS, type GridFilters } from "../search";
 import type { Pokemon } from "../types";
 import { GridControls } from "./GridControls";
 import { PokemonCard } from "./PokemonCard";
@@ -15,32 +15,26 @@ interface GridProps {
   onAdd: (pokemon: Pokemon) => Promise<boolean>;
 }
 
-const count = (value: number) => value.toLocaleString("en-US");
+interface CardListProps extends GridProps {
+  next: number; // how many the button would add; no button when 0
+  onMore: () => void;
+}
 
-// Draws the first cards of `pokemon`, and the next batch each time the button
-// under them is pressed. The button stays where focus is, so pressing it again
-// needs no moving about; the new cards come before it, in reading order. When
-// every card is drawn the button goes.
-function CardList({ pokemon, onAdd }: GridProps) {
-  const [drawn, setDrawn] = useState(PAGE_SIZE);
-  const shown = Math.min(drawn, pokemon.length);
-  const next = Math.min(PAGE_SIZE, pokemon.length - shown);
+// The drawn cards, then the button that draws the next batch. The button
+// stays where focus is, so pressing it again needs no moving about; the new
+// cards come before it, in reading order. When every card is drawn it goes.
+function CardList({ pokemon, onAdd, next, onMore }: CardListProps) {
   return (
     <>
       <div className="grid">
-        {pokemon.slice(0, shown).map((entry) => (
+        {pokemon.map((entry) => (
           <PokemonCard key={entry.id} pokemon={entry} onAdd={onAdd} />
         ))}
       </div>
       {next > 0 && (
-        <div className="show-more">
-          <p aria-live="polite">
-            {count(shown)} of {count(pokemon.length)} on screen
-          </p>
-          <button type="button" onClick={() => setDrawn(shown + PAGE_SIZE)}>
-            Show {next} more
-          </button>
-        </div>
+        <button type="button" className="show-more" onClick={onMore}>
+          Show {next} more
+        </button>
       )}
     </>
   );
@@ -61,8 +55,15 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
 
 export function PokemonGrid({ pokemon, onAdd }: GridProps) {
   const [filters, setFilters] = useState<GridFilters>(NO_FILTERS);
+  const [drawn, setDrawn] = useState(PAGE_SIZE);
   const visible = useMemo(() => filterPokemon(pokemon, filters), [pokemon, filters]);
-  const total = useMemo(() => listedPokemon(pokemon).length, [pokemon]);
+  const onScreen = Math.min(drawn, visible.length);
+
+  // A new search or filter starts again from the first batch.
+  function changeFilters(next: GridFilters) {
+    setFilters(next);
+    setDrawn(PAGE_SIZE);
+  }
 
   // Enter in the search box adds the best match. The box is cleared only if
   // the Pokémon was added and the reader has not typed something else since.
@@ -70,21 +71,27 @@ export function PokemonGrid({ pokemon, onAdd }: GridProps) {
     const top = visible[0];
     if (!top || !(await onAdd(top))) return;
     setFilters((current) => (current.query === filters.query ? { ...current, query: "" } : current));
+    setDrawn(PAGE_SIZE);
   }
 
   return (
     <>
       <GridControls
         filters={filters}
-        onChange={setFilters}
+        onChange={changeFilters}
         onEnter={addTopResult}
-        shown={visible.length}
-        total={total}
+        onScreen={onScreen}
+        matching={visible.length}
       />
       {visible.length === 0 ? (
-        <NoResults query={filters.query} onClear={() => setFilters(NO_FILTERS)} />
+        <NoResults query={filters.query} onClear={() => changeFilters(NO_FILTERS)} />
       ) : (
-        <CardList key={JSON.stringify(filters)} pokemon={visible} onAdd={onAdd} />
+        <CardList
+          pokemon={visible.slice(0, onScreen)}
+          onAdd={onAdd}
+          next={Math.min(PAGE_SIZE, visible.length - onScreen)}
+          onMore={() => setDrawn(onScreen + PAGE_SIZE)}
+        />
       )}
     </>
   );

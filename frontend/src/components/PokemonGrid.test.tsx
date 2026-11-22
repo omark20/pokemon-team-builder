@@ -20,21 +20,20 @@ const typeIn = (text: string) => fireEvent.change(searchBox(), { target: { value
 const pressEnter = async () => act(async () => void fireEvent.keyDown(searchBox(), { key: "Enter" }));
 const showMore = () => screen.queryByRole("button", { name: /^Show \d+ more$/ });
 
-test("opens with all 1,351 entries counted, the checkbox unticked and 60 cards drawn", () => {
+test("opens with 60 of the 1,351 entries on screen and the checkbox unticked", () => {
   const { cardNames } = renderGrid();
-  expect(screen.getByRole("status").textContent).toBe("Showing 1,351 of 1,351");
+  expect(screen.getByRole("status").textContent).toBe("Showing 60 of 1,351");
   expect(checkbox().checked).toBe(false);
   expect(cardNames()).toHaveLength(60);
   expect(cardNames().slice(0, 3)).toEqual(["Bulbasaur", "Ivysaur", "Venusaur"]);
 });
 
-test("'Show 60 more' adds the next 60 cards after the last one and says how many are on screen", () => {
+test("'Show 60 more' adds the next 60 cards after the last one and the count follows", () => {
   const { cardNames } = renderGrid();
-  expect(screen.getByText("60 of 1,351 on screen")).toBeTruthy();
   fireEvent.click(showMore()!);
   expect(cardNames()).toHaveLength(120);
   expect(cardNames()[60]).toBe("Poliwhirl"); // number 61 in samples/census_all_pokemon.tsv
-  expect(screen.getByText("120 of 1,351 on screen")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toBe("Showing 120 of 1,351");
 });
 
 test("pressing the button until it goes puts every one of the 1,351 on screen", () => {
@@ -61,13 +60,13 @@ test("after a press focus stays on the button, and the new cards come before it 
 test("ticking the checkbox leaves the 1,025 default entries", () => {
   renderGrid();
   fireEvent.click(checkbox());
-  expect(screen.getByRole("status").textContent).toBe("Showing 1,025 of 1,351");
+  expect(screen.getByRole("status").textContent).toBe("Showing 60 of 1,025");
 });
 
 test("search results are drawn best match first", () => {
   const { cardNames } = renderGrid();
   typeIn("char");
-  expect(screen.getByRole("status").textContent).toBe("Showing 10 of 1,351");
+  expect(screen.getByRole("status").textContent).toBe("Showing 10 of 10");
   expect(cardNames()).toEqual([
     "Charmander", "Charmeleon", "Charizard", "Charjabug", "Charcadet",
     "Charizard-mega-x", "Charizard-mega-y", "Charizard-gmax", "Chimchar", "Pecharunt",
@@ -78,7 +77,7 @@ test("the type filter offers all types and the 18 standard ones", () => {
   renderGrid();
   expect(typeFilter().options).toHaveLength(19);
   fireEvent.change(typeFilter(), { target: { value: "ghost" } });
-  expect(screen.getByRole("status").textContent).toBe("Showing 96 of 1,351");
+  expect(screen.getByRole("status").textContent).toBe("Showing 60 of 96");
 });
 
 test("changing a filter starts again from the first 60 cards", () => {
@@ -98,7 +97,7 @@ test("no match shows a message, and 'Clear filters' restores all 1,351", () => {
   expect(cardNames()).toEqual([]);
 
   fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-  expect(screen.getByRole("status").textContent).toBe("Showing 1,351 of 1,351");
+  expect(screen.getByRole("status").textContent).toBe("Showing 60 of 1,351");
   expect(searchBox().value).toBe("");
   expect(typeFilter().value).toBe("");
   expect(checkbox().checked).toBe(false);

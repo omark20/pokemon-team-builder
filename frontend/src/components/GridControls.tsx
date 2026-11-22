@@ -1,5 +1,5 @@
 // The controls above the grid: a search box, a type filter, the checkbox that
-// hides special versions, and the count of entries shown.
+// hides special versions, and how many cards are on screen out of how many match.
 import type { KeyboardEvent } from "react";
 import type { GridFilters } from "../search";
 import { TYPE_NAMES, type TypeName } from "../types";
@@ -9,13 +9,13 @@ interface ControlsProps {
   onChange: (filters: GridFilters) => void;
   // Called when Enter is pressed in a search box that holds a query.
   onEnter: () => void;
-  shown: number;
-  total: number;
+  onScreen: number; // cards drawn so far
+  matching: number; // entries that pass the search and both filters
 }
 
 const count = (value: number) => value.toLocaleString("en-US");
 
-export function GridControls({ filters, onChange, onEnter, shown, total }: ControlsProps) {
+export function GridControls({ filters, onChange, onEnter, onScreen, matching }: ControlsProps) {
   function handleKey(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && filters.query.trim() !== "") onEnter();
   }
@@ -51,7 +51,7 @@ export function GridControls({ filters, onChange, onEnter, shown, total }: Contr
         Hide special versions (Mega, regional and others)
       </label>
       <p className="controls-count" role="status">
-        Showing {count(shown)} of {count(total)}
+        Showing {count(onScreen)} of {count(matching)}
       </p>
     </section>
   );

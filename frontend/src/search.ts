@@ -40,16 +40,12 @@ export function searchPokemon(list: Pokemon[], query: string): Pokemon[] {
   return ranked.map((entry) => entry.pokemon);
 }
 
-// The entries the grid can show at all: everything PokéAPI still serves.
-export function listedPokemon(list: Pokemon[]): Pokemon[] {
-  return list.filter((pokemon) => !pokemon.removed);
-}
-
-// The grid's contents: listed entries that pass the type filter and the
-// "hide special versions" checkbox, ordered by the search.
+// The grid's contents: entries PokéAPI still serves that pass the type filter
+// and the "hide special versions" checkbox, ordered by the search.
 export function filterPokemon(list: Pokemon[], filters: GridFilters): Pokemon[] {
-  const kept = listedPokemon(list).filter(
+  const kept = list.filter(
     (pokemon) =>
+      !pokemon.removed &&
       (filters.type === "" || pokemon.types.includes(filters.type)) &&
       (!filters.hideSpecial || pokemon.is_default),
   );
