@@ -31,4 +31,4 @@ The search is exact over the pool in use: 1,025, or 931 with the filter. The las
 - No migration tool: tables change by hand.
 - Two tabs on one team: last save wins.
 - At most 10 new visitors a minute and 50,000 in all; beyond, newcomers cannot save until some are deleted by hand.
-- Passwords need only 8 characters (OWASP asks 15); sessions last 30 days; wrong tries can block a username 15 minutes.
+- Passwords need only 8 characters (OWASP asks 15); sessions last 30 days; blocking a username takes ten or more addresses.

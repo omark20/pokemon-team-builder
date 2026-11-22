@@ -366,27 +366,38 @@ def test_a_record_is_never_both_anonymous_and_an_account(
 # Limits
 
 
-@pytest.mark.parametrize("exists", [True, False], ids=["real-name", "unknown-name"])
-def test_the_eleventh_attempt_on_one_name_is_429_from_any_address(
-    client: TestClient, exists: bool
+PAIR = [("Misty", 1)] * 10  # one username from one address
+ONE_ADDRESS = [(f"name{n}", 1) for n in range(20)]  # one address, several names
+# One username in other capitals from ten addresses, ten each: within both counts above.
+SPREAD = [("MiStY" if n % 2 else "misty", 1 + n // 10) for n in range(100)]
+
+
+@pytest.mark.parametrize(
+    ("allowed", "refused", "owner_elsewhere"),
+    [
+        (PAIR, ("misty", 1), 200),
+        ([("Brock", 1)] * 10, ("brock", 1), 200),
+        (ONE_ADDRESS, ("name20", 1), 200),
+        (SPREAD, ("MISTY", 11), 429),
+    ],
+    ids=["one-name-one-address", "unknown-name-one-address", "one-address", "one-name-everywhere"],
+)
+def test_sign_in_attempts_are_counted_per_name_and_address_per_address_and_per_name(
+    client: TestClient,
+    allowed: list[tuple[str, int]],
+    refused: tuple[str, int],
+    owner_elsewhere: int,
 ) -> None:
-    if exists:
-        sign_up(browser(client))
-    names = ["Misty", "misty", "MISTY"]
-    answers = [
-        client.post(
-            "/api/session",
-            json={"username": names[n % 3], "password": "wrong password"},
-            headers=from_address(n),
-        ).status_code
-        for n in range(11)
-    ]
-    assert answers == [401] * 10 + [429]
+    sign_up(browser(client))
 
+    def attempt(name: str, address: int, password: str = "a wrong guess") -> int:
+        body = {"username": name, "password": password}
+        response = client.post("/api/session", json=body, headers=from_address(address))
+        return response.status_code
 
-def test_the_twenty_first_sign_in_from_one_address_is_429(client: TestClient) -> None:
-    answers = [sign_in(client, f"name{n}").status_code for n in range(21)]
-    assert answers == [401] * 20 + [429]
+    answers = [attempt(name, address) for name, address in allowed] + [attempt(*refused)]
+    assert answers == [401] * len(allowed) + [429]
+    assert attempt("Misty", 99, PASSWORD) == owner_elsewhere
 
 
 def test_the_sixth_creation_attempt_from_one_address_is_429_taken_names_included(
@@ -482,16 +493,22 @@ def test_another_account_sending_a_password_touches_only_itself(
     assert count(conn, "SELECT count(*) FROM users WHERE username = 'Misty'") == 1
 
 
-def test_deleting_shares_the_sign_in_count_for_its_username(
+def test_the_sixth_delete_from_one_session_is_429_and_another_session_still_deletes(
     client: TestClient, conn: psycopg.Connection
 ) -> None:
     sign_up(client)
-    for number in range(10):
-        stranger = client.post(
-            "/api/session",
-            json={"username": "misty", "password": "a guess at it"},
-            headers=from_address(number),
-        )
-        assert stranger.status_code == 401
-    assert delete_account(client).status_code == 429
-    assert count(conn, "SELECT count(*) FROM users") == 1
+    laptop = browser(client)
+    sign_in(laptop)
+    answers = [delete_account(client, "a wrong guess").status_code for _ in range(6)]
+    assert answers == [401] * 5 + [429]
+    assert delete_account(laptop).status_code == 204
+    assert count(conn, "SELECT count(*) FROM users") == 0
+
+
+def test_delete_attempts_leave_the_usernames_sign_in_counts_alone(client: TestClient) -> None:
+    sign_up(client)
+    for _ in range(5):
+        delete_account(client, "a wrong guess")
+    stranger = browser(client)
+    answers = [sign_in(stranger, "Misty", "a wrong guess").status_code for _ in range(10)]
+    assert answers == [401] * 10

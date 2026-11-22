@@ -68,7 +68,8 @@ The documentation routes are off and the server does not announce itself. *Tests
 | Counter teams | 20 a minute per address; two searched at once; 250,000 steps per strictness level |
 | New visitors | 20 an hour per address; 10 a minute from all addresses together |
 | Visitors in all, accounts included | 50,000 |
-| Sign-in attempts, and account deletions | 10 in 15 minutes per username from any address; 20 in 15 minutes per address; successes count too |
+| Sign-in attempts, real names or not, successes included | 10 in 15 minutes for one username from one address; 20 in 15 minutes from one address, whatever the names; 100 in 15 minutes for one username from all addresses together |
+| Account deletions | 5 in 15 minutes from one signed-in browser, within its address's 20; never counted per username, so strangers cannot use them up |
 | Account-creation attempts | 5 an hour per address, taken names included; 60 an hour from all addresses together |
 | Password hashes at once | 2 |
 | Admin calls | 30 a minute per address |
@@ -106,7 +107,7 @@ Admin only. Its changes are tagged and reset removes exactly them; both controls
 - There is no email and no password reset: a forgotten password loses the account. A password cannot be changed; its owner can delete the account and make a new one.
 - A session lasts 30 days with no time-out for inactivity. A password cannot be changed and there is no "sign out everywhere", so a leaked password or a stolen session can be stopped only by deleting the account.
 - Sign-up says when a name is taken, so names can be tested, 5 an hour per address.
-- Someone who keeps trying a username can keep its owner from signing in, 15 minutes at a time, and can try 960 passwords a day against it.
+- Against one username, one address can try 960 passwords a day, and ten or more addresses together 9,600. Keeping its owner from signing in takes ten or more addresses sending 100 attempts between them every quarter of an hour, without a pause; a ceiling of 50 would have taken only two, which is why it is 100. Nobody at another address can block the owner from deleting the account. These counts rest on the visitor's address (`limits.client_address`); if that header could be faked, only the 100 per username would still hold.
 - There is no anti-forgery token: requests from other sites are stopped by the `Origin` check and SameSite only, two layers where OWASP also recommends a token.
 - Stored hashes are not upgraded if the hash settings change, and the cookie does not use the `__Host-` name prefix.
 - Someone with many addresses can slow first-time visitors and, over days, reach the visitor ceiling.

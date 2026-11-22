@@ -91,14 +91,14 @@ def create_account(body: Credentials, request: Request, response: Response) -> d
     return {"username": username}
 
 
-@router.post("/session", dependencies=[Depends(limits.limit_sign_in)])
+@router.post("/session")
 def sign_in(body: Credentials, request: Request, response: Response) -> dict[str, Any]:
     """Sign in, and merge this browser's anonymous teams into the account up to 20.
 
     An unknown name and a wrong password get the same answer after the same work: for an
     unknown name a dummy hash is verified.
     """
-    limits.enforce(request, "sign_in_name", key=body.username.lower())
+    limits.enforce_sign_in(request, body.username)
     with db.connection_for(request) as conn:
         account = account_store.find_account(conn, body.username)
     with _hash_place(request):
@@ -133,19 +133,26 @@ def sign_out(request: Request) -> Response:
     return response
 
 
-@router.post("/account/delete", status_code=204, dependencies=[Depends(limits.limit_sign_in)])
+@router.post(
+    "/account/delete",
+    status_code=204,
+    dependencies=[Depends(limits.limit_deletes_per_address)],
+)
 def delete_account(body: PasswordBody, request: Request) -> Response:
     """Delete the signed-in account, its teams, dismissals and sessions; clear the cookie.
 
-    The password is checked like a sign-in, and the attempt counts against the sign-in
-    limits for this address and this username, so this is not a second place to guess.
+    The password is checked like a sign-in. Attempts count per signed-in browser and
+    against the address's sign-in count, never per username: a stranger cannot use them
+    up, and one stolen session cannot use up the owner's own session's attempts.
     """
     with db.connection_for(request) as conn:
         account = account_store.signed_in_account(conn, request, datetime.now(UTC))
     if account is None:
         raise HTTPException(401, NOT_SIGNED_IN)
-    account_id, username, stored = account
-    limits.enforce(request, "sign_in_name", key=username.lower())
+    account_id, _, stored = account
+    session = auth.cookie_hash(request)
+    assert session is not None  # the account was found by this cookie
+    limits.enforce(request, "delete_session", key=session.hex())
     with _hash_place(request):
         matched = accounts.password_matches(stored, body.password.get_secret_value())
     if not matched:

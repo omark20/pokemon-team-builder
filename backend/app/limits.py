@@ -35,8 +35,10 @@ LIMITS = {
     "counter": Limit(20, 60),  # counter-team searches: 250,000 steps a strictness level
     "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
     # Accounts: every attempt counts, whether it succeeds or not, before any password check.
-    "sign_in": Limit(20, 900),  # sign-in attempts per address
-    "sign_in_name": Limit(10, 900),  # sign-in attempts per typed username (lower case), any address
+    "sign_in_pair": Limit(10, 900),  # sign-ins for one username (lower case) from one address
+    "sign_in": Limit(20, 900),  # sign-ins from one address, whatever the names; also deletes
+    "sign_in_name": Limit(100, 900),  # sign-ins for one username from all addresses together
+    "delete_session": Limit(5, 900),  # account deletions from one signed-in browser
     "account": Limit(5, 3600),  # account-creation attempts per address, taken names included
     "account_total": Limit(60, 3600),  # the same, all addresses together (one shared key)
 }
@@ -150,9 +152,23 @@ async def limit_counter(request: Request) -> None:
     enforce(request, "counter")
 
 
-async def limit_sign_in(request: Request) -> None:
-    """Route dependency for signing in, per address; the per-username count is in the
-    route, once the body has been read."""
+def enforce_sign_in(request: Request, username: str) -> None:
+    """The three sign-in counts, in this order, for any name typed, real or not: the name
+    from this address, this address whatever the names, and the name from all addresses.
+
+    So a stranger at one address cannot lock an owner out: blocking the name everywhere
+    takes ten or more addresses between them.
+    """
+    name = username.lower()
+    # An address never holds a space, so the space keeps every (address, name) pair apart.
+    enforce(request, "sign_in_pair", key=f"{client_address(request)} {name}")
+    enforce(request, "sign_in")
+    enforce(request, "sign_in_name", key=name)
+
+
+async def limit_deletes_per_address(request: Request) -> None:
+    """Route dependency for deleting an account: the address's sign-in count, before any
+    database work. The per-browser count is in the route, once the session is known."""
     enforce(request, "sign_in")
 
 
