@@ -16,6 +16,7 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.demo import Overrides
 from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon
 from app.domain.types import Chart
 from app.logs import log_event
@@ -50,6 +51,7 @@ class Run:
     complete: bool = True  # false once the chart or the removals had to be left alone
     wrote_pokemon: bool = False  # a Pokémon row was inserted, updated or flagged
     missing: list[int] = field(default_factory=list)  # candidates for removal
+    overrides: Overrides = field(default_factory=Overrides)  # the demo's patches, if any
 
 
 class ChangeRow(NamedTuple):
@@ -61,6 +63,7 @@ class ChangeRow(NamedTuple):
     pokemon_id: int | None = None
     attacker: str | None = None
     defender: str | None = None
+    is_demo: bool = False  # the field was set by a demo patch
 
 
 def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
@@ -69,7 +72,18 @@ def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
         cursor = conn.execute("SELECT attacker, defender, multiplier FROM type_effectiveness")
         stored = {(attacker, defender): value for attacker, defender, value in cursor}
         cells = diff_chart(stored, chart)
-        rows = [ChangeRow("multiplier", c.old, c.new, None, c.attacker, c.defender) for c in cells]
+        demo_cells = run.overrides.chart
+        rows = [
+            ChangeRow(
+                "multiplier",
+                c.old,
+                c.new,
+                attacker=c.attacker,
+                defender=c.defender,
+                is_demo=(c.attacker, c.defender) in demo_cells,
+            )
+            for c in cells
+        ]
         insert_changes(conn, run, rows)
         conn.cursor().executemany(
             "INSERT INTO type_effectiveness (attacker, defender, multiplier) VALUES (%s, %s, %s)"
@@ -95,7 +109,10 @@ def _update_if_changed(
     conn: Conn, run: Run, stored: dict[str, Any], record: PokemonRecord, values: list[Any]
 ) -> None:
     diff = diff_pokemon(stored, record)
-    rows = [ChangeRow(c.field, c.old, c.new, record.id) for c in diff.changes]
+    demo = run.overrides.patched_fields(record.id)
+    rows = [
+        ChangeRow(c.field, c.old, c.new, record.id, is_demo=c.field in demo) for c in diff.changes
+    ]
     if stored["removed_at"] is not None:
         rows.append(ChangeRow("status", "removed", "available", record.id))
         log_event(logger, logging.INFO, "pokemon_restored", run_id=run.run_id, pokemon_id=record.id)
@@ -135,7 +152,9 @@ def apply_removals(conn: Conn, run: Run) -> None:
             ).fetchone()
             if flagged:
                 run.wrote_pokemon = True
-                insert_changes(conn, run, [ChangeRow("status", "available", "removed", pokemon_id)])
+                demo = "status" in run.overrides.patched_fields(pokemon_id)
+                row = ChangeRow("status", "available", "removed", pokemon_id, is_demo=demo)
+                insert_changes(conn, run, [row])
                 log_event(
                     logger,
                     logging.INFO,
@@ -150,10 +169,10 @@ def insert_changes(conn: Conn, run: Run, rows: list[ChangeRow]) -> None:
     detected = run.now()
     conn.cursor().executemany(
         "INSERT INTO changes (pokemon_id, attacker, defender, field, old_value, new_value,"
-        " detected_at, scan_run_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        " detected_at, scan_run_id, is_demo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         [
             (r.pokemon_id, r.attacker, r.defender, r.field, Jsonb(r.old), Jsonb(r.new))
-            + (detected, run.run_id)
+            + (detected, run.run_id, r.is_demo)
             for r in rows
         ],
     )

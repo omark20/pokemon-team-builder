@@ -67,6 +67,11 @@ def require_scan_token(request: Request) -> None:
     _require_bearer(request, request.app.state.settings.scan_token)
 
 
+def require_admin_token(request: Request) -> None:
+    """Dependency: allow only a caller presenting ADMIN_TOKEN (the demo controls)."""
+    _require_bearer(request, request.app.state.settings.admin_token)
+
+
 def _require_bearer(request: Request, expected: str | None) -> None:
     header = request.headers.get("authorization")
     if header is not None and expected is not None and _bearer_matches(header, expected):

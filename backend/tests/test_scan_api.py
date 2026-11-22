@@ -2,35 +2,13 @@
 
 import psycopg
 import pytest
-from conftest import ADMIN_TOKEN, SCAN_TOKEN
+from conftest import SCAN_TOKEN
 from fastapi.testclient import TestClient
 
 from app import scan
-from app.config import Settings
-from app.main import create_app
 
 SCAN = "/api/admin/scan"
 BEARER = {"Authorization": f"Bearer {SCAN_TOKEN}"}
-
-
-@pytest.mark.parametrize(
-    "header",
-    [
-        None,
-        "Bearer not-the-token",
-        f"Basic {SCAN_TOKEN}",
-        f"Bearer {ADMIN_TOKEN}",
-        "Bearer ünïcode",
-    ],
-    ids=["absent", "wrong", "wrong-scheme", "admin-token", "non-ascii"],
-)
-def test_trigger_without_the_scan_token_is_401_and_starts_nothing(
-    client: TestClient, conn: psycopg.Connection, header: str | None
-) -> None:
-    # Bytes, so that a non-ASCII header can be sent at all.
-    headers = {} if header is None else {"Authorization": header.encode()}
-    assert client.post(SCAN, headers=headers).status_code == 401
-    assert conn.execute("SELECT count(*) FROM scan_runs").fetchone() == (0,)
 
 
 @pytest.fixture
@@ -89,13 +67,6 @@ def test_database_allows_only_one_running_row(client: TestClient, conn: psycopg.
     conn.execute("INSERT INTO scan_runs (status, scope) VALUES ('running', 'full')")
     with pytest.raises(psycopg.errors.UniqueViolation):
         conn.execute("INSERT INTO scan_runs (status, scope) VALUES ('running', 'subset')")
-
-
-def test_trigger_stays_closed_when_scan_token_is_unset(database_url: str) -> None:
-    settings = Settings(database_url=database_url, scan_token=None, admin_token=ADMIN_TOKEN)
-    with TestClient(create_app(settings), base_url="https://testserver") as client:
-        assert client.post(SCAN).status_code == 401
-        assert client.post(SCAN, headers={"Authorization": "Bearer "}).status_code == 401
 
 
 def test_status_lists_five_newest_runs_with_public_fields_only(

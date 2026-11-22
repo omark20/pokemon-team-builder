@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
-from app import db, logs, pokemon_list, scan_store
+from app import db, demo, logs, pokemon_list, scan_store
 from app.config import load_settings
 from app.domain.diff import ParseError, PokemonRecord, parse_pokemon
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
@@ -118,6 +118,7 @@ def scan_with_pokeapi(database_url: str, run_id: int, pokemon_ids: Sequence[int]
 
 
 def _scan_steps(conn: Conn, fetch: Fetch, run: Run, pokemon_ids: Sequence[int] | None) -> str:
+    run.overrides = demo.load(conn)
     chart_ok = _scan_chart(conn, fetch, run)
     listed = _read_list(conn, fetch, run)
     if listed is None:
@@ -145,7 +146,7 @@ def _scan_chart(conn: Conn, fetch: Fetch, run: Run) -> bool:
     except (KeyError, TypeError):
         _log_chart_rejected(run, "malformed", "-")
         return False
-    scan_store.save_chart(conn, run, chart)
+    scan_store.save_chart(conn, run, run.overrides.apply_to_chart(chart))
     return True
 
 
@@ -209,9 +210,11 @@ def _fetch_one(fetch: Fetch, item: tuple[int, str]) -> Fetched:
 
 
 def _apply_fetched(conn: Conn, run: Run, fetched: Fetched) -> None:
-    if fetched.record is not None:
-        scan_store.save_pokemon(conn, run, fetched.record)
-    elif fetched.reason is None:
+    """Save a record, with any demo patch applied, or note a removal or a skip."""
+    removed_by_demo = run.overrides.removes(fetched.pokemon_id)
+    if fetched.record is not None and not removed_by_demo:
+        scan_store.save_pokemon(conn, run, run.overrides.apply(fetched.record))
+    elif fetched.reason is None or removed_by_demo:
         run.missing.append(fetched.pokemon_id)
     else:
         run.failed += 1

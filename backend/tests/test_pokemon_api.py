@@ -4,6 +4,7 @@ Expected values are read off samples/pokemon_6_charizard_dual_type.json.
 """
 
 import psycopg
+from conftest import ADMIN_TOKEN
 from fake_pokeapi import FakePokeApi, pokemon_path, run_fake_scan
 from fastapi.testclient import TestClient
 
@@ -65,3 +66,16 @@ def test_a_scan_that_changes_nothing_keeps_the_copy_in_memory(
     connect_calls.clear()
     by_id(client)
     assert connect_calls == []
+
+
+def test_the_list_shows_a_demo_value_after_its_scan_and_the_original_after_reset(
+    client: TestClient, conn: psycopg.Connection, source: FakePokeApi
+) -> None:
+    run_fake_scan(conn, source)
+    by_id(client)
+    admin = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+    client.put("/api/admin/demo/overrides", headers=admin, json={"pokemon": {"6": {"attack": 94}}})
+    run_fake_scan(conn, source, pokemon_ids=[6])
+    assert by_id(client)[6]["stats"][1] == 94
+    client.post("/api/admin/demo/reset", headers=admin)
+    assert by_id(client)[6]["stats"][1] == 84

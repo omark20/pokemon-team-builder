@@ -90,3 +90,16 @@ CREATE TABLE IF NOT EXISTS team_members (
     PRIMARY KEY (team_id, position)
 );
 CREATE INDEX IF NOT EXISTS team_members_pokemon_id ON team_members (pokemon_id);
+
+-- An alert a visitor has dismissed stays dismissed for that visitor only.
+CREATE TABLE IF NOT EXISTS dismissals (
+    user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    change_id bigint NOT NULL REFERENCES changes (id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, change_id)
+);
+
+-- The demo's "pretend PokéAPI said this" document. At most one row.
+CREATE TABLE IF NOT EXISTS demo_overrides (
+    only_row boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    doc jsonb NOT NULL
+);

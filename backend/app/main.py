@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db, limits, logs
 from app.config import Settings, load_settings
-from app.routes import admin, counter, pokemon, teams
+from app.routes import admin, alerts, counter, demo_controls, pokemon, teams
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(pokemon.router)
     app.include_router(teams.router)
     app.include_router(counter.router)
+    app.include_router(alerts.router)
+    app.include_router(demo_controls.router)
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
     return app

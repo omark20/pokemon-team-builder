@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
 
-from app import auth, scan
+from app import auth, demo, scan
 from app.db import Connection
 from app.routes.params import PokemonId
 
@@ -32,8 +32,7 @@ def scan_status(conn: Connection) -> dict[str, Any]:
         )
         .fetchall()
     )
-    # Demo overrides arrive with their tables at a later milestone; until then none exist.
-    return {"runs": runs, "demo_active": False}
+    return {"runs": runs, "demo_active": demo.is_active(conn)}
 
 
 @router.post("/api/admin/scan", status_code=202, dependencies=[Depends(auth.require_scan_token)])
