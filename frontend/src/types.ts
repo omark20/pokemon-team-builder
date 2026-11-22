@@ -40,3 +40,11 @@ export const STAT_LABELS = [
 export function displayName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
+
+// One of the visitor's teams, as the backend sends it. `pokemon_ids` is in
+// slot order and may hold the same Pokémon more than once.
+export interface Team {
+  id: number;
+  name: string;
+  pokemon_ids: number[];
+}

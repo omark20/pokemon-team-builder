@@ -246,3 +246,283 @@ button:hover {
   font-size: 13px;
   color: var(--text-soft);
 }
+
+/* The face-off card */
+
+.face-off {
+  margin-bottom: 20px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.face-off-message,
+.first-visit {
+  margin: 0;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.first-visit p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  min-height: 30px;
+  border-color: transparent;
+  background: none;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.tab[aria-pressed="true"] {
+  background: #e6f1fb;
+  color: #185fa5;
+  font-weight: 600;
+}
+
+/* Two halves side by side with "vs" between; on a narrow window the counter
+   half drops below the team. Each half keeps three positions per row. */
+
+.halves {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .halves {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.versus {
+  padding-top: 80px;
+  font-size: 13px;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .versus {
+    padding: 0;
+  }
+}
+
+.half-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-height: 32px;
+  margin-bottom: 6px;
+}
+
+.half-header input {
+  flex: 1 1 140px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+
+.half-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.half-count {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.link-button {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: #185fa5;
+  text-decoration: underline;
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.slot-filled {
+  cursor: grab;
+}
+
+.slot-filled.revealed,
+.slot-filled:focus {
+  border-color: var(--border-strong);
+  outline: none;
+}
+
+.slot.drop-target {
+  background: #e6f1fb;
+}
+
+.slot .sprite {
+  width: 56px;
+  height: 56px;
+}
+
+.slot-outline {
+  width: 56px;
+  height: 56px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 50%;
+}
+
+.slot-name {
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-empty .slot-name {
+  font-weight: 400;
+  color: var(--text-soft);
+}
+
+/* A slot's "×" and arrows: always in the page and reachable with Tab, but
+   invisible and ignoring the pointer until the slot is revealed. */
+
+.slot-control {
+  position: absolute;
+  min-height: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: var(--surface);
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-soft);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.slot.revealed .slot-control {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slot-remove {
+  top: 0;
+  right: 0;
+}
+
+.slot-earlier {
+  top: 30px;
+  left: 0;
+}
+
+.slot-later {
+  top: 30px;
+  right: 0;
+}
+
+.counter-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.face-off-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.face-off-status {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* The message about the last action, kept in view at the bottom. */
+
+.notice-bar {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 14px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+
+.notice-info {
+  background: #eaf3de;
+  border-color: #97c459;
+  color: #27500a;
+}
+
+.notice-error {
+  background: #fcebeb;
+  border-color: #f09595;
+  color: #791f1f;
+}
+
+.notice-close {
+  min-height: 24px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: inherit;
+}
