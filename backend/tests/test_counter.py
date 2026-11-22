@@ -403,7 +403,6 @@ def test_reported_numbers_describe_the_returned_team(opponents: str):
     counters = tuple(pick.counter for pick in result.picks)
     assert tuple(result.totals.values()) == totals(counters, enemy)
     assert result.grid == [[matchup(c, e) for e in enemy] for c in counters]
-    assert [pick.coverage for pick in result.picks] == [sum(row) for row in result.grid]
     assert result.weakness_counts == weakness_counts(counters, enemy)
 
 

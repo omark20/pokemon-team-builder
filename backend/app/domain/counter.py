@@ -134,8 +134,6 @@ class Pick:
     opponent: Pokemon
     counter: Pokemon
     matchup: int
-    coverage: int
-    base_stats: int
     reason: str
 
 
@@ -196,7 +194,7 @@ def describe_pick(counter: Pokemon, opponent: Pokemon, opponents: Opponents, cha
         f"Across the whole opposing team its matchups add up to {written_across}."
     )
     points = matchup(counter, opponent, chart)
-    return Pick(opponent, counter, points, across, sum(counter.stats), reason)
+    return Pick(opponent, counter, points, reason)
 
 
 def opposing_types(opponents: Opponents) -> list[str]:

@@ -72,14 +72,10 @@ def test_database_allows_only_one_running_row(client: TestClient, conn: psycopg.
 def test_status_lists_five_newest_runs_with_public_fields_only(
     client: TestClient, conn: psycopg.Connection
 ) -> None:
-    for number in range(7):
-        conn.execute(
-            "INSERT INTO scan_runs (status, scope, note) VALUES ('ok', 'full', %s)",
-            (f"internal {number}",),
-        )
+    for _ in range(7):
+        conn.execute("INSERT INTO scan_runs (status, scope) VALUES ('ok', 'full')")
     body = client.get("/api/scan/status").json()
     assert body["demo_active"] is False
     assert [run["id"] for run in body["runs"]] == [7, 6, 5, 4, 3]
     expected = {"id", "started_at", "finished_at", "status", "scope", "scanned", "changed"}
     assert set(body["runs"][0]) == expected | {"failed", "started_by"}
-    assert "internal" not in str(body)

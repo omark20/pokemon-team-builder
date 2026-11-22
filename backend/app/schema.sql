@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     scope text NOT NULL CHECK (scope IN ('full', 'subset')),
     scanned integer NOT NULL DEFAULT 0,
     changed integer NOT NULL DEFAULT 0,
-    failed integer NOT NULL DEFAULT 0,
-    note text  -- internal only, never returned by the API
+    failed integer NOT NULL DEFAULT 0
 );
 -- Who started the run: 'api' for the scheduler's call, 'app' for the app's own start
 -- (self_scan.py); null for older runs and for `make sync`.
