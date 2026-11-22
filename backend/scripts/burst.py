@@ -8,8 +8,12 @@ deployed one is. The app runs as it does on the host, one uvicorn worker. Two bu
 2. 3,000 reads from five addresses, 48 at a time, more at once than the app has worker
    threads: every one answered, none refused or failed.
 
-During each, /healthz is asked every quarter of a second and must answer within 5
-seconds every time, since the host restarts a service whose health check stops answering.
+Then the database is stopped and started with the app left running, as the host does
+for maintenance: while it is down every read is a 503 within about two seconds, and
+within 30 seconds of its return reads are answered again, with no restart of the app.
+
+Throughout, /healthz is asked every quarter of a second and must answer within 5 seconds
+every time, since the host restarts a service whose health check stops answering.
 """
 
 import os
@@ -27,6 +31,10 @@ import httpx
 ADDRESS = "http://127.0.0.1:8766"
 DATABASE = "postgresql://pokemon:{password}@127.0.0.1:5435/pokemon?sslmode=require"
 BACKEND = Path(__file__).resolve().parents[1]
+COMPOSE = ["docker", "compose", "--profile", "burst"]
+DOWN_READS = 10
+DOWN_READ_SECONDS = 2.5  # the pool's 2-second wait, and a little for the answer
+RECOVERY_SECONDS = 30
 HEALTH_EVERY_SECONDS = 0.25
 HEALTH_TIMEOUT_SECONDS = 5
 
@@ -106,6 +114,49 @@ def check(burst: Burst) -> bool:
     return passed
 
 
+def timed_read(http: httpx.Client, number: int) -> tuple[int | str, float]:
+    """One status read from its own address, so the read limit never refuses it."""
+    start = time.perf_counter()
+    try:
+        headers = {"cf-connecting-ip": f"198.51.100.{number % 250 + 1}"}
+        code: int | str = http.get("/api/scan/status", headers=headers).status_code
+    except httpx.HTTPError as exc:
+        code = type(exc).__name__
+    return code, time.perf_counter() - start
+
+
+def seconds_until_answered(http: httpx.Client) -> float | None:
+    """Seconds until a read is answered 200 again, or None after RECOVERY_SECONDS."""
+    start = time.monotonic()
+    for number in range(1000):
+        if timed_read(http, number)[0] == 200:
+            return time.monotonic() - start
+        if time.monotonic() - start > RECOVERY_SECONDS:
+            return None
+        time.sleep(0.5)
+    return None
+
+
+def database_gone_and_back() -> bool:
+    with HealthProbe() as health, httpx.Client(base_url=ADDRESS, timeout=10) as http:
+        subprocess.run([*COMPOSE, "stop", "db-burst"], check=True, capture_output=True)
+        down = [timed_read(http, number) for number in range(DOWN_READS)]
+        subprocess.run([*COMPOSE, "start", "db-burst"], check=True, capture_output=True)
+        back_after = seconds_until_answered(http)
+    codes = Counter(code for code, _ in down)
+    slowest = max(seconds for _, seconds in down)
+    passed = codes == {503: DOWN_READS} and slowest <= DOWN_READ_SECONDS
+    passed = passed and back_after is not None and health.failed == 0
+    recovered = "never" if back_after is None else f"{back_after:.1f} s after start"
+    print(
+        f"burst: {'ok  ' if passed else 'FAIL'} database gone and back: while down {dict(codes)},"
+        f" slowest {slowest:.1f} s; answered again {recovered};"
+        f" /healthz {health.asked - health.failed}/{health.asked}",
+        flush=True,
+    )
+    return passed
+
+
 def start_app() -> subprocess.Popen[bytes]:
     database_url = DATABASE.format(password=os.environ["POSTGRES_PASSWORD"])
     command = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1"]
@@ -131,6 +182,7 @@ def main() -> int:
     app = start_app()
     try:
         passed = wait_until_up(app) and all([check(burst) for burst in BURSTS])
+        passed = passed and database_gone_and_back()
     finally:
         app.terminate()
         app.wait(timeout=10)

@@ -1,7 +1,7 @@
 """Database access: a small fixed set of reused connections, and schema.sql at start-up.
 
 Opening a Postgres connection costs the database far more than a query: on a test
-database held to the deployed size (0.1 CPU, TLS), about 7 new connections a second
+database held to the deployed size (0.1 CPU, TLS), 11 to 14 new connections a second
 against about 3,800 queries a second on an open one. So requests borrow one of a few
 connections opened once, and wait at most two seconds for one before answering 503.
 A borrowed connection commits when the request succeeds and rolls back when it fails.
@@ -16,7 +16,7 @@ from typing import Any
 
 import psycopg
 from fastapi import HTTPException, Request
-from psycopg_pool import ConnectionPool, PoolTimeout, TooManyRequests
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from app.logs import log_event
 
@@ -57,8 +57,7 @@ def apply_schema(conn: psycopg.Connection[Any]) -> None:
 
 @contextmanager
 def connection_for(request: Request) -> Iterator[psycopg.Connection[Any]]:
-    """Borrow a connection for a request, or answer 503 if none is free in time or too
-    many requests are already waiting for one.
+    """Borrow a connection for a request, or answer 503 if none is free in time.
 
     The failure is logged by error class only: a database error's message can name
     the host or the user.
@@ -66,7 +65,7 @@ def connection_for(request: Request) -> Iterator[psycopg.Connection[Any]]:
     try:
         with request.app.state.pool.connection() as conn:
             yield conn
-    except (PoolTimeout, TooManyRequests) as exc:
+    except PoolTimeout as exc:
         log_event(
             logger,
             logging.ERROR,
