@@ -13,6 +13,7 @@ from conftest import ADMIN_TOKEN, SCAN_TOKEN
 from fake_pokeapi import FakePokeApi, pokemon_path, run_fake_scan
 from fastapi.testclient import TestClient
 
+from app import demo
 from app.config import Settings
 from app.main import create_app
 
@@ -219,3 +220,41 @@ def test_undoing_a_demo_value_without_reset_is_still_demo_and_reset_removes_it(
     assert stocked.post(RESET, headers=ADMIN).json() == {"restored": 2, "deleted": 2}
     assert stored_data(conn) == before
     assert change_fields(conn) == []
+
+
+@pytest.mark.parametrize(("method", "path"), [("PUT", OVERRIDES), ("POST", RESET)])
+def test_demo_controls_answer_409_while_a_scan_is_running(
+    stocked: TestClient, conn: psycopg.Connection, method: str, path: str
+) -> None:
+    stocked.put(OVERRIDES, headers=ADMIN, json=ATTACK_94)
+    conn.execute("INSERT INTO scan_runs (status, scope) VALUES ('running', 'subset')")
+    other = {"pokemon": {"6": {"attack": 99}}, "type_chart": []}
+    assert stocked.request(method, path, headers=ADMIN, json=other).status_code == 409
+    stored = conn.execute("SELECT doc FROM demo_overrides").fetchone()
+    assert stored == ({"pokemon": {"6": {"attack": 94}}, "type_chart": []},)
+
+
+def test_reset_deletes_only_the_demo_changes_it_restored(
+    stocked: TestClient,
+    conn: psycopg.Connection,
+    source: FakePokeApi,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stocked.put(OVERRIDES, headers=ADMIN, json=ATTACK_94)
+    demo_scan(conn, source)
+    real_restore = demo._restore
+
+    def restore_while_a_scan_commits_a_demo_change(*args: Any) -> None:
+        # What a scan that started before the reset could commit while it runs.
+        with psycopg.connect(database_url, autocommit=True) as other:
+            other.execute(
+                "INSERT INTO changes (pokemon_id, field, old_value, new_value, detected_at,"
+                " scan_run_id, is_demo) SELECT 25, 'attack', '55', '60', now(), max(id), true"
+                " FROM scan_runs"
+            )
+        real_restore(*args)
+
+    monkeypatch.setattr(demo, "_restore", restore_while_a_scan_commits_a_demo_change)
+    assert stocked.post(RESET, headers=ADMIN).json() == {"restored": 1, "deleted": 1}
+    assert change_fields(conn) == [("attack", 55, 60, True)]

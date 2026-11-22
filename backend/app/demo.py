@@ -8,6 +8,7 @@ values back, newest first, then deletes them, so the next real scan finds nothin
 """
 
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -74,16 +75,35 @@ def is_active(conn: Conn) -> bool:
     return bool(row and row[0])
 
 
+def scan_in_progress(conn: Conn, started_after: datetime) -> bool:
+    """Whether a scan started after this time is running; no new one starts until commit.
+
+    The lock conflicts with the INSERT that starts a scan (PostgreSQL 18 docs, "Explicit
+    Locking": INSERT takes ROW EXCLUSIVE, which SHARE ROW EXCLUSIVE blocks), so a trigger
+    arriving meanwhile waits for this transaction instead of racing it.
+    """
+    conn.execute("LOCK TABLE scan_runs IN SHARE ROW EXCLUSIVE MODE")
+    row = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM scan_runs WHERE status = 'running' AND started_at > %s)",
+        (started_after,),
+    ).fetchone()
+    return bool(row and row[0])
+
+
 def reset(conn: Conn) -> dict[str, int]:
-    """Delete the document, write back every demo change's old value, delete those changes."""
+    """Delete the document, write back every demo change's old value, delete those changes.
+
+    Only the rows read and restored here are deleted, never a row committed meanwhile.
+    """
     conn.execute("DELETE FROM demo_overrides")
     changes = conn.execute(
-        "SELECT pokemon_id, attacker, defender, field, old_value FROM changes"
+        "SELECT id, pokemon_id, attacker, defender, field, old_value FROM changes"
         " WHERE is_demo ORDER BY id DESC"
     ).fetchall()
-    for pokemon_id, attacker, defender, name, old in changes:
+    for _, pokemon_id, attacker, defender, name, old in changes:
         _restore(conn, pokemon_id, attacker, defender, name, old)
-    deleted = conn.execute("DELETE FROM changes WHERE is_demo").rowcount
+    restored = [change_id for change_id, *_ in changes]
+    deleted = conn.execute("DELETE FROM changes WHERE id = ANY(%s)", (restored,)).rowcount
     return {"restored": len(changes), "deleted": deleted}
 
 

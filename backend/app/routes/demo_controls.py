@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-from app import auth, db, demo, pokemon_list
+from app import auth, db, demo, pokemon_list, scan
 from app.domain.diff import MAX_BASE_STAT, SPRITE_PREFIX
 from app.domain.types import STANDARD_TYPES
 from app.routes.params import MAX_ID
@@ -93,6 +93,7 @@ class OverridesBody(BaseModel):
 def put_overrides(request: Request, body: OverridesBody) -> dict[str, Any]:
     """Store the document, replacing any earlier one, and return it as stored."""
     with db.connection_for(request) as conn:
+        _refuse_while_scanning(conn)
         wanted = {int(key) for key in body.pokemon}
         found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
         if max(wanted, default=0) > MAX_ID or {pid for (pid,) in found} != wanted:
@@ -111,7 +112,14 @@ def put_overrides(request: Request, body: OverridesBody) -> dict[str, Any]:
 def reset(request: Request) -> dict[str, int]:
     """Undo every demo change and drop the document; then clear the list held in memory."""
     with db.connection_for(request) as conn:
+        _refuse_while_scanning(conn)
         result = demo.reset(conn)
     # Cleared only after the commit, so a rebuild cannot pick up the patched values.
     pokemon_list.clear("demo_reset")
     return result
+
+
+def _refuse_while_scanning(conn: db.Conn) -> None:
+    """409 while a scan runs: it read the document at its start and would go on using it."""
+    if demo.scan_in_progress(conn, scan.utc_now() - scan.STALE_AFTER):
+        raise HTTPException(409, "A scan is running; try again when it has finished")
