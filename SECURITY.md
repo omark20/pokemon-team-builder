@@ -73,7 +73,7 @@ Over a limit is 429 with `Retry-After`; the page says to try again in a few seco
 
 ## The scan
 
-**Threat:** bad upstream data corrupts the copy. Only PokéAPI's host is fetched, redirects are not followed, and every response passes a strict parser (`pokeapi.py`, `domain/diff.py`). A failure skips that Pokémon and records no change; a list that looks truncated, or more than 20 disappearances in a run, changes nothing (`scan.py`). *Tests:* `test_scan.py`, `test_pokeapi.py`.
+**Threat:** bad upstream data corrupts the copy. Only PokéAPI's host is fetched, redirects are not followed, and every response passes a strict parser (`pokeapi.py`, `domain/diff.py`). A failure skips that Pokémon and records no change; a list that looks truncated stops the run before anything is changed (`scan.py`); more than 20 disappearances in one run removes none of them and marks the run incomplete (`scan_store.apply_removals`). *Tests:* `test_scan.py`, `test_pokeapi.py`.
 
 ## The demo
 
