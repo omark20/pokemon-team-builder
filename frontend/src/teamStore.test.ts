@@ -1,6 +1,7 @@
 // The team rules, run against a stand-in backend that records every request.
 import { expect, test, vi } from "vitest";
-import { MESSAGES, nextTeamName, TeamStore } from "./teamStore";
+import { MESSAGES } from "./messages";
+import { nextTeamName, TeamStore } from "./teamStore";
 import { byName } from "./test/census";
 import { FakeServer } from "./test/fakeServer";
 import type { Team } from "./types";
@@ -16,6 +17,10 @@ async function start(teams: Team[] = []) {
 }
 
 const team = (id: number, name: string, pokemon_ids: number[] = []): Team => ({ id, name, pokemon_ids });
+
+// Waits until every request already answered, and every step waiting on it, has
+// run: a timer of 0 fires only after all pending promise steps are done.
+const allSettled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test("the first Add creates 'Team 1', then adds the Pokémon to it and selects it", async () => {
   const { server, store, state } = await start();
@@ -235,4 +240,50 @@ test("switching tab mid-build leaves Build usable on the new tab", async () => {
   void store.buildCounter();
   store.select(2);
   expect(state().building).toBe(false);
+});
+
+test.each([
+  { when: "the teams are still loading", arrange: async () => new TeamStore(), text: MESSAGES.teamsLoading },
+  {
+    when: "the teams failed to load",
+    arrange: async () => {
+      new FakeServer().refuseNext("GET", 500);
+      const store = new TeamStore();
+      await store.load();
+      return store;
+    },
+    text: MESSAGES.teamsFailed,
+  },
+])("an Add while $when says why nothing happened", async ({ arrange, text }) => {
+  const store = await arrange();
+  expect(await store.add(PIKACHU)).toBe(false);
+  expect(store.getState().notice).toEqual({ kind: "error", text });
+});
+
+test("an Add while the first team is still being created says to wait", async () => {
+  const { server, store, state } = await start();
+  const release = server.hold();
+  const first = store.add(PIKACHU);
+  expect(await store.add(CHARIZARD)).toBe(false);
+  expect(state().notice).toEqual({ kind: "error", text: MESSAGES.stillCreating });
+  release();
+  await first;
+});
+
+test("'Save as new team' that stops half way says so in its own words", async () => {
+  const { server, store, state } = await start([team(1, "Team 1", [6, 9, 3])]);
+  await store.buildCounter();
+  server.refuseNext("PUT", 500);
+  await store.saveCounterAsTeam();
+  expect(state().notice).toEqual({ kind: "error", text: MESSAGES.counterNotSaved("Team 2") });
+});
+
+test("a save that fails for a team deleted meanwhile reports nothing", async () => {
+  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B")]);
+  const release = server.hold(); // holds the save; the team is then deleted
+  store.setMembers(1, [6, 9]);
+  await store.remove(1);
+  release();
+  await allSettled(); // the save is answered 404, and the store has handled it
+  expect(state().notice).toBeNull();
 });

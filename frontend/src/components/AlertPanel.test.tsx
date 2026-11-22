@@ -89,3 +89,13 @@ test("nothing on the page announces demo mode while the demo is active", async (
   await screen.findByText(/^Showing /);
   expect(document.body.textContent?.toLowerCase()).not.toContain("demo");
 });
+
+test("a second click on 'Dismiss all' while it runs starts nothing more", async () => {
+  const server = await start([change(11, 6, 84, 94), change(12, 25, 55, 60), change(13, 3, 82, 80)]);
+  const button = panel().getByRole("button", { name: "Dismiss all" });
+  await act(async () => {
+    fireEvent.click(button);
+    fireEvent.click(button);
+  });
+  expect(dismissPaths(server)).toHaveLength(3);
+});

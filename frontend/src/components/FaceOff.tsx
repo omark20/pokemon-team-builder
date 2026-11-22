@@ -29,7 +29,7 @@ function statusLine(team: Team, counter: CounterResult | null): string {
   }
   return team.pokemon_ids.length === 0
     ? "Add Pokémon from the grid below."
-    : "Drag to reorder. Hover a Pokémon to remove it.";
+    : "Drag a Pokémon to reorder, or select it for its arrows and ×.";
 }
 
 // Whether the counter team may include legendary and mythical Pokémon. Off

@@ -15,11 +15,12 @@ function normalise(text: string): string {
   return text.toLowerCase().replace(/-/g, " ");
 }
 
-// How well one Pokémon matches a normalised query: 0 for its exact number,
+// How well one Pokémon matches a normalised query: 0 for its exact number
+// (leading zeros allowed, so "025" is 25),
 // 1 when its name starts with the query, 2 when the name contains it, and
 // null for no match.
 function matchRank(pokemon: Pokemon, query: string): number | null {
-  if (String(pokemon.id) === query) return 0;
+  if (/^\d+$/.test(query) && Number(query) === pokemon.id) return 0;
   const name = normalise(pokemon.name);
   if (name.startsWith(query)) return 1;
   if (name.includes(query)) return 2;

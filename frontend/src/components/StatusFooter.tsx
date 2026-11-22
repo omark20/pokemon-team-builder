@@ -13,7 +13,9 @@ export function describeRun(run: ScanRun | undefined): string {
   const checked = `PokéAPI last checked for changes ${when(run.finished_at ?? run.started_at)}`;
   if (run.status === "failed") return `${checked}; that check failed.`;
   const changes = `${run.changed} ${run.changed === 1 ? "change" : "changes"}`;
-  return `${checked}: ${run.scanned.toLocaleString("en-US")} Pokémon scanned, ${changes} found.`;
+  const summary = `${checked}: ${run.scanned.toLocaleString("en-US")} Pokémon scanned, ${changes} found`;
+  if (run.status === "incomplete") return `${summary}; ${run.failed} could not be read this time.`;
+  return `${summary}.`;
 }
 
 export function StatusFooter() {

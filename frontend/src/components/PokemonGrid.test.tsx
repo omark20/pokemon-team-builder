@@ -6,9 +6,9 @@ import { PokemonGrid } from "./PokemonGrid";
 
 const CHECKBOX_LABEL = "Hide special versions (Mega, regional and others)";
 
-function renderGrid(added = true) {
+function renderGrid(added = true, teamFull = false) {
   const onAdd = vi.fn().mockResolvedValue(added);
-  const { container } = render(<PokemonGrid pokemon={CENSUS} onAdd={onAdd} />);
+  const { container } = render(<PokemonGrid pokemon={CENSUS} onAdd={onAdd} teamFull={teamFull} />);
   const cardNames = () => [...container.querySelectorAll(".card-name")].map((name) => name.textContent);
   return { container, onAdd, cardNames };
 }
@@ -139,4 +139,11 @@ test("Enter with nothing matching adds nothing and keeps the query", async () =>
 test("the words 'alternate forms' appear nowhere", () => {
   const { container } = renderGrid();
   expect(container.textContent?.toLowerCase()).not.toContain("alternate form");
+});
+
+test("with a full team every card's button says so and cannot be pressed", () => {
+  renderGrid(true, true);
+  const buttons = screen.getAllByRole("button", { name: "Team full (6/6)" }) as HTMLButtonElement[];
+  expect(buttons).toHaveLength(60);
+  expect(buttons.every((button) => button.disabled)).toBe(true);
 });

@@ -13,6 +13,7 @@ interface GridProps {
   pokemon: Pokemon[];
   // Adds a Pokémon to the team being edited; resolves to true when it was added.
   onAdd: (pokemon: Pokemon) => Promise<boolean>;
+  teamFull: boolean; // the team being edited has six members
 }
 
 interface CardListProps extends GridProps {
@@ -23,12 +24,12 @@ interface CardListProps extends GridProps {
 // The drawn cards, then the button that draws the next batch. The button
 // stays where focus is, so pressing it again needs no moving about; the new
 // cards come before it, in reading order. When every card is drawn it goes.
-function CardList({ pokemon, onAdd, next, onMore }: CardListProps) {
+function CardList({ pokemon, onAdd, teamFull, next, onMore }: CardListProps) {
   return (
     <>
       <div className="grid">
         {pokemon.map((entry) => (
-          <PokemonCard key={entry.id} pokemon={entry} onAdd={onAdd} />
+          <PokemonCard key={entry.id} pokemon={entry} onAdd={onAdd} teamFull={teamFull} />
         ))}
       </div>
       {next > 0 && (
@@ -53,7 +54,7 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   );
 }
 
-export function PokemonGrid({ pokemon, onAdd }: GridProps) {
+export function PokemonGrid({ pokemon, onAdd, teamFull }: GridProps) {
   const [filters, setFilters] = useState<GridFilters>(NO_FILTERS);
   const [drawn, setDrawn] = useState(PAGE_SIZE);
   const visible = useMemo(() => filterPokemon(pokemon, filters), [pokemon, filters]);
@@ -89,6 +90,7 @@ export function PokemonGrid({ pokemon, onAdd }: GridProps) {
         <CardList
           pokemon={visible.slice(0, onScreen)}
           onAdd={onAdd}
+          teamFull={teamFull}
           next={Math.min(PAGE_SIZE, visible.length - onScreen)}
           onMore={() => setDrawn(onScreen + PAGE_SIZE)}
         />

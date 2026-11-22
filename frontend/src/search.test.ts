@@ -19,6 +19,8 @@ test.each([
   { rule: "a space matches a dash", query: "mega x", expected: MEGA_X },
   { rule: "a dash matches a dash", query: "mega-x", expected: MEGA_X },
   { rule: "a number matches the exact ID only", query: "25", expected: [25] },
+  { rule: "leading zeros still match the number", query: "025", expected: [25] },
+  { rule: "any number of leading zeros", query: "0006", expected: [6] },
   // Ivysaur is ID 2 and porygon2 has "2" in its name; IDs such as 12 or 20 do not match.
   { rule: "the exact ID comes before names containing the number", query: "2", expected: [2, 233] },
 ])("searchPokemon: $rule ($query)", ({ query, expected }) => {

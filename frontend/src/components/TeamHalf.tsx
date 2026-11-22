@@ -96,6 +96,7 @@ export function TeamHalf({ team, pokemonById, onMembers, onRename, onDelete }: H
             onMoveEarlier={index > 0 ? () => move(index, index - 1, "slot-earlier") : undefined}
             onMoveLater={index < ids.length - 1 ? () => move(index, index + 1, "slot-later") : undefined}
             onDragStart={() => (dragged.current = index)}
+            onDragEnd={() => (dragged.current = null)}
             onDrop={() => dropOn(index)}
           />
         ))}

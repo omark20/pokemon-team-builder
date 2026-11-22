@@ -13,6 +13,7 @@ export interface SlotActions {
   onMoveEarlier?: () => void; // absent for the first slot
   onMoveLater?: () => void; // absent for the last slot
   onDragStart: () => void;
+  onDragEnd: () => void; // the drag finished, dropped or cancelled
   onDrop: () => void;
 }
 
@@ -60,7 +61,7 @@ function SlotControl(props: { label: string; className: string; children: ReactN
   );
 }
 
-export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDragStart, onDrop }: SlotProps) {
+export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDragStart, onDragEnd, onDrop }: SlotProps) {
   const { revealed, handlers, acts } = useReveal();
   const [dropTarget, setDropTarget] = useState(false);
   const name = displayName(pokemon.name);
@@ -85,6 +86,7 @@ export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDrag
         setDropTarget(true);
       }}
       onDragLeave={() => setDropTarget(false)}
+      onDragEnd={onDragEnd}
       onDrop={handleDrop}
       {...handlers}
     >

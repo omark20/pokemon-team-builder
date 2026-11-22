@@ -9,8 +9,9 @@ interface SpriteProps {
 }
 
 export function Sprite({ url, name, size }: SpriteProps) {
-  const [failed, setFailed] = useState(false);
-  if (url === null || failed) {
+  // The address that failed, so a different picture in the same place loads.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (url === null || url === failedUrl) {
     return (
       <div className="sprite sprite-missing" role="img" aria-label={`No picture of ${name}`}>
         ?
@@ -19,7 +20,7 @@ export function Sprite({ url, name, size }: SpriteProps) {
   }
   return (
     <div className="sprite">
-      <img src={url} alt={name} width={size} height={size} loading="lazy" onError={() => setFailed(true)} />
+      <img src={url} alt={name} width={size} height={size} loading="lazy" onError={() => setFailedUrl(url)} />
     </div>
   );
 }

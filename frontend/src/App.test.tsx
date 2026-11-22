@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import App from "./App";
-import { MESSAGES } from "./teamStore";
+import { MESSAGES } from "./messages";
 import { FakeServer } from "./test/fakeServer";
 import type { Team } from "./types";
 

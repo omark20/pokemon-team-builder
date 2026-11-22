@@ -12,12 +12,15 @@ interface PanelProps {
   pokemonById: Map<number, Pokemon>;
   failed: boolean;
   message: string | null;
+  dismissing: boolean; // a dismissal is in flight; the buttons wait
   onDismiss: (id: number) => void;
   onDismissAll: () => void;
   onRetry: () => void;
 }
 
-function AlertRowView({ alert, teams, pokemonById, onDismiss }: Pick<PanelProps, "teams" | "pokemonById" | "onDismiss"> & { alert: Alert }) {
+type RowProps = Pick<PanelProps, "teams" | "pokemonById" | "dismissing" | "onDismiss"> & { alert: Alert };
+
+function AlertRowView({ alert, teams, pokemonById, dismissing, onDismiss }: RowProps) {
   const row = describeAlert(alert, teams, pokemonById);
   return (
     <li className="alert-row">
@@ -34,7 +37,7 @@ function AlertRowView({ alert, teams, pokemonById, onDismiss }: Pick<PanelProps,
           {row.detected} · {row.affects}
         </div>
       </div>
-      <button type="button" className="alert-dismiss" onClick={() => onDismiss(alert.id)}>
+      <button type="button" className="alert-dismiss" disabled={dismissing} onClick={() => onDismiss(alert.id)}>
         Dismiss
       </button>
     </li>
@@ -60,7 +63,7 @@ export function AlertPanel(props: PanelProps) {
         <div className="alert-headline">
           <strong>{headline(alerts.length)}</strong>
           {alerts.length > 0 && (
-            <button type="button" className="alert-dismiss" onClick={props.onDismissAll}>
+            <button type="button" className="alert-dismiss" disabled={props.dismissing} onClick={props.onDismissAll}>
               Dismiss all
             </button>
           )}
@@ -69,7 +72,14 @@ export function AlertPanel(props: PanelProps) {
       {message && <p role="alert">{message}</p>}
       <ul className="alert-rows">
         {alerts.map((alert) => (
-          <AlertRowView key={alert.id} alert={alert} teams={props.teams} pokemonById={props.pokemonById} onDismiss={props.onDismiss} />
+          <AlertRowView
+            key={alert.id}
+            alert={alert}
+            teams={props.teams}
+            pokemonById={props.pokemonById}
+            dismissing={props.dismissing}
+            onDismiss={props.onDismiss}
+          />
         ))}
       </ul>
     </section>

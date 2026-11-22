@@ -10,6 +10,7 @@ import { AlertPanel } from "./components/AlertPanel";
 import { FaceOff } from "./components/FaceOff";
 import { GridPlaceholder, PokemonGrid } from "./components/PokemonGrid";
 import { StatusFooter } from "./components/StatusFooter";
+import { TEAM_SIZE } from "./teamMoves";
 import { TeamStore, useTeams, type Notice } from "./teamStore";
 import type { Pokemon, Team } from "./types";
 
@@ -73,6 +74,7 @@ export default function App() {
   const pokemon = state.status === "ready" ? state.pokemon : NOT_LOADED;
   const pokemonById = useMemo(() => new Map(pokemon.map((entry) => [entry.id, entry])), [pokemon]);
   const addToTeam = (entry: Pokemon) => store.add(entry);
+  const teamFull = (store.activeTeam()?.pokemon_ids.length ?? 0) >= TEAM_SIZE;
   const alerts = useTeamAlerts(teams.teams);
   return (
     <main className="page">
@@ -97,7 +99,7 @@ export default function App() {
           </button>
         </div>
       )}
-      {state.status === "ready" && <PokemonGrid pokemon={state.pokemon} onAdd={addToTeam} />}
+      {state.status === "ready" && <PokemonGrid pokemon={state.pokemon} onAdd={addToTeam} teamFull={teamFull} />}
       <StatusFooter />
       <NoticeBar notice={teams.notice} onClose={() => store.dismissNotice()} />
     </main>

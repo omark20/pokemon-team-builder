@@ -1,7 +1,8 @@
 // The visitor's change alerts: loaded once when the page opens, and dismissed
 // one at a time with the existing per-alert call. "Dismiss all" makes that
 // call for each alert in turn and stops at the first refusal, leaving the rest.
-import { useCallback, useEffect, useState } from "react";
+// While a dismissal is in flight a second click does nothing.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { dismissAlert, fetchAlerts } from "./api";
 import type { Alert } from "./types";
 
@@ -17,8 +18,28 @@ export interface AlertsState {
   message: string | null; // why the last dismissal did not go through
 }
 
+// Runs one action at a time. The ref is read at once, so a second click in
+// the same moment is refused; `running` is for disabling the buttons.
+function useOneAtATime() {
+  const busy = useRef(false);
+  const [running, setRunning] = useState(false);
+  async function run(action: () => Promise<unknown>): Promise<void> {
+    if (busy.current) return;
+    busy.current = true;
+    setRunning(true);
+    try {
+      await action();
+    } finally {
+      busy.current = false;
+      setRunning(false);
+    }
+  }
+  return { running, run };
+}
+
 export function useAlerts() {
   const [state, setState] = useState<AlertsState>({ alerts: [], failed: false, message: null });
+  const { running, run } = useOneAtATime();
 
   const load = useCallback(async () => {
     try {
@@ -30,7 +51,7 @@ export function useAlerts() {
   useEffect(() => void load(), [load]);
 
   // True when the alert was dismissed; it then leaves the list.
-  async function dismiss(id: number, refusal = ALERT_MESSAGES.dismissFailed): Promise<boolean> {
+  async function dismissOne(id: number, refusal = ALERT_MESSAGES.dismissFailed): Promise<boolean> {
     try {
       await dismissAlert(id);
     } catch {
@@ -41,11 +62,13 @@ export function useAlerts() {
     return true;
   }
 
-  async function dismissAll(ids: number[]): Promise<void> {
+  async function dismissEach(ids: number[]): Promise<void> {
     for (const id of ids) {
-      if (!(await dismiss(id, ALERT_MESSAGES.dismissAllStopped))) return;
+      if (!(await dismissOne(id, ALERT_MESSAGES.dismissAllStopped))) return;
     }
   }
 
-  return { ...state, load, dismiss, dismissAll };
+  const dismiss = (id: number) => run(() => dismissOne(id));
+  const dismissAll = (ids: number[]) => run(() => dismissEach(ids));
+  return { ...state, dismissing: running, load, dismiss, dismissAll };
 }

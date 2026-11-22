@@ -12,6 +12,7 @@ const FULL_BAR = 160;
 interface CardProps {
   pokemon: Pokemon;
   onAdd: (pokemon: Pokemon) => void;
+  teamFull: boolean; // the team being edited has six; the button says so and waits
 }
 
 function StatBar({ index, value }: { index: number; value: number }) {
@@ -30,7 +31,7 @@ function StatBar({ index, value }: { index: number; value: number }) {
   );
 }
 
-export function PokemonCard({ pokemon, onAdd }: CardProps) {
+export function PokemonCard({ pokemon, onAdd, teamFull }: CardProps) {
   const name = displayName(pokemon.name);
   return (
     <article className="card" style={typeStyle(pokemon.types[0]!)}>
@@ -48,8 +49,8 @@ export function PokemonCard({ pokemon, onAdd }: CardProps) {
           <StatBar key={index} index={index} value={value} />
         ))}
       </div>
-      <button type="button" className="card-add" onClick={() => onAdd(pokemon)}>
-        Add to team
+      <button type="button" className="card-add" disabled={teamFull} onClick={() => onAdd(pokemon)}>
+        {teamFull ? "Team full (6/6)" : "Add to team"}
       </button>
     </article>
   );

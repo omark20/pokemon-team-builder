@@ -33,7 +33,7 @@ test("before a build the right half is an empty box with no button in it", async
   expect(counterHalf().getByText("No counter team yet")).toBeTruthy();
   expect(counterHalf().queryByRole("button")).toBeNull();
   expect(primary().textContent).toBe("Build counter team");
-  expect(footer().getByText("Drag to reorder. Hover a Pokémon to remove it.")).toBeTruthy();
+  expect(footer().getByText("Drag a Pokémon to reorder, or select it for its arrows and ×.")).toBeTruthy();
 });
 
 test("after a build, counter i faces member i, and the footer reports the pool size", async () => {

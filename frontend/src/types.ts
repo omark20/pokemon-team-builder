@@ -105,4 +105,5 @@ export interface ScanRun {
   status: "running" | "ok" | "incomplete" | "failed";
   scanned: number;
   changed: number;
+  failed: number; // Pokémon that could not be read in this run
 }

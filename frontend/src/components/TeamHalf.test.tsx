@@ -38,6 +38,15 @@ test("dropping slot 1 on slot 4 swaps the two and moves nothing else", () => {
   expect(onMembers).toHaveBeenCalledExactlyOnceWith([25, 9, 3, 6, 94, 149]);
 });
 
+test("a drag cancelled before its drop leaves nothing to drop later", () => {
+  const { onMembers, slots } = renderHalf([6, 9, 3, 25]);
+  const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
+  fireEvent.dragStart(slots()[0]!, { dataTransfer });
+  fireEvent.dragEnd(slots()[0]!, { dataTransfer }); // Esc, or let go outside the team
+  fireEvent.drop(slots()[3]!, { dataTransfer }); // then something else is dropped here
+  expect(onMembers).not.toHaveBeenCalled();
+});
+
 test("dropping a slot on an empty outline moves it to the end", () => {
   const { onMembers, slots } = renderHalf([6, 9, 25]);
   drag(slots()[0]!, slots()[4]!);

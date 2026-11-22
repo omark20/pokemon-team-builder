@@ -9,7 +9,7 @@ import { PokemonCard } from "./PokemonCard";
 const LABELS = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
 
 function renderCard(pokemon: Pokemon, onAdd = vi.fn()) {
-  const { container } = render(<PokemonCard pokemon={pokemon} onAdd={onAdd} />);
+  const { container } = render(<PokemonCard pokemon={pokemon} onAdd={onAdd} teamFull={false} />);
   return { container, onAdd };
 }
 

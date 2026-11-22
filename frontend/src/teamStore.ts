@@ -6,6 +6,7 @@
 // fails the team goes back to what the server last confirmed.
 import { useSyncExternalStore } from "react";
 import { ApiError, createTeam, deleteTeam, fetchCounter, fetchTeams, renameTeam, saveMembers } from "./api";
+import { counterErrorText, errorText, MESSAGES } from "./messages";
 import { TEAM_SIZE } from "./teamMoves";
 import { displayName, type CounterResult, type Pokemon, type Team } from "./types";
 
@@ -29,34 +30,6 @@ export interface TeamsState {
   counterError: string | null; // why the last build gave no counter team
   building: boolean; // a counter team is being worked out for what is on screen
   leaveOutLegendary: boolean; // the visitor's tick; kept while the page is open
-}
-
-export const MESSAGES = {
-  teamFull: "This team already has six Pokémon. Remove one to add another.",
-  saveFailed: "Couldn't save your team. Your change was undone.",
-  tooFastSeconds: "You're going a little fast. Try again in a few seconds.",
-  tooFastMinutes: "You're going a little fast. Try again in a few minutes.",
-  createFailed: "Couldn't create the team. Try again.",
-  tooManyTeams: "You already have 20 teams. Delete one to make another.",
-  renameFailed: "Couldn't rename the team. Try again.",
-  deleteFailed: "Couldn't delete the team. Try again.",
-  counterFailed: "Couldn't build the counter team. Try again.",
-  halfDone: (team: string) =>
-    `${team} was created, but the Pokémon could not be added. Press Add again.`,
-};
-
-// A "too many requests" answer gets its own message, by how long the wait is:
-// the hourly limit on new visitors is minutes away, the others seconds.
-function errorText(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiError) || error.status !== 429) return fallback;
-  return error.retryAfter > 60 ? MESSAGES.tooFastMinutes : MESSAGES.tooFastSeconds;
-}
-
-// A 503 from the counter endpoint says in its own words what is missing (the
-// type chart, the legendary flags) or that it is busy; the page shows that.
-function counterErrorText(error: unknown): string {
-  const unavailable = error instanceof ApiError && error.status === 503 && error.detail;
-  return unavailable || errorText(error, MESSAGES.counterFailed);
 }
 
 // "Team" and the next number after the highest one in use: "Team 1" first.
@@ -147,9 +120,13 @@ export class TeamStore {
   // Adds a Pokémon to the selected team; true when it was added. A visitor
   // with no team gets "Team 1" made first.
   async add(pokemon: Pokemon): Promise<boolean> {
-    if (this.state.status !== "ready" || this.state.creating) return false;
+    const waiting = this.whyAddWaits();
+    if (waiting) {
+      this.update({ notice: { kind: "error", text: waiting } });
+      return false;
+    }
     const team = this.activeTeam();
-    if (!team) return (await this.createTeamWith([pokemon.id])) === true;
+    if (!team) return (await this.createTeamWith([pokemon.id], MESSAGES.halfDone)) === true;
     if (team.pokemon_ids.length >= TEAM_SIZE) {
       this.update({ notice: { kind: "error", text: MESSAGES.teamFull } });
       return false;
@@ -158,6 +135,13 @@ export class TeamStore {
     const text = `${displayName(pokemon.name)} added to ${team.name}.`;
     this.update({ notice: { kind: "info", text } });
     return true;
+  }
+
+  // Why an Add cannot happen yet, or null when it can.
+  private whyAddWaits(): string | null {
+    if (this.state.status === "loading") return MESSAGES.teamsLoading;
+    if (this.state.status === "failed") return MESSAGES.teamsFailed;
+    return this.state.creating ? MESSAGES.stillCreating : null;
   }
 
   // Shows the new member list at once and saves it in the background.
@@ -195,7 +179,7 @@ export class TeamStore {
   // "Save as new team": the counter team becomes a team of its own.
   async saveCounterAsTeam(): Promise<void> {
     const ids = this.state.counter?.picks.map((pick) => pick.counter.id);
-    if (ids) await this.createTeamWith(ids);
+    if (ids) await this.createTeamWith(ids, MESSAGES.counterNotSaved);
   }
 
   // Sends the newest unsent list, and again if a newer one arrived meanwhile,
@@ -208,6 +192,7 @@ export class TeamStore {
       }
     } catch (error) {
       this.unsent.delete(id);
+      if (!this.state.teams.some((team) => team.id === id)) return; // deleted meanwhile
       this.changeTeam(id, { pokemon_ids: this.confirmed.get(id) ?? [] });
       this.fail(error, MESSAGES.saveFailed);
     } finally {
@@ -217,8 +202,8 @@ export class TeamStore {
 
   // A new team holding these Pokémon: two requests, create then set members.
   // Used by a first Add and by "Save as new team". If the second request
-  // fails the new team stays, empty, and the message says so.
-  private createTeamWith(pokemonIds: number[]): Promise<boolean | null> {
+  // fails the new team stays, empty, and `halfDone` says what to do next.
+  private createTeamWith(pokemonIds: number[], halfDone: (team: string) => string): Promise<boolean | null> {
     return this.whileCreating(async () => {
       const team = await this.postTeam();
       if (!team) return false;
@@ -228,7 +213,7 @@ export class TeamStore {
         this.changeTeam(team.id, { pokemon_ids: saved.pokemon_ids });
         return true;
       } catch {
-        this.update({ notice: { kind: "error", text: MESSAGES.halfDone(team.name) } });
+        this.update({ notice: { kind: "error", text: halfDone(team.name) } });
         return false;
       }
     });
