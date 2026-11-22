@@ -47,6 +47,13 @@ class PokeApiSource:
             raise UpstreamError("timeout", retryable=True) from None
         except httpx.TransportError:
             raise UpstreamError("connection", retryable=True) from None
+        except httpx.RequestError:
+            # The rest of httpx's RequestError (a body that will not decode, too many
+            # redirects): this answer is unusable, but the rest of the scan goes on.
+            raise UpstreamError("request_failed", retryable=False) from None
+        except httpx.InvalidURL:
+            # Outside httpx's HTTPError family: a URL with a control character in it.
+            raise UpstreamError("invalid_url", retryable=False) from None
         status = response.status_code
         if status == 404:
             return None
