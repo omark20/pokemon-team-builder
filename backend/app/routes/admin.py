@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field
 
-from app import auth, db, demo, scan
+from app import auth, db, demo, limits, scan
 from app.routes.params import PokemonId
 
 router = APIRouter()
@@ -35,7 +35,11 @@ def scan_status(request: Request) -> dict[str, Any]:
         return {"runs": runs, "demo_active": demo.is_active(conn)}
 
 
-@router.post("/api/admin/scan", status_code=202, dependencies=[Depends(auth.require_scan_token)])
+@router.post(
+    "/api/admin/scan",
+    status_code=202,
+    dependencies=[Depends(limits.limit_admin), Depends(auth.require_scan_token)],
+)
 def trigger_scan(
     request: Request,
     background: BackgroundTasks,

@@ -17,12 +17,15 @@ from pydantic import (
     model_validator,
 )
 
-from app import auth, db, demo, pokemon_list, scan
+from app import auth, db, demo, limits, pokemon_list, scan
 from app.domain.diff import MAX_BASE_STAT, SPRITE_PREFIX
 from app.domain.types import STANDARD_TYPES
 from app.routes.params import MAX_ID
 
-router = APIRouter(prefix="/api/admin/demo", dependencies=[Depends(auth.require_admin_token)])
+router = APIRouter(
+    prefix="/api/admin/demo",
+    dependencies=[Depends(limits.limit_admin), Depends(auth.require_admin_token)],
+)
 STRICT = ConfigDict(extra="forbid", strict=True)
 # 20 Pokémon patches and all 324 chart cells come to about 25 KB.
 OVERRIDES_MAX_BODY_BYTES = 64 * 1024

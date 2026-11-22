@@ -76,14 +76,16 @@ def _require_bearer(request: Request, expected: str | None) -> None:
     header = request.headers.get("authorization")
     if header is not None and expected is not None and _bearer_matches(header, expected):
         return
-    log_event(
-        logger,
-        logging.WARNING,
-        "admin_unauthorized",
-        request_id=request.state.request_id,
-        route=route_template(request),
-        token="absent" if header is None else "wrong",
-    )
+    address = limits.client_address(request)
+    if request.app.state.limiter.first_refusal("admin", address):
+        log_event(
+            logger,
+            logging.WARNING,
+            "admin_unauthorized",
+            request_id=request.state.request_id,
+            route=route_template(request),
+            token="absent" if header is None else "wrong",
+        )
     raise HTTPException(401, "Unauthorized", headers={"WWW-Authenticate": "Bearer"})
 
 

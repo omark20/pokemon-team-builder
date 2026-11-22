@@ -19,7 +19,7 @@ from psycopg.conninfo import conninfo_to_dict
 from app import auth
 from app.config import Settings
 from app.pokeapi import UpstreamError
-from app.routes import teams
+from app.routes import counter, teams
 
 APP = Path(__file__).resolve().parents[1] / "app"
 TEAMS = "/api/teams"
@@ -173,3 +173,37 @@ def test_a_failing_scan_is_explained_by_its_log_lines(
     assert row == ("incomplete", 11, 0, 3)
     summary = "status=incomplete scanned=11 changed=0 failed=3 filled=0"
     assert summary in lines[-1] and lines[-1].startswith(f"scan_finished run_id={run_id}")
+
+
+def _refuse_admin(client: TestClient, _: pytest.MonkeyPatch) -> None:
+    client.post("/api/admin/scan", headers={"Authorization": f"Bearer {WRONG_TOKEN}"})
+
+
+def _refuse_counter(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(counter, "COUNTER_WAIT_SECONDS", 0.01)
+    team = client.post(TEAMS, json={"name": "Busy"}).json()
+    client.put(f"{TEAMS}/{team['id']}/members", json={"pokemon_ids": [6]})
+    places = client.app.state.counter_places
+    assert places.acquire(blocking=False) and places.acquire(blocking=False)
+    try:
+        client.get(f"{TEAMS}/{team['id']}/counter")
+    finally:
+        places.release()
+        places.release()
+
+
+@pytest.mark.parametrize(
+    ("refuse", "event"),
+    [(_refuse_admin, "admin_unauthorized"), (_refuse_counter, "counter_busy")],
+)
+def test_a_repeated_refusal_is_logged_once_per_address_per_window(
+    stocked: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    refuse: Callable[[TestClient, pytest.MonkeyPatch], None],
+    event: str,
+) -> None:
+    with caplog.at_level(logging.INFO):
+        for _ in range(3):
+            refuse(stocked, monkeypatch)
+    assert len([message for message in caplog.messages if event in message]) == 1

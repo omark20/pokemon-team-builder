@@ -32,6 +32,7 @@ LIMITS = {
     "write": Limit(120, 60),  # team and alert writes
     "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
     "counter": Limit(20, 60),  # counter-team searches, each up to 1,000,000 steps
+    "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
 }
 
 
@@ -64,15 +65,29 @@ class RateLimiter:
         limit = self._limits[bucket]
         with self._lock:
             now = self._clock()
-            window = self._windows[bucket]
-            if now >= window.started + limit.window_seconds:
-                window = self._windows[bucket] = _Window(now)
+            window = self._current(bucket, now)
             window.counts[address] = window.counts.get(address, 0) + 1
             if window.counts[address] <= limit.requests:
                 return None
             first = address not in window.refused
             window.refused.add(address)
             return Refusal(math.ceil(window.started + limit.window_seconds - now), first)
+
+    def first_refusal(self, bucket: str, address: str) -> bool:
+        """Note a refusal outside the count (a wrong token, a busy search). True only for
+        the address's first refusal in this bucket's window, so only that one is logged."""
+        with self._lock:
+            window = self._current(bucket, self._clock())
+            first = address not in window.refused
+            window.refused.add(address)
+            return first
+
+    def _current(self, bucket: str, now: float) -> _Window:
+        """The bucket's window, started afresh once the last one has ended."""
+        window = self._windows[bucket]
+        if now >= window.started + self._limits[bucket].window_seconds:
+            window = self._windows[bucket] = _Window(now)
+        return window
 
 
 def client_address(request: Request) -> str:
@@ -125,3 +140,9 @@ async def limit_writes(request: Request) -> None:
 async def limit_counter(request: Request) -> None:
     """Route dependency for the counter-team search, the costliest request."""
     enforce(request, "counter")
+
+
+async def limit_admin(request: Request) -> None:
+    """Route dependency for the admin endpoints, before their token check: a loop of
+    wrong tokens is refused like any other flood."""
+    enforce(request, "admin")

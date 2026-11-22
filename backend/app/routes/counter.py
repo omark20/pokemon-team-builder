@@ -46,7 +46,8 @@ def counter_team(
     """
     places = request.app.state.counter_places
     if not places.acquire(timeout=COUNTER_WAIT_SECONDS):
-        log_event(logger, logging.WARNING, "counter_busy", request_id=request.state.request_id)
+        if request.app.state.limiter.first_refusal("counter", limits.client_address(request)):
+            log_event(logger, logging.WARNING, "counter_busy", request_id=request.state.request_id)
         raise HTTPException(503, "Counter teams are busy", headers={"Retry-After": "1"})
     try:
         return _counter_for(team_id, request, leave_out_legendary)
