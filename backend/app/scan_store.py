@@ -72,7 +72,7 @@ def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
         cursor = conn.execute("SELECT attacker, defender, multiplier FROM type_effectiveness")
         stored = {(attacker, defender): value for attacker, defender, value in cursor}
         cells = diff_chart(stored, chart)
-        demo_cells = run.overrides.chart
+        demo_cells = _demo_cells(conn, run) if cells else set()
         rows = [
             ChangeRow(
                 "multiplier",
@@ -113,18 +113,38 @@ def _update_if_changed(
     conn: Conn, run: Run, stored: dict[str, Any], record: PokemonRecord, values: list[Any]
 ) -> None:
     diff = diff_pokemon(stored, record)
-    demo = run.overrides.patched_fields(record.id)
+    restored = stored["removed_at"] is not None
+    demo = _demo_fields(conn, run, record.id) if diff.changes or restored else set()
     rows = [
         ChangeRow(c.field, c.old, c.new, record.id, is_demo=c.field in demo) for c in diff.changes
     ]
-    if stored["removed_at"] is not None:
-        rows.append(ChangeRow("status", "removed", "available", record.id))
+    if restored:
+        rows.append(
+            ChangeRow("status", "removed", "available", record.id, is_demo="status" in demo)
+        )
         log_event(logger, logging.INFO, "pokemon_restored", run_id=run.run_id, pokemon_id=record.id)
     if rows or diff.filled:
         conn.execute(UPDATE_ROW, [*values, run.now(), record.id])
         run.wrote_pokemon = True
     insert_changes(conn, run, rows)
     run.filled += bool(diff.filled)
+
+
+def _demo_fields(conn: Conn, run: Run, pokemon_id: int) -> set[str]:
+    """Fields whose change is demo: those the patch names, and those whose stored value
+    a demo change put there and reset has not yet undone (so undoing it is demo too)."""
+    rows = conn.execute(
+        "SELECT DISTINCT field FROM changes WHERE is_demo AND pokemon_id = %s", (pokemon_id,)
+    )
+    return run.overrides.patched_fields(pokemon_id) | {field for (field,) in rows}
+
+
+def _demo_cells(conn: Conn, run: Run) -> set[tuple[str, str]]:
+    """The same for chart cells: patched now, or holding a value a demo change put there."""
+    rows = conn.execute(
+        "SELECT DISTINCT attacker, defender FROM changes WHERE is_demo AND attacker IS NOT NULL"
+    )
+    return set(run.overrides.chart) | {(attacker, defender) for attacker, defender in rows}
 
 
 def stored_not_listed(conn: Conn, listed: dict[int, str]) -> list[int]:
@@ -156,7 +176,7 @@ def apply_removals(conn: Conn, run: Run) -> None:
             ).fetchone()
             if flagged:
                 run.wrote_pokemon = True
-                demo = "status" in run.overrides.patched_fields(pokemon_id)
+                demo = "status" in _demo_fields(conn, run, pokemon_id)
                 row = ChangeRow("status", "available", "removed", pokemon_id, is_demo=demo)
                 insert_changes(conn, run, [row])
                 log_event(

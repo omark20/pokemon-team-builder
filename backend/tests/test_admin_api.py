@@ -196,3 +196,26 @@ def test_an_override_that_real_data_could_not_contain_is_422(
 ) -> None:
     assert stocked.put(OVERRIDES, headers=ADMIN, json=doc).status_code == 422
     assert conn.execute("SELECT count(*) FROM demo_overrides").fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    "doc",
+    [
+        {"pokemon": {"6": {"attack": 94}}},
+        {"pokemon": {"25": {"removed": True}}},
+        {"type_chart": [{"attacker": "fire", "defender": "grass", "multiplier": 1}]},
+    ],
+    ids=["stat", "removal", "chart-cell"],
+)
+def test_undoing_a_demo_value_without_reset_is_still_demo_and_reset_removes_it(
+    stocked: TestClient, conn: psycopg.Connection, source: FakePokeApi, doc: dict[str, Any]
+) -> None:
+    before = stored_data(conn)
+    stocked.put(OVERRIDES, headers=ADMIN, json=doc)
+    demo_scan(conn, source)
+    stocked.put(OVERRIDES, headers=ADMIN, json={"pokemon": {}, "type_chart": []})  # no reset
+    demo_scan(conn, source)
+    assert [is_demo for *_, is_demo in change_fields(conn)] == [True, True]
+    assert stocked.post(RESET, headers=ADMIN).json() == {"restored": 2, "deleted": 2}
+    assert stored_data(conn) == before
+    assert change_fields(conn) == []
