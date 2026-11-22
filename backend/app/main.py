@@ -1,8 +1,10 @@
 """The web application: API routes, the built frontend, and the rules every request passes.
 
 Every response carries the security headers. A write whose Origin header names another
-site is refused. An unhandled error is logged by class and frames and answered with a
-generic 500 carrying only a request ID the visitor can quote.
+site is refused. A body that fails validation is answered without quoting it, so a
+password sent in a malformed body never comes back. An unhandled error is logged by
+class and frames and answered with a generic 500 carrying only a request ID the visitor
+can quote.
 """
 
 import logging
@@ -15,6 +17,7 @@ from urllib.parse import urlsplit
 
 import psycopg
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +25,7 @@ from psycopg_pool import PoolTimeout
 
 from app import db, limits, logs
 from app.config import Settings, load_settings
-from app.routes import admin, alerts, counter, demo_controls, pokemon, teams
+from app.routes import admin, alerts, counter, demo_controls, pokemon, sessions, teams
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +76,14 @@ def create_app(settings: Settings) -> FastAPI:
     app.state.settings = settings
     app.state.limiter = limits.RateLimiter()
     app.state.counter_places = threading.BoundedSemaphore(counter.COUNTER_PLACES)
+    app.state.hash_places = threading.BoundedSemaphore(sessions.HASH_PLACES)
+    app.exception_handler(RequestValidationError)(validation_failed)
     app.middleware("http")(guard_request)
     app.add_middleware(GZipMiddleware)
     app.get("/healthz")(healthz)
     # Bodies over the limit are refused with 413 while being read: before they are parsed
     # or any token is checked. Set per route, so the refusal passes the middleware above.
-    for routes in (admin, pokemon, teams, counter, alerts, demo_controls):
+    for routes in (admin, pokemon, teams, counter, alerts, demo_controls, sessions):
         app.include_router(routes.router, max_body_size=MAX_BODY_BYTES)
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
@@ -89,6 +94,18 @@ async def healthz() -> dict[str, bool]:
     """Says the process is up. Touches no database and, being async, needs no worker
     thread, so it answers even while every worker thread is waiting on the database."""
     return {"ok": True}
+
+
+# What a validation error keeps: its kind, where it is, and the library's sentence. The
+# input it refused and the context, which can quote it, are left out for the whole app.
+ERROR_KEYS = ("type", "loc", "msg")
+
+
+async def validation_failed(_: Request, exc: Exception) -> JSONResponse:
+    """422 listing each problem without the value that caused it."""
+    assert isinstance(exc, RequestValidationError)  # registered for this class only
+    detail = [{key: error[key] for key in ERROR_KEYS if key in error} for error in exc.errors()]
+    return JSONResponse({"detail": detail}, status_code=422)
 
 
 async def guard_request(

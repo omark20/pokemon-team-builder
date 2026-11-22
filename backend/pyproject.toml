@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Backend of the Pokémon Team Builder: stored PokéAPI copy, teams, counter teams, change alerts."
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "argon2-cffi==25.1.0",
     "fastapi>=0.165.0",
     "httpx>=0.28.1",
     "psycopg[binary,pool]>=3.3.9",

@@ -17,10 +17,12 @@ from local_app import HOST, free_port, start_app, wait_until_up
 from smoke_steps import (
     Smoke,
     SmokeFailure,
+    account_a,
     alert_for_a,
     back_to_baseline,
     clean_up,
     counter_a,
+    delete_account_a,
     full_list,
     full_scan,
     legendary_filter,
@@ -37,6 +39,7 @@ STEPS: list[tuple[str, Callable[[Smoke], None]]] = [
     ("1 a full live scan ends ok", full_scan),
     ("2 the list matches the captures", full_list),
     ("3 visitor A's team is stored in order", team_a),
+    ("3b A's account keeps the team across signing out and in", account_a),
     ("4 A's counter team is the expected one", counter_a),
     ("4b leaving out legendaries changes the pool and the picks", legendary_filter),
     ("5 storing a patch alone changes nothing", patch_stored_alone),
@@ -45,6 +48,7 @@ STEPS: list[tuple[str, Callable[[Smoke], None]]] = [
     ("8 B, without Charizard, gets nothing", no_alert_for_b),
     ("9 reset", reset),
     ("10 everything is back and the next scan is a no-op", back_to_baseline),
+    ("11 A deletes the account this run made", delete_account_a),
 ]
 
 

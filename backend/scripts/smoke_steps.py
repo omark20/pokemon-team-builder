@@ -3,6 +3,7 @@
 Expected values come from the captures in samples/, never from the app's own output.
 """
 
+import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -51,6 +52,8 @@ class Smoke:
     teams: dict[str, int] = field(default_factory=dict)  # visitor name: their team's ID
     alert_baselines: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     patched: bool = False  # this run stored a demo patch, so it must reset it
+    account_name: str = ""  # A's account, made by this run, which deletes it
+    account_password: str = ""  # never printed
 
     def scan_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.scan_token}"}
@@ -151,6 +154,32 @@ def team_a(smoke: Smoke) -> None:
     check(members == [TEAM_A], f"A's team to hold {TEAM_A} in that order", members)
 
 
+def account_a(smoke: Smoke) -> None:
+    """A makes an account with a name made up for the run, signs out and back in."""
+    name = f"smoke-{secrets.token_hex(4)}"
+    credentials = {"username": name, "password": secrets.token_urlsafe(12)}
+    created = smoke.as_visitor("A", "POST", "/api/account", json=credentials)
+    check(created.status_code == 201, "201 creating A's account", created.status_code)
+    smoke.account_name, smoke.account_password = name, credentials["password"]
+    smoke.cookies["A"] = created.cookies["uid"]
+    check(_team_ids(smoke, "A") == [smoke.teams["A"]], "A's account to hold its team", "other")
+    signed_out = smoke.as_visitor("A", "DELETE", "/api/session")
+    check(signed_out.status_code == 204, "204 signing out", signed_out.status_code)
+    check(_team_ids(smoke, "A") == [], "no team after signing out", "a team")
+    wrong = {"username": name, "password": credentials["password"] + "x"}
+    refused = smoke.http.post("/api/session", json=wrong)
+    check(refused.status_code == 401, "401 for a wrong password", refused.status_code)
+    signed_in = smoke.http.post("/api/session", json=credentials)
+    check(signed_in.status_code == 200, "200 signing in", signed_in.status_code)
+    smoke.cookies["A"] = signed_in.cookies["uid"]
+    smoke.http.cookies.clear()  # as in new_team: the cookie is sent by hand only
+    check(_team_ids(smoke, "A") == [smoke.teams["A"]], "A's team back after signing in", "other")
+
+
+def _team_ids(smoke: Smoke, visitor: str) -> list[int]:
+    return [team["id"] for team in smoke.as_visitor(visitor, "GET", "/api/teams").json()]
+
+
 def counter_a(smoke: Smoke) -> None:
     body = smoke.as_visitor("A", "GET", f"/api/teams/{smoke.teams['A']}/counter").json()
     names = [pick["counter"]["name"] for pick in body["picks"]]
@@ -232,12 +261,33 @@ def back_to_baseline(smoke: Smoke) -> None:
     check(smoke.alerts("A") == smoke.alert_baselines["A"], "A's alerts still back", "an alert")
 
 
+def delete_account_a(smoke: Smoke) -> None:
+    """A deletes the account this run made; its team goes with it and the name can no
+    longer sign in, so the run leaves no account behind. It runs last, not inside step 3b,
+    because the steps between use A's team."""
+    credentials = {"username": smoke.account_name, "password": smoke.account_password}
+    response = _delete_account(smoke)
+    check(response.status_code == 204, "204 deleting A's account", response.status_code)
+    smoke.account_password = ""
+    check(_team_ids(smoke, "A") == [], "no team left after deleting the account", "a team")
+    again = smoke.http.post("/api/session", json=credentials)
+    check(again.status_code == 401, "401 signing in to the deleted account", again.status_code)
+
+
+def _delete_account(smoke: Smoke) -> httpx.Response:
+    body = {"password": smoke.account_password}
+    return smoke.as_visitor("A", "POST", "/api/account/delete", json=body)
+
+
 def clean_up(smoke: Smoke) -> None:
-    """Reset a demo this run stored and delete its teams, whatever happened before."""
+    """Reset a demo this run stored and delete its teams and account, whatever happened
+    before."""
     if smoke.patched:
         smoke.http.post("/api/admin/demo/reset", headers=smoke.admin_headers())
     for visitor, team_id in smoke.teams.items():
         smoke.as_visitor(visitor, "DELETE", f"/api/teams/{team_id}")
+    if smoke.account_password:
+        _delete_account(smoke)
 
 
 def _has(entry: dict[str, Any], expected: dict[str, Any]) -> bool:

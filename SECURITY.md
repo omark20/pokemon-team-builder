@@ -8,7 +8,20 @@ Visitors' teams; the site staying up; the two admin tokens; the stored copy of P
 
 ## Who a visitor is
 
-**Threat:** someone guesses or forges who they are. There are no accounts: a visitor is a cookie, `uid`, holding 32 random bytes (`secrets.token_urlsafe`), marked HttpOnly, Secure and SameSite=Lax, kept for a year (`auth.create_user`). The database stores only its SHA-256, so a copy of it gives no working cookie; a made-up cookie matches no one. No name, email or address is stored; Render's own request log records IP addresses for a limited time. *Tests:* `test_the_cookie_is_httponly_secure_and_samesite_lax`, `test_a_made_up_cookie_is_treated_as_none`.
+**Threat:** someone guesses or forges who they are. A visitor is a cookie, `uid`, holding 32 random bytes (`secrets.token_urlsafe`), marked HttpOnly, Secure and SameSite=Lax. It holds either an anonymous visitor's token, kept for a year (`auth.create_user`), or a signed-in browser's session token, good for 30 days from sign-in and checked on the server (`auth.identify`). The database stores only each token's SHA-256, so a copy of it gives no working cookie; a made-up or expired cookie matches no one. Every sign-up and sign-in issues a new token and destroys the one it replaces. An anonymous visitor's record holds nothing about a person; an account adds only the username chosen and a password hash, never an email. Render's own request log records IP addresses for a limited time. *Tests:* `test_the_cookie_is_httponly_secure_and_samesite_lax`, `test_a_made_up_cookie_is_treated_as_none`, `test_a_session_lasts_30_days`, `test_an_anonymous_visitor_keeps_their_teams_and_gets_a_new_cookie`.
+
+## Accounts and passwords
+
+**Threat:** a password is guessed, read or leaked, or one account reaches another. Accounts are optional: a username and a password, no email (`accounts.py`, `account_store.py`, `routes/sessions.py`).
+
+- A username is 3 to 20 of the letters a to z in either case, digits, `_`, `-` and `.`, and is unique whatever its capitals. A password is 8 to 128 characters of any kind and is never trimmed; one of 46,483 common passwords (SecLists' NCSC list, compared in lower case), or the username itself, is refused.
+- Passwords are hashed with Argon2id at OWASP's setting of 19 MiB, 2 passes and 1 lane; the stored string carries its salt and settings. At most two hashes are worked out at once, then 503; no database connection is held while hashing.
+- An unknown name and a wrong password get the same 401 and the same body after the same work: for an unknown name a fixed dummy hash is verified.
+- Signing in merges the browser's anonymous teams into the account, oldest first, up to 20, in one transaction; the rest are deleted with the browser's record, and the sign-in form says so first. Nothing is merged from a browser signed in to another account.
+- An account has at most 10 sessions, the oldest removed first; signing out deletes that browser's session on the server. Its owner can delete an account with its current password: the account, its teams, its dismissals and every session go together, so every device is signed out, and the name is free again.
+- The password is a secret type from the moment the body is read, and no validation error quotes what was sent (`main.validation_failed`).
+
+*Tests:* `test_accounts.py`, `test_accounts_api.py`.
 
 ## Your teams are yours
 
@@ -20,11 +33,11 @@ Visitors' teams; the site staying up; the two admin tokens; the stored copy of P
 
 ## Requests from other sites
 
-**Threat:** another page makes a visitor's browser write here. A write whose `Origin` names another site is refused with 403 (`main.is_cross_site_write`); SameSite=Lax keeps the cookie off cross-site writes anyway. No GET request changes anything. *Test:* `test_write_from_another_site_is_refused`.
+**Threat:** another page makes a visitor's browser write here. A write whose `Origin` names another site, or `null`, is refused with 403 (`main.is_cross_site_write`); SameSite=Lax keeps the cookie off cross-site writes anyway. This covers sign-up, sign-in and sign-out as well, so another page cannot sign a visitor in to someone else's account. No GET request changes anything. *Tests:* `test_write_from_another_site_is_refused`, `test_a_sign_in_sent_as_a_form_from_another_site_is_refused`.
 
 ## What a request may contain
 
-**Threat:** malformed or oversized input. Bodies are strict: exact types, no unknown fields, bounded lengths and IDs. A team name is 1 to 50 characters, with no control characters and at least one visible one. Bodies over 16 KB (64 KB for the demo document) are refused with 413 *while being read*, before parsing or any token check (`main.MAX_BODY_BYTES`). *Tests:* `test_malformed_requests_are_4xx_never_500`, `test_names_are_1_to_50_visible_characters_without_control_characters`, `test_an_oversized_body_is_refused_with_413_before_it_is_read`.
+**Threat:** malformed or oversized input. Bodies are strict: exact types, no unknown fields, bounded lengths and IDs. A team name is 1 to 50 characters, with no control characters and at least one visible one. Bodies over 16 KB (64 KB for the demo document) are refused with 413 *while being read*, before parsing or any token check (`main.MAX_BODY_BYTES`). A 422 names each problem's kind and place, never the value sent. *Tests:* `test_malformed_requests_are_4xx_never_500`, `test_names_are_1_to_50_visible_characters_without_control_characters`, `test_an_oversized_body_is_refused_with_413_before_it_is_read`, `test_a_malformed_body_is_422_without_its_password`.
 
 ## Database safety
 
@@ -46,7 +59,7 @@ The documentation routes are off and the server does not announce itself. *Tests
 
 ## Limits
 
-**Threat:** a script floods the site or fills the database (`limits.LIMITS`, `auth.MAX_VISITORS`, `routes/counter.py`, `domain/counter_search.py`):
+**Threat:** a script floods the site, fills the database or guesses passwords (`limits.LIMITS`, `auth.MAX_VISITORS`, `routes/counter.py`, `domain/counter_search.py`, `routes/sessions.py`):
 
 | What | Limit |
 |---|---|
@@ -54,7 +67,10 @@ The documentation routes are off and the server does not announce itself. *Tests
 | Writes | 120 a minute per address |
 | Counter teams | 20 a minute per address; two searched at once; 250,000 steps per strictness level |
 | New visitors | 20 an hour per address; 10 a minute from all addresses together |
-| Visitors in all | 50,000 |
+| Visitors in all, accounts included | 50,000 |
+| Sign-in attempts, and account deletions | 10 in 15 minutes per username from any address; 20 in 15 minutes per address; successes count too |
+| Account-creation attempts | 5 an hour per address, taken names included; 60 an hour from all addresses together |
+| Password hashes at once | 2 |
 | Admin calls | 30 a minute per address |
 
 Over a limit is 429 with `Retry-After`; the page says to try again in a few seconds or minutes. A visitor's address is the `CF-Connecting-IP` header Render's edge sets (`limits.client_address`): probing the live site, the edge refused a request that set it, while `X-Forwarded-For` began with whatever the sender wrote. *Tests:* `test_limits.py`.
@@ -69,7 +85,7 @@ Over a limit is 429 with `Retry-After`; the page says to try again in a few seco
 
 ## Logs
 
-**Threat:** a secret or visitor detail written to the log. Lines carry named fields only; outside text is quoted so it cannot start a new line; exceptions are logged by class and code location, never by message (`logs.py`). The app's own lines never carry tokens, cookies, bodies, connection strings or visitor addresses; the web server's access line shows only the address of Render's proxy; and the database library's routine and warning messages are silenced. *Tests:* `test_no_secret_cookie_or_request_body_reaches_the_log`, `test_only_the_helper_logs_exceptions`.
+**Threat:** a secret or visitor detail written to the log. Lines carry named fields only; outside text is quoted so it cannot start a new line; exceptions are logged by class and code location, never by message (`logs.py`). The app's own lines never carry tokens, cookies, bodies, connection strings or visitor addresses. Account events (created, signed in, sign-in failed, signed out, deleted) carry only the request ID and the account's internal number: never a username, since people sometimes type their password into that box, nor a password, a hash or a token; the web server's access line shows only the address of Render's proxy; and the database library's routine and warning messages are silenced. *Tests:* `test_no_secret_cookie_or_request_body_reaches_the_log`, `test_account_flows_log_no_username_password_hash_or_cookie`, `test_only_the_helper_logs_exceptions`.
 
 ## The scan
 
@@ -85,7 +101,14 @@ Admin only. Its changes are tagged and reset removes exactly them; both controls
 
 ## What is not protected
 
-- No accounts: losing the cookie loses the teams, and anyone holding the cookie holds them.
+- Without an account, losing the cookie loses the teams; with or without one, anyone holding the cookie holds them until it ends.
+- Passwords need only 8 characters. OWASP calls fewer than 15 weak where there is no second factor, and there is none.
+- There is no email and no password reset: a forgotten password loses the account. A password cannot be changed; its owner can delete the account and make a new one.
+- A session lasts 30 days with no time-out for inactivity, and there is no "sign out everywhere".
+- Sign-up says when a name is taken, so names can be tested, 5 an hour per address.
+- Someone who keeps trying a username can keep its owner from signing in, 15 minutes at a time, and can try 960 passwords a day against it.
+- There is no anti-forgery token: requests from other sites are stopped by the `Origin` check and SameSite only, two layers where OWASP also recommends a token.
+- Stored hashes are not upgraded if the hash settings change, and the cookie does not use the `__Host-` name prefix.
 - Someone with many addresses can slow first-time visitors and, over days, reach the visitor ceiling.
 - While a demo is active, every visitor sees its values.
 - The schedule is best effort.

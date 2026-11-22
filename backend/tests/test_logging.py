@@ -80,6 +80,26 @@ def test_no_secret_cookie_or_request_body_reaches_the_log(
     assert [secret for secret in secrets if secret in caplog.text] == []
 
 
+def test_account_flows_log_no_username_password_hash_or_cookie(
+    client: TestClient, conn: psycopg.Connection, caplog: pytest.LogCaptureFixture
+) -> None:
+    name, password, guess = "Kasumi7f3a", "correct horse 2e9d", "wrong guess 5c1d"
+    laptop = TestClient(client.app, base_url="https://testserver")
+    with caplog.at_level(logging.INFO):
+        client.post("/api/account", json={"username": name, "password": password})
+        laptop.post("/api/session", json={"username": name, "password": guess})
+        laptop.post("/api/session", json={"username": name.upper(), "password": password})
+        cookies = [client.cookies["uid"], laptop.cookies["uid"]]
+        laptop.delete("/api/session")
+        row = conn.execute("SELECT password_hash FROM users").fetchone()
+        client.post("/api/account/delete", json={"password": password})
+    assert row is not None
+    secrets = [name, name.lower(), name.upper(), password, guess, row[0], *cookies]
+    events = ["account_created", "sign_in_failed", "signed_in", "signed_out", "account_deleted"]
+    assert [event for event in events if f" {event} " not in caplog.text] == []
+    assert [secret for secret in secrets if secret in caplog.text] == []
+
+
 @pytest.mark.parametrize(("header", "logged"), [(None, "absent"), (WRONG_TOKEN, "wrong")])
 def test_an_admin_refusal_says_whether_a_token_was_absent_or_wrong(
     client: TestClient, caplog: pytest.LogCaptureFixture, header: str | None, logged: str

@@ -34,6 +34,11 @@ LIMITS = {
     "new_visitor_total": Limit(10, 60),  # the same, all addresses together (one shared key)
     "counter": Limit(20, 60),  # counter-team searches: 250,000 steps a strictness level
     "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
+    # Accounts: every attempt counts, whether it succeeds or not, before any password check.
+    "sign_in": Limit(20, 900),  # sign-in attempts per address
+    "sign_in_name": Limit(10, 900),  # sign-in attempts per typed username (lower case), any address
+    "account": Limit(5, 3600),  # account-creation attempts per address, taken names included
+    "account_total": Limit(60, 3600),  # the same, all addresses together (one shared key)
 }
 
 
@@ -143,6 +148,18 @@ async def limit_writes(request: Request) -> None:
 async def limit_counter(request: Request) -> None:
     """Route dependency for the counter-team search, the costliest request."""
     enforce(request, "counter")
+
+
+async def limit_sign_in(request: Request) -> None:
+    """Route dependency for signing in, per address; the per-username count is in the
+    route, once the body has been read."""
+    enforce(request, "sign_in")
+
+
+async def limit_account(request: Request) -> None:
+    """Route dependency for creating an account: per address, then for all addresses."""
+    enforce(request, "account")
+    enforce(request, "account_total", key="all")
 
 
 async def limit_admin(request: Request) -> None:

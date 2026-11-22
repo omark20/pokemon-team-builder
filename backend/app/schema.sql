@@ -69,13 +69,32 @@ CREATE TABLE IF NOT EXISTS changes (
 );
 CREATE INDEX IF NOT EXISTS changes_detected_at ON changes (detected_at);
 
--- Anonymous visitors. The cookie holds a random value; only its SHA-256 is stored, so
+-- Visitors. The cookie holds a random value; only its SHA-256 is stored, so
 -- nothing here can be turned back into a working cookie. Nothing else about a person.
 CREATE TABLE IF NOT EXISTS users (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- never sent to any client
     token_hash bytea NOT NULL UNIQUE,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Optional accounts, added later: a record is either anonymous (a token, no username)
+-- or an account (a username and a password hash, no token); the code keeps it so.
+-- username_key is the name in lower case, so Ash and ash are one name.
+ALTER TABLE users ALTER COLUMN token_hash DROP NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username_key text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_key ON users (username_key);
+
+-- One row per browser signed in to an account; its cookie's SHA-256, as for anonymous
+-- visitors. A session lasts 30 days from sign-in.
+CREATE TABLE IF NOT EXISTS sessions (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token_hash bytea NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessions_user_id ON sessions (user_id);
 
 CREATE TABLE IF NOT EXISTS teams (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
