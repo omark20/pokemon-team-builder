@@ -1,7 +1,7 @@
-// What "Show details" opens under the face-off: how the team was chosen, why
-// each counter was picked, every counter's matchup against every member of the
-// team, the team's three totals, and how many counters each of the team's
-// types hits hard.
+// What "Show details" opens under the face-off: the view of the team as a
+// whole. How the team was chosen, every counter's matchup against every member
+// of the team, the team's three totals, and how many counters each of the
+// team's types hits hard. Why each counter was picked is on its own card.
 //
 // A matchup is how hard the counter hits that Pokémon minus how hard it is
 // hit back, in points (one per doubling of damage), from -5 to 5. A counter's
@@ -34,24 +34,6 @@ function Matchup({ points }: { points: number }) {
     <>
       <span className="matchup-word">{matchupWord(points)}</span> {signed(points)}
     </>
-  );
-}
-
-function Reasons({ counter }: { counter: CounterResult }) {
-  return (
-    <ul className="reasons">
-      {counter.picks.map((pick, index) => (
-        <li key={index}>
-          <strong>
-            {displayName(pick.counter.name)} <span className="muted">beats</span> {displayName(pick.opponent.name)}
-          </strong>{" "}
-          <span className="matchup" style={matchupStyle(pick.matchup)}>
-            <Matchup points={pick.matchup} />
-          </span>
-          <p>{pick.reason}</p>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -120,7 +102,6 @@ export function CounterDetails({ counter }: { counter: CounterResult }) {
   return (
     <div className="counter-details">
       <HowChosen />
-      <Reasons counter={counter} />
       <MatchupTable counter={counter} />
       <Totals counter={counter} />
     </div>

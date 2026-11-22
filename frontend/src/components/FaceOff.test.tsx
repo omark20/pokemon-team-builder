@@ -68,13 +68,13 @@ test.each(CHANGES)("%s clears the counter team", async (_change, act) => {
   expect(primary().textContent).toBe("Build counter team");
 });
 
-test("the details open on request: one reason per pick and a table whose rows add up to coverage", async () => {
+test("the details open on request with the team-level view only: a table whose rows add up to coverage", async () => {
   await start();
   await build();
   expect(document.querySelector(".counter-details")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-  const reasons = [...document.querySelectorAll(".reasons p")].map((el) => el.textContent);
-  expect(reasons).toEqual(COUNTER.picks.map((pick) => pick.reason));
+  const details = document.querySelector(".counter-details")!.textContent;
+  expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]); // reasons are on the cards
   const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];
   expect(rows.map((row) => row.querySelectorAll("td:not(.row-sum)").length)).toEqual([3, 3, 3]);
   const sums = rows.map((row) => Number(row.querySelector(".row-sum")!.textContent));
@@ -154,4 +154,30 @@ test("a finished build is announced once, politely, with the counters' names", a
   expect(live.textContent).toBe("");
   await build();
   expect(live.textContent).toBe("Counter team ready: Archeops, Hydrapple, Celesteela.");
+});
+
+const whyButtons = () => counterHalf().getAllByRole("button", { name: /^(Why\?|Hide why)$/ });
+const shownReasons = () => [...document.querySelectorAll(".why")].map((el) => el.textContent);
+
+test("a card's Why? shows that pick's reason under it, and only that one, until pressed again", async () => {
+  await start();
+  await build();
+  const second = whyButtons()[1]!;
+  expect([second.tagName, second.getAttribute("type")]).toEqual(["BUTTON", "button"]); // reachable with Tab, works with Enter
+  fireEvent.click(second);
+  expect(shownReasons()).toEqual([COUNTER.picks[1]!.reason]);
+  expect([second.textContent, second.getAttribute("aria-expanded")]).toEqual(["Hide why", "true"]);
+  fireEvent.click(second);
+  expect(shownReasons()).toEqual([]);
+  expect([second.textContent, second.getAttribute("aria-expanded")]).toEqual(["Why?", "false"]);
+});
+
+test("a rebuild hides every open reason", async () => {
+  await start();
+  await build();
+  act(() => whyButtons().forEach((button) => button.click())); // three presses before one render
+  expect(shownReasons()).toHaveLength(3);
+  fireEvent.click(primary());
+  await screen.findByText("beats Charizard");
+  expect(shownReasons()).toEqual([]);
 });

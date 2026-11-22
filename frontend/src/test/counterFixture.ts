@@ -19,11 +19,11 @@ const pick = (opponent: [number, string], counter: [number, string], numbers: nu
 export const COUNTER: CounterResult = {
   picks: [
     pick([6, "charizard"], [567, "archeops"], [4, 0.5, 3, 3, 567], "rock",
-      "Archeops (rock, flying) hits Charizard for 4× with rock attacks; Charizard's best attack back does ½×. Across the whole opposing team its matchups add up to +3."),
+      "Archeops (rock, flying) hits Charizard for 4× with rock attacks. Charizard's best attack back does ½×. Across the whole opposing team its matchups add up to +3."),
     pick([9, "blastoise"], [1019, "hydrapple"], [2, 0.25, 3, 1, 540], "grass",
-      "Hydrapple (grass, dragon) hits Blastoise for 2× with grass attacks; Blastoise's best attack back does ¼×. Across the whole opposing team its matchups add up to +1."),
+      "Hydrapple (grass, dragon) hits Blastoise for 2× with grass attacks. Blastoise's best attack back does ¼×. Across the whole opposing team its matchups add up to +1."),
     pick([3, "venusaur"], [797, "celesteela"], [2, 0.25, 3, 2, 570], "flying",
-      "Celesteela (steel, flying) hits Venusaur for 2× with flying attacks; Venusaur's best attack back does ¼×. Across the whole opposing team its matchups add up to +2."),
+      "Celesteela (steel, flying) hits Venusaur for 2× with flying attacks. Venusaur's best attack back does ¼×. Across the whole opposing team its matchups add up to +2."),
   ],
   totals: { assigned_points: 9, coverage: 6, base_stats: 1677 },
   grid: [

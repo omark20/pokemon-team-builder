@@ -574,37 +574,6 @@ button:disabled {
   font-size: 13px;
 }
 
-.reasons {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-  gap: 0 18px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.reasons li {
-  padding: 6px 0;
-  border-top: 1px solid var(--border);
-}
-
-.reasons p {
-  margin: 2px 0 0;
-  color: var(--text-soft);
-}
-
-.muted {
-  font-weight: 400;
-  color: var(--text-soft);
-}
-
-.matchup {
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
 /* Cells stand apart with a small gap, so two neighbours of the same colour
    still read as two cells. */
 .matchups {
@@ -673,7 +642,6 @@ button:disabled {
 }
 
 /* The matchup scale's colours come from colours.ts as custom properties. */
-.matchup,
 .matchup-cell {
   background: var(--matchup-fill);
   color: var(--matchup-text);
@@ -956,4 +924,20 @@ button:disabled {
   border-color: #a32d2d;
   background: #a32d2d;
   color: #ffffff;
+}
+
+/* A counter card's "Why?" button and the reason it shows under the card. */
+.why-toggle {
+  min-height: 24px;
+  margin-top: 4px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.why {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-soft);
+  text-align: left;
 }
