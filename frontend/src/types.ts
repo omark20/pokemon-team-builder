@@ -74,6 +74,7 @@ export interface CounterResult {
   relaxed: boolean; // more than half the counters share a weakness: no team avoided it
   stopped_early: boolean; // the search hit its step limit; a better team may exist
   pool_size: number;
+  legendary_left_out: boolean; // the candidates excluded legendary and mythical Pokémon
 }
 
 // A value as the scan recorded it: a number (a stat or a multiplier), text,

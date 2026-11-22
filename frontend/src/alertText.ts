@@ -17,6 +17,8 @@ const WRITTEN_MULTIPLIERS: Record<string, string> = { "0": "0×", "0.25": "¼×"
 // Column names as words a reader knows; any other field shows its own name.
 const FIELD_NAMES: Record<string, string> = {
   is_default: "special version",
+  is_legendary: "legendary",
+  is_mythical: "mythical",
   special_attack: "special attack",
   special_defense: "special defense",
   sprite_url: "picture",
@@ -27,6 +29,7 @@ export function formatValue(field: string, value: ChangeValue): string {
   if (field === "multiplier") return WRITTEN_MULTIPLIERS[String(value)] ?? `${String(value)}×`;
   if (field === "sprite_url") return value === null ? "none" : "a picture";
   if (field === "is_default") return value ? "no" : "yes"; // "special version" reads as the opposite
+  if (typeof value === "boolean") return value ? "yes" : "no";
   if (Array.isArray(value)) return value.join(", ");
   return String(value);
 }

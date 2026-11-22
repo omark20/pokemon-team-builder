@@ -15,10 +15,11 @@ export const NOTICES = {
 
 interface CounterProps {
   counter: CounterResult | null;
+  error: string | null; // why the last build gave no team; shown in the empty box
   pokemonById: Map<number, Pokemon>;
 }
 
-export function CounterHalf({ counter, pokemonById }: CounterProps) {
+export function CounterHalf({ counter, error, pokemonById }: CounterProps) {
   return (
     <section className="half" aria-label="Counter team">
       <h2 className="half-title">Counter team</h2>
@@ -37,7 +38,9 @@ export function CounterHalf({ counter, pokemonById }: CounterProps) {
           })}
         </ol>
       ) : (
-        <div className="counter-empty">No counter team yet</div>
+        <div className={`counter-empty${error ? " counter-error" : ""}`} role={error ? "alert" : undefined}>
+          {error ?? "No counter team yet"}
+        </div>
       )}
       {counter?.stopped_early && <p className="counter-notice">{NOTICES.stoppedEarly}</p>}
       {counter?.relaxed && <p className="counter-notice">{NOTICES.relaxed}</p>}

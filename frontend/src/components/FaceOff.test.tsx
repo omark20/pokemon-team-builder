@@ -7,6 +7,7 @@ import App from "../App";
 import { COUNTER } from "../test/counterFixture";
 import { FakeServer } from "../test/fakeServer";
 import { NOTICES } from "./CounterHalf";
+import { LEAVE_OUT_LABEL } from "./FaceOff";
 
 const TEAM = { id: 1, name: "Team 1", pokemon_ids: [6, 9, 3] };
 
@@ -92,6 +93,38 @@ test.each([
   expect(counterHalf().getByText(notice)).toBeTruthy();
   expect(footer().getByText(status)).toBeTruthy();
   expect(document.querySelector(".counter-details")).toBeNull();
+});
+
+test("the legendary box has its label, starts unticked, and ticking it clears a shown team", async () => {
+  const server = await start();
+  const box = footer().getByRole("checkbox", { name: LEAVE_OUT_LABEL }) as HTMLInputElement;
+  expect(LEAVE_OUT_LABEL).toBe("Leave out legendary and mythical Pokémon");
+  expect(box.checked).toBe(false);
+  await build();
+  const requests = server.calls.length;
+  fireEvent.click(box);
+  expect(counterHalf().getByText("No counter team yet")).toBeTruthy();
+  expect(primary().textContent).toBe("Build counter team");
+  expect(server.calls).toHaveLength(requests);
+});
+
+test.each([
+  { leftOut: true, pool: 931, status: "Best team out of 931 candidates, legendary and mythical left out." },
+  { leftOut: false, pool: 1025, status: "Best team out of 1,025 candidates." },
+])("the status line names the pool the response reports (left out: $leftOut)", async ({ leftOut, pool, status }) => {
+  const server = new FakeServer([TEAM]);
+  server.counter = { ...COUNTER, pool_size: pool, legendary_left_out: leftOut };
+  render(<App />);
+  await screen.findByText(/^Showing /);
+  await build();
+  expect(footer().getByText(status)).toBeTruthy();
+});
+
+test("a refused build shows the server's reason in the counter half", async () => {
+  const server = await start();
+  server.refuseNext("GET", 503, undefined, "/api/teams/1/counter", "The legendary flags are not loaded yet");
+  fireEvent.click(primary());
+  expect((await counterHalf().findByRole("alert")).textContent).toBe("The legendary flags are not loaded yet");
 });
 
 test("'Save as new team' makes a team of the three counters", async () => {

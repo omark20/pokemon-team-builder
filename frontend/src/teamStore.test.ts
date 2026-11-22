@@ -168,12 +168,24 @@ test("an answer for members that changed while it was worked out is dropped", as
 });
 
 test.each([
-  { refusal: [503], text: MESSAGES.noTypeChart },
-  { refusal: [500], text: MESSAGES.counterFailed },
-  { refusal: [429, 30], text: MESSAGES.tooFastSeconds },
-])("a refused build ($refusal) shows no team and says why", async ({ refusal, text }) => {
+  { refusal: 503, detail: "The legendary flags are not loaded yet", text: "The legendary flags are not loaded yet" },
+  { refusal: 503, detail: "Counter teams are busy", text: "Counter teams are busy" },
+  { refusal: 500, detail: undefined, text: MESSAGES.counterFailed },
+  { refusal: 429, detail: undefined, text: MESSAGES.tooFastSeconds },
+])("a refused build ($refusal) shows no team and says why: $text", async ({ refusal, detail, text }) => {
   const { server, store, state } = await start([team(1, "Team 1", [6])]);
-  server.refuseNext("GET", refusal[0]!, refusal[1]);
+  server.refuseNext("GET", refusal, 30, "/api/teams/1/counter", detail);
   await store.buildCounter();
-  expect(state()).toMatchObject({ counter: null, building: false, notice: { kind: "error", text } });
+  expect(state()).toMatchObject({ counter: null, building: false, counterError: text });
+});
+
+test("the legendary tick is sent with the next build, and only then", async () => {
+  const { server, store } = await start([team(1, "Team 1", [6])]);
+  store.setLeaveOutLegendary(true);
+  expect(server.calls.at(-1)?.path).toBe("/api/teams"); // ticking asks nothing
+  await store.buildCounter();
+  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter?leave_out_legendary=true");
+  store.setLeaveOutLegendary(false);
+  await store.buildCounter();
+  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter");
 });

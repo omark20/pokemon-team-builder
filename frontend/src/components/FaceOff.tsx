@@ -16,14 +16,35 @@ interface FaceOffProps {
   alertTeamIds: Set<number>;
 }
 
+// The wording of the legendary filter's checkbox, in one place while the
+// operator decides it (it may also move; see LegendaryToggle).
+export const LEAVE_OUT_LABEL = "Leave out legendary and mythical Pokémon";
+
 function statusLine(team: Team, counter: CounterResult | null): string {
   if (counter) {
     const pool = counter.pool_size.toLocaleString("en-US");
-    return `${counter.stopped_early ? "Best team found" : "Best team"} out of ${pool} candidates.`;
+    const best = counter.stopped_early ? "Best team found" : "Best team";
+    const leftOut = counter.legendary_left_out ? ", legendary and mythical left out" : "";
+    return `${best} out of ${pool} candidates${leftOut}.`;
   }
   return team.pokemon_ids.length === 0
     ? "Add Pokémon from the grid below."
     : "Drag to reorder. Hover a Pokémon to remove it.";
+}
+
+// Whether the counter team may include legendary and mythical Pokémon. Off
+// when the page opens; changing it clears the counter half.
+function LegendaryToggle({ store, teams }: Pick<FaceOffProps, "store" | "teams">) {
+  return (
+    <label className="legendary-toggle">
+      <input
+        type="checkbox"
+        checked={teams.leaveOutLegendary}
+        onChange={(event) => store.setLeaveOutLegendary(event.target.checked)}
+      />
+      {LEAVE_OUT_LABEL}
+    </label>
+  );
 }
 
 // The row along the bottom of the card. Building needs at least one member.
@@ -31,6 +52,7 @@ function Footer({ store, teams, team }: Pick<FaceOffProps, "store" | "teams"> & 
   return (
     <footer className="face-off-footer">
       <p className="face-off-status">{statusLine(team, teams.counter)}</p>
+      <LegendaryToggle store={store} teams={teams} />
       {teams.counter && (
         <button type="button" disabled={teams.creating} onClick={() => void store.saveCounterAsTeam()}>
           Save as new team
@@ -107,7 +129,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
             <span className="versus" aria-hidden="true">
               vs
             </span>
-            <CounterHalf counter={counter} pokemonById={pokemonById} />
+            <CounterHalf counter={counter} error={teams.counterError} pokemonById={pokemonById} />
           </div>
           {counter && (
             <button type="button" className="details-toggle" aria-expanded={open} onClick={() => setOpenFor(open ? null : counter)}>

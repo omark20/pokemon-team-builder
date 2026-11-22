@@ -33,6 +33,16 @@ test.each([
     row: { what: "picture", oldValue: "a picture", newValue: "none" },
   },
   {
+    change: "the legendary flag",
+    alert: alert({ field: "is_legendary", old_value: false, new_value: true }),
+    row: { what: "legendary", oldValue: "no", newValue: "yes" },
+  },
+  {
+    change: "a field the page does not know",
+    alert: alert({ field: "weight", old_value: 905, new_value: 910 }),
+    row: { what: "weight", oldValue: "905", newValue: "910" },
+  },
+  {
     change: "a removal",
     alert: alert({ field: "status", old_value: "available", new_value: "removed" }),
     row: { what: "no longer listed by PokéAPI", oldValue: null, newValue: null },

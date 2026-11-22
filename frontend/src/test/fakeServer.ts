@@ -17,6 +17,7 @@ interface Refusal {
   status: number;
   retryAfter?: number;
   path?: string; // only a request to this path; any path when absent
+  detail?: string; // the server's sentence, sent as {"detail": ...}
 }
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -46,8 +47,8 @@ export class FakeServer {
     return changing.map((call) => [`${call.method} ${call.path}`, call.body]);
   }
 
-  refuseNext(method: string, status: number, retryAfter?: number, path?: string): void {
-    this.refusals.push({ method, status, retryAfter, path });
+  refuseNext(method: string, status: number, retryAfter?: number, path?: string, detail?: string): void {
+    this.refusals.push({ method, status, retryAfter, path, detail });
   }
 
   // The next request waits until the returned function is called.
@@ -70,7 +71,7 @@ export class FakeServer {
     if (!refusal) return this.answer(method, path, body);
     this.refusals = this.refusals.filter((entry) => entry !== refusal);
     const headers = refusal.retryAfter ? { "Retry-After": String(refusal.retryAfter) } : undefined;
-    return new Response("{}", { status: refusal.status, headers });
+    return new Response(JSON.stringify({ detail: refusal.detail }), { status: refusal.status, headers });
   }
 
   private answer(method: string, path: string, body: Call["body"]): Response {

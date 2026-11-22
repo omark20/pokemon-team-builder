@@ -769,3 +769,19 @@ button:disabled {
   font-size: 12px;
   color: var(--text-soft);
 }
+
+.legendary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.counter-error {
+  border-color: #f09595;
+  background: #fcebeb;
+  color: #791f1f;
+  padding: 0 12px;
+  text-align: center;
+}

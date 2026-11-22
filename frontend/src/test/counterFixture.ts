@@ -35,4 +35,5 @@ export const COUNTER: CounterResult = {
   relaxed: false,
   stopped_early: false,
   pool_size: 1025,
+  legendary_left_out: false,
 };
