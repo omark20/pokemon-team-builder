@@ -73,7 +73,7 @@ export class TeamStore {
   // Loads the visitor's teams; also used after signing in or out, when the
   // teams on screen belong to someone else.
   async load(): Promise<void> {
-    this.update({ status: "loading", ...this.clearCounter() });
+    this.update({ status: "loading", notice: null, ...this.clearCounter() });
     try {
       const teams = await fetchTeams();
       for (const team of teams) this.confirmed.set(team.id, team.pokemon_ids);

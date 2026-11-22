@@ -18,6 +18,7 @@ test.each([
   { status: 429, retryAfter: 30, detail: "Too many sign-in attempts.", text: "Too many sign-in attempts. Try again in 30 seconds." },
   { status: 429, retryAfter: 600, detail: null, text: "Too many attempts. Try again in 10 minutes." },
   { status: 429, retryAfter: 61, detail: null, text: "Too many attempts. Try again in 2 minutes." },
+  { status: 429, retryAfter: 643, detail: "Too many requests", text: "Too many requests. Try again in 11 minutes." },
 ])("a 429 says when to try again ($retryAfter s)", ({ status, retryAfter, detail, text }) => {
   expect(accountErrorText(new ApiError(status, retryAfter, detail))).toBe(text);
 });

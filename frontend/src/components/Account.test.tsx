@@ -213,3 +213,22 @@ test("after deleting, the page is as for a first visit and says the account was 
   expect(within(topRight()!).getAllByRole("button").map((b) => b.textContent)).toEqual(["Create account", "Sign in"]);
   expect(document.querySelector(".notice-bar span")?.textContent).toBe("Your account was deleted.");
 });
+
+test("a dialog opened again does not show the last attempt's message", async () => {
+  const server = await start();
+  openDialog("Sign in");
+  server.refuseNext("POST", 401, undefined, "/api/session", "Wrong username or password.");
+  await fillAndSubmit("ash", "not-it-at-all");
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  openDialog("Sign in");
+  expect(dialog().queryByRole("alert")).toBeNull();
+});
+
+test("signing out clears a message left from before", async () => {
+  await start([TEAM]);
+  openDialog("Create account");
+  await fillAndSubmit("ash", "pikachu-rules");
+  expect(document.querySelector(".notice-bar")).not.toBeNull(); // "Account created. ..."
+  await act(async () => fireEvent.click(within(topRight()!).getByRole("button", { name: "Sign out" })));
+  expect(document.querySelector(".notice-bar")).toBeNull();
+});

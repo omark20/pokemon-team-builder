@@ -34,7 +34,8 @@ export function accountErrorText(error: unknown): string {
   if (!(error instanceof ApiError)) return "Couldn't reach the server. Try again.";
   if (error.status !== 429) return error.detail ?? "Something went wrong. Try again.";
   const wait = error.retryAfter > 0 ? ` Try again in ${waitText(error.retryAfter)}.` : " Try again later.";
-  return `${error.detail ?? "Too many attempts."}${wait}`;
+  const said = error.detail ?? "Too many attempts.";
+  return `${/[.!?]$/.test(said) ? said : `${said}.`}${wait}`; // the server's sentence may lack a full stop
 }
 
 interface AccountEvents {

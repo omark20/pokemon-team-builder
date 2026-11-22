@@ -8,10 +8,15 @@ import { DialogFrame } from "./DialogFrame";
 export const deleteWarning = (username: string) =>
   `This deletes the account ${username}, its teams and its sign-ins on every device. It cannot be undone.`;
 
+// Mounted only while open, so each opening starts with no message from the last.
 export function DeleteAccountDialog({ account }: { account: Account }) {
+  if (account.dialog !== "delete" || !account.username) return null;
+  return <DeleteForm account={account} username={account.username} />;
+}
+
+function DeleteForm({ account, username }: { account: Account; username: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   const busy = useRef(false); // a second press while one is in flight is ignored
-  if (account.dialog !== "delete" || !account.username) return null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,7 +28,7 @@ export function DeleteAccountDialog({ account }: { account: Account }) {
   return (
     <DialogFrame title="Delete account" onClose={account.close}>
       <form onSubmit={submit}>
-        <p>{deleteWarning(account.username)}</p>
+        <p>{deleteWarning(username)}</p>
         <label>
           Password
           <input name="password" type="password" autoComplete="current-password" required autoFocus />

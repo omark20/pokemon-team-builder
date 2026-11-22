@@ -20,15 +20,18 @@ interface DialogProps {
   hasTeams: boolean; // this browser has teams, which signing in would merge
 }
 
+// Mounted only while open, so each opening starts with no message from the last.
 export function AccountDialog({ account, hasTeams }: DialogProps) {
+  const mode = account.dialog;
+  if (mode !== "create" && mode !== "signin") return null;
+  return <EntryForm account={account} hasTeams={hasTeams} text={FORMS[mode]} />;
+}
+
+function EntryForm({ account, hasTeams, text }: DialogProps & { text: (typeof FORMS)[keyof typeof FORMS] }) {
   const [problem, setProblem] = useState<string | null>(null);
   // A submit while one is in flight is ignored. The button is not disabled,
   // since disabling the focused button would drop focus out of the dialog.
   const busy = useRef(false);
-  const mode = account.dialog;
-  if (mode !== "create" && mode !== "signin") return null;
-  const text = FORMS[mode];
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy.current) return;
@@ -52,7 +55,7 @@ export function AccountDialog({ account, hasTeams }: DialogProps) {
             <input name="password" type="password" autoComplete={text.password} required />
           </label>
           <p>{NO_RESET}</p>
-          {mode === "signin" && hasTeams && <p>{TEAMS_MERGED}</p>}
+          {text.mode === "signin" && hasTeams && <p>{TEAMS_MERGED}</p>}
           {problem && (
             <p className="dialog-error" role="alert">
               {problem}
