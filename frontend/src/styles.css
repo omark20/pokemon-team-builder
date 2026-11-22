@@ -1,0 +1,248 @@
+/* One stylesheet for the whole page. System fonts only: nothing is loaded
+   from another site. Type colours arrive as the custom properties
+   --type-tint, --type-text and --type-bar, set per element from colours.ts. */
+
+:root {
+  --page: #faf9f5;
+  --surface: #ffffff;
+  --track: #f3f1ea;
+  --border: #e2e0d8;
+  --border-strong: #cfcdc4;
+  --text: #1b1b19;
+  --text-soft: #5f5e5a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-height: 32px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--text-soft);
+}
+
+:focus-visible {
+  outline: 2px solid #185fa5;
+  outline-offset: 2px;
+}
+
+/* Controls above the grid */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.controls-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.controls-search,
+.controls select {
+  height: 36px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+
+.controls-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.controls-count {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* The grid: as many 200-pixel columns as fit, and never fewer than two, so a
+   phone shows two cards per row. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, calc(50% - 4px)), 1fr));
+  gap: 8px;
+}
+
+.card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.card-placeholder {
+  height: 250px;
+  background: var(--track);
+}
+
+.sprite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--type-tint);
+}
+
+.sprite img {
+  image-rendering: pixelated;
+}
+
+.sprite-missing {
+  font-size: 24px;
+  color: var(--type-text);
+}
+
+.card-name {
+  max-width: 100%;
+  margin: 6px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--type-tint);
+  color: var(--type-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Six stats in two columns of three, filled column by column. */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: 2px 10px;
+  width: 100%;
+}
+
+/* A card narrower than about 190 pixels (166 inside its padding and border)
+   shows the six stats in one column. */
+@container (max-width: 166px) {
+  .stats {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.stat-label {
+  width: 24px;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+
+.stat-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--type-bar);
+}
+
+.stat-value {
+  width: 22px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.card-add {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+/* A message that takes the grid's place: nothing found, or loading failed. */
+
+.notice {
+  padding: 24px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.notice p {
+  margin: 2px 0 10px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
