@@ -133,9 +133,6 @@ class Pick:
 
     opponent: Pokemon
     counter: Pokemon
-    attack: float  # the counter's best multiplier on the opponent
-    attack_type: str  # the counter's type that gives it
-    attack_back: float  # the opponent's best multiplier on the counter
     matchup: int
     coverage: int
     base_stats: int
@@ -199,7 +196,7 @@ def describe_pick(counter: Pokemon, opponent: Pokemon, opponents: Opponents, cha
         f"Across the whole opposing team its matchups add up to {written_across}."
     )
     points = matchup(counter, opponent, chart)
-    return Pick(opponent, counter, hit, hit_type, back, points, across, sum(counter.stats), reason)
+    return Pick(opponent, counter, points, across, sum(counter.stats), reason)
 
 
 def opposing_types(opponents: Opponents) -> list[str]:
