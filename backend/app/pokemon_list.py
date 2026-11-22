@@ -33,12 +33,18 @@ LIST_QUERY = """
 
 
 def get(connect: Callable[[], AbstractContextManager[psycopg.Connection[Any]]]) -> bytes:
-    """The serialised list, built with one query on a connection from `connect` if not held."""
+    """The serialised list, built with one query on a connection from `connect` if not held.
+
+    The connection is borrowed before the lock is taken, so a request waiting for one (or
+    failing to get one) never makes other requests queue behind that wait.
+    """
     global _body
-    with _lock:
+    body = _body
+    if body is not None:
+        return body
+    with connect() as conn, _lock:
         if _body is None:
-            with connect() as conn:
-                _body = _serialise(conn)
+            _body = _serialise(conn)
         return _body
 
 

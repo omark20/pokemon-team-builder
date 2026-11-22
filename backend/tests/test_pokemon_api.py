@@ -3,10 +3,19 @@
 Expected values are read off samples/pokemon_6_charizard_dual_type.json.
 """
 
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from typing import Any
+
 import psycopg
+import pytest
 from conftest import ADMIN_TOKEN
 from fake_pokeapi import FakePokeApi, pokemon_path, run_fake_scan
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
+
+from app import pokemon_list
 
 CHARIZARD_ENTRY = {
     "id": 6,
@@ -79,3 +88,36 @@ def test_the_list_shows_a_demo_value_after_its_scan_and_the_original_after_reset
     assert by_id(client)[6]["stats"][1] == 94
     client.post("/api/admin/demo/reset", headers=admin)
     assert by_id(client)[6]["stats"][1] == 84
+
+
+def test_waiting_for_a_connection_does_not_make_other_list_requests_queue() -> None:
+    """With the copy empty, one request stuck waiting for a connection must not hold back
+    another, here one whose connection fails at once."""
+    waiting, release = threading.Event(), threading.Event()
+
+    @contextmanager
+    def slow_connection() -> Iterator[None]:
+        waiting.set()
+        release.wait(timeout=10)
+        raise HTTPException(503)
+        yield
+
+    @contextmanager
+    def failing_connection() -> Iterator[None]:
+        raise HTTPException(503)
+        yield
+
+    def fails(connect: Callable[[], Any]) -> None:
+        with pytest.raises(HTTPException):
+            pokemon_list.get(connect)
+
+    stuck = threading.Thread(target=fails, args=(slow_connection,))
+    stuck.start()
+    assert waiting.wait(timeout=5)
+    other = threading.Thread(target=fails, args=(failing_connection,))
+    other.start()
+    other.join(timeout=5)
+    finished_while_the_other_waited = not other.is_alive()
+    release.set()
+    stuck.join(timeout=10)
+    assert finished_while_the_other_waited
