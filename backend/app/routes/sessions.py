@@ -111,6 +111,9 @@ def sign_in(body: Credentials, request: Request, response: Response) -> dict[str
     now = datetime.now(UTC)
     with db.connection_for(request) as conn:
         merge = account_store.sign_in(request, response, conn, account_id, now)
+    if merge is None:  # the account was deleted while its password was being checked
+        _log(request, "sign_in_failed", account_id)
+        raise HTTPException(401, WRONG)
     _log(request, "signed_in", account_id)
     return {"username": username, **vars(merge)}
 

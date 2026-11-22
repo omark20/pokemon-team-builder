@@ -112,14 +112,17 @@ def _convert(conn: db.Conn, user_id: int, username: str, password_hash: str) -> 
 
 def sign_in(
     request: Request, response: Response, conn: db.Conn, account_id: int, now: datetime
-) -> Merge:
-    """Sign this browser in to the account, whose password has been checked.
+) -> Merge | None:
+    """Sign this browser in to the account, whose password has been checked; None if the
+    account was deleted since then, and nothing is changed.
 
     The account's record is locked first, then the browser's anonymous record, always in
     that order. A browser signed in to an account, this one or another, has that session
     deleted and nothing merged; an anonymous browser's teams and dismissals are merged.
     """
-    conn.execute("SELECT id FROM users WHERE id = %s FOR UPDATE", (account_id,))
+    locked = conn.execute("SELECT id FROM users WHERE id = %s FOR UPDATE", (account_id,))
+    if locked.fetchone() is None:  # deleted from another browser after the password check
+        return None
     identity = auth.identify(request, conn, now)
     merge = Merge(0, 0)
     if identity is not None and identity.signed_in:

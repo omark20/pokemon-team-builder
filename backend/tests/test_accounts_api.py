@@ -176,6 +176,27 @@ def test_a_signed_in_visitor_cannot_reach_another_accounts_team(client: TestClie
     assert other.patch(f"{TEAMS}/{team_id}", json={"name": "x"}).status_code == 404
 
 
+def test_an_account_deleted_after_its_password_was_checked_is_401_not_500(
+    client: TestClient, conn: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sign_up(client)
+    real_matches = accounts.password_matches
+
+    def matches_then_deleted(stored: str | None, password: str) -> bool:
+        matched = real_matches(stored, password)
+        conn.execute("DELETE FROM users WHERE username_key = 'misty'")  # another browser's delete
+        return matched
+
+    monkeypatch.setattr(accounts, "password_matches", matches_then_deleted)
+    laptop = browser(client)
+    response = sign_in(laptop)
+    assert (response.status_code, response.json()) == (
+        401,
+        {"detail": "Wrong username or password."},
+    )
+    assert "uid" not in laptop.cookies
+
+
 # Sessions
 
 
