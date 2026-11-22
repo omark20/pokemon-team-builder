@@ -1,7 +1,7 @@
 # Captured PokéAPI samples
 
 Raw responses captured 2026-11-19 (UTC 2026-11-20 02:20) with plain `curl`, unmodified.
-Design against these files, not against memory of the docs.
+The app's response parser and its tests are written from these files.
 
 | File | Request |
 |---|---|
@@ -30,7 +30,7 @@ Design against these files, not against memory of the docs.
 5. **Stats are always these six**, in this order: `hp`, `attack`, `defense`,
    `special-attack`, `special-defense`, `speed`, each with `base_stat` and `effort`.
 6. **`/type` returns 21 types, not 18.** The extra three are `stellar`, `unknown`
-   and `shadow`. The spec says 18, so these must be filtered out.
+   and `shadow`; only the 18 standard types are used.
 7. **Type effectiveness is in `/type/{id}` under `damage_relations`** with six
    lists: `double_damage_to`, `half_damage_to`, `no_damage_to`,
    `double_damage_from`, `half_damage_from`, `no_damage_from`. Anything not listed
@@ -127,7 +127,7 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     on the wire with gzip, 25 MB decoded; the largest body is 10 KB on the wire.
     No request was refused or throttled (`census_species_curl_log.txt`).
 
-## Not verified — do not rely on these without a capture
+## Not verified by these captures
 
 - What `x-pokeapi-hash` / `x-pokeapi-deploy-date` actually track. They look like a
   data-deploy fingerprint that could make change detection cheap, but their
