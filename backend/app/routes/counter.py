@@ -26,31 +26,35 @@ CHART_CELLS = 18 * 18
 COUNTER_PLACES = 2
 COUNTER_WAIT_SECONDS = 2.0  # then 503, rather than holding a worker thread longer
 EMPTY_TEAM_MESSAGE = "This team has no Pokémon yet. Add some to build its counter team."
+FLAGS_NOT_LOADED = "The legendary flags are not loaded yet"
 POKEMON_QUERY = """
     SELECT id, name, types, ARRAY[hp, attack, defense, special_attack, special_defense, speed],
-           is_default, removed_at IS NOT NULL
+           is_default, removed_at IS NOT NULL, is_legendary, is_mythical
     FROM pokemon
 """
 
 
 @router.get("/api/teams/{team_id}/counter", dependencies=[Depends(limits.limit_counter)])
-def counter_team(team_id: PathId, request: Request) -> dict[str, Any]:
+def counter_team(
+    team_id: PathId, request: Request, leave_out_legendary: bool = False
+) -> dict[str, Any]:
     """The counter team, one counter per slot; a message instead for an empty team.
 
-    A place is taken before any database work and given back after the search; with
-    both places taken for two seconds, the answer is 503.
+    With `leave_out_legendary`, no legendary or mythical Pokémon (PokéAPI's own species
+    flags) may be picked. A place is taken before any database work and given back after
+    the search; with both places taken for two seconds, the answer is 503.
     """
     places = request.app.state.counter_places
     if not places.acquire(timeout=COUNTER_WAIT_SECONDS):
         log_event(logger, logging.WARNING, "counter_busy", request_id=request.state.request_id)
         raise HTTPException(503, "Counter teams are busy", headers={"Retry-After": "1"})
     try:
-        return _counter_for(team_id, request)
+        return _counter_for(team_id, request, leave_out_legendary)
     finally:
         places.release()
 
 
-def _counter_for(team_id: int, request: Request) -> dict[str, Any]:
+def _counter_for(team_id: int, request: Request, leave_out_legendary: bool) -> dict[str, Any]:
     with db.connection_for(request) as conn:
         user_id = auth.current_user(request, conn)
         owned = conn.execute(
@@ -66,9 +70,13 @@ def _counter_for(team_id: int, request: Request) -> dict[str, Any]:
         chart = _stored_chart(conn)
         stored = {p.id: p for p in _stored_pokemon(conn)}
     # The search runs after the connection is returned, so it holds none while it works.
+    pool = candidate_pool(stored.values(), leave_out_legendary)
+    if leave_out_legendary and not pool:
+        # Until a scan has read the flags every one is unread, and unread is left out.
+        raise HTTPException(503, FLAGS_NOT_LOADED)
     opponents = [stored[pokemon_id] for (pokemon_id,) in members]
-    result = build_counter_team(opponents, candidate_pool(stored.values()), chart)
-    return {"size": len(opponents), **asdict(result)}
+    result = build_counter_team(opponents, pool, chart)
+    return {"size": len(opponents), **asdict(result), "legendary_left_out": leave_out_legendary}
 
 
 def _stored_chart(conn: db.Conn) -> Chart:
@@ -82,6 +90,8 @@ def _stored_chart(conn: db.Conn) -> Chart:
 
 def _stored_pokemon(conn: db.Conn) -> list[Pokemon]:
     return [
-        Pokemon(pid, name, tuple(types), tuple(stats), is_default, removed)
-        for pid, name, types, stats, is_default, removed in conn.execute(POKEMON_QUERY)
+        Pokemon(pid, name, tuple(types), tuple(stats), is_default, removed, legendary, mythical)
+        for pid, name, types, stats, is_default, removed, legendary, mythical in conn.execute(
+            POKEMON_QUERY
+        )
     ]

@@ -6,7 +6,7 @@ samples/; 12 of them are default forms (ids below 10000), so the candidate pool 
 
 import psycopg
 import pytest
-from fake_pokeapi import FakePokeApi, run_fake_scan
+from fake_pokeapi import FakePokeApi, run_fake_scan, species_path
 from fastapi.testclient import TestClient
 
 from app.routes import counter
@@ -69,4 +69,29 @@ def test_with_both_counter_places_taken_a_third_is_503_and_other_reads_answer(
     finally:
         places.release()
         places.release()
+    assert visitor.get(f"{TEAMS}/{team_id}/counter").status_code == 200
+
+
+def test_leaving_out_legendaries_removes_them_from_the_pool_and_the_picks(
+    client: TestClient, conn: psycopg.Connection, source: FakePokeApi
+) -> None:
+    source.answers[species_path(248)]["is_legendary"] = True  # Tyranitar, for this test only
+    run_fake_scan(conn, source)
+    team_id = team_with(client, [6, 9, 3])
+    body = client.get(f"{TEAMS}/{team_id}/counter", params={"leave_out_legendary": "true"}).json()
+    assert (body["legendary_left_out"], body["pool_size"]) == (True, 11)
+    picks = [pick["counter"] for pick in body["picks"]]
+    assert len(picks) == 3
+    assert not any(c["is_legendary"] or c["is_mythical"] for c in picks)
+    default = client.get(f"{TEAMS}/{team_id}/counter").json()
+    assert (default["legendary_left_out"], default["pool_size"]) == (False, 12)
+
+
+def test_leaving_out_legendaries_before_the_flags_are_read_is_503(
+    visitor: TestClient, conn: psycopg.Connection
+) -> None:
+    team_id = team_with(visitor, [6])
+    conn.execute("UPDATE pokemon SET is_legendary = NULL, is_mythical = NULL")
+    filtered = visitor.get(f"{TEAMS}/{team_id}/counter", params={"leave_out_legendary": "true"})
+    assert (filtered.status_code, filtered.json()["detail"]) == (503, counter.FLAGS_NOT_LOADED)
     assert visitor.get(f"{TEAMS}/{team_id}/counter").status_code == 200
