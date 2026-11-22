@@ -204,17 +204,18 @@ def _apply_fetched(conn: Conn, run: Run, fetched: scan_fetch.Fetched) -> None:
 
 
 def _finish(conn: Conn, run: Run, status: str) -> None:
+    """Record how the run ended, unless a later trigger has already failed it as stale."""
     finished = run.now()
-    conn.execute(
+    recorded = conn.execute(
         "UPDATE scan_runs SET status = %s, finished_at = %s, scanned = %s, changed = %s,"
-        " failed = %s WHERE id = %s",
+        " failed = %s WHERE id = %s AND status = 'running'",
         (status, finished, run.scanned, run.changed, run.failed, run.run_id),
-    )
+    ).rowcount
     seconds = int((finished - run.started).total_seconds())
     log_event(
         logger,
-        logging.ERROR if status == "failed" else logging.INFO,
-        "scan_finished",
+        logging.ERROR if status == "failed" or not recorded else logging.INFO,
+        "scan_finished" if recorded else "scan_finished_late",
         run_id=run.run_id,
         status=status,
         scanned=run.scanned,

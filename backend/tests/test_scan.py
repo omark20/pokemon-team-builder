@@ -16,7 +16,7 @@ from psycopg import sql
 
 from app.domain.diff import RECORD_FIELDS
 from app.pokeapi import UpstreamError
-from app.scan import start_run
+from app.scan import run_scan, start_run
 
 CHARIZARD = pokemon_path(6)
 FIXED_TIME = datetime(2026, 11, 20, 9, 17, tzinfo=UTC)
@@ -347,3 +347,13 @@ def test_a_species_that_cannot_be_read_leaves_the_flags_and_saves_the_rest(
     assert failed == (1,)
     expected = f"species_unread run_id={run_id} pokemon_id=25 {reason}"
     assert [line for line in caplog.messages if "species_unread" in line] == [expected]
+
+
+def test_a_run_failed_as_stale_stays_failed_when_it_finishes_late(
+    conn: psycopg.Connection, source: FakePokeApi
+) -> None:
+    cut_off = start_run(conn, "full", FIXED_TIME - timedelta(minutes=31))
+    start_run(conn, "full", FIXED_TIME)  # a later trigger fails the stale run
+    run_scan(conn, source, cut_off, retry_waits=(0, 0, 0))
+    status = conn.execute("SELECT status FROM scan_runs WHERE id = %s", (cut_off,)).fetchone()
+    assert status == ("failed",)
