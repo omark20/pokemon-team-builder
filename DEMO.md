@@ -7,7 +7,7 @@ comparison, the same change records, the same alert query. Nothing writes an ale
 directly. The example changes Charizard's attack from 84 to 94.
 
 Locally, take the two tokens from your `.env` and use `http://127.0.0.1:8000` with
-`make dev` running (see [SETUP.md](SETUP.md)). On the public site only the operator holds
+`make dev` running (see [SETUP.md](SETUP.md)). On the public site only the site's owner holds
 `ADMIN_TOKEN`.
 
 ```bash
