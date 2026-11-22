@@ -40,7 +40,7 @@ Design against these files, not against memory of the docs.
    `etag`, `x-pokeapi-hash`, and `x-pokeapi-deploy-date` (epoch seconds), and
    `access-control-allow-origin: *`.
 
-## Added by the planner, 2026-11-20 (about 22:25–22:30 UTC)
+## Added 2026-11-20 (about 22:25–22:30 UTC)
 
 Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
 
@@ -81,7 +81,7 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     fact 3). The largest body is 743 KB. No request was refused or throttled
     (`census_curl_log.txt`).
 
-## Added by the planner, 2026-11-21
+## Added 2026-11-21
 
 | File | Request |
 |---|---|

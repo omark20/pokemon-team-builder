@@ -23,7 +23,7 @@ db:
 
 # Run the backend on http://127.0.0.1:8000 with reload.
 dev: db
-	cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+	cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --no-server-header
 
 lint:
 	cd backend && uv run ruff check .

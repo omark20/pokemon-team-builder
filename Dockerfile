@@ -24,5 +24,5 @@ RUN useradd --system --no-create-home app
 USER app
 ENV PATH="/app/backend/.venv/bin:$PATH"
 # The host sets PORT; 10000 is its documented default. One worker, so the in-memory
-# list cache and rate limits are exact.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000} --workers 1"]
+# list cache and rate limits are exact. No Server header, so the software is not announced.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000} --workers 1 --no-server-header"]
