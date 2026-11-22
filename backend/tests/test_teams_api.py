@@ -11,6 +11,8 @@ import pytest
 from fake_pokeapi import FakePokeApi, run_fake_scan
 from fastapi.testclient import TestClient
 
+from app import auth
+
 TEAMS = "/api/teams"
 SIX_DIFFERENT = [3, 6, 9, 25, 34, 59]
 
@@ -206,3 +208,17 @@ def test_malformed_requests_are_4xx_never_500(
     headers = {"Content-Type": "application/json"}
     response = visitor.request(method, path, content=content, headers=headers)
     assert 400 <= response.status_code < 500
+
+
+def test_at_the_visitor_ceiling_no_one_new_is_saved_but_others_still_save(
+    visitor: TestClient,
+    other_visitor: TestClient,
+    conn: psycopg.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    team = new_team(visitor)
+    monkeypatch.setattr(auth, "MAX_VISITORS", 1)  # the one visitor who already exists
+    assert other_visitor.post(TEAMS, json={"name": "Team 1"}).status_code == 503
+    assert user_count(conn) == 1
+    assert visitor.patch(f"{TEAMS}/{team['id']}", json={"name": "Still mine"}).status_code == 200
+    assert visitor.post(TEAMS, json={"name": "Team 2"}).status_code == 201

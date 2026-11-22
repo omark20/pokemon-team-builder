@@ -6,7 +6,7 @@ import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
 
-from app.limits import Limit, RateLimiter, client_address
+from app.limits import LIMITS, Limit, RateLimiter, client_address
 
 READ_ENDPOINTS = ["/api/scan/status", "/api/teams", "/api/pokemon"]
 
@@ -34,6 +34,8 @@ def full_read_bucket(client: TestClient) -> TestClient:
 def test_the_request_after_the_limit_is_refused_with_retry_after(
     client: TestClient, method: str, path: str, body: object, allowed: int, window: int
 ) -> None:
+    # Room in the all-addresses bucket, so the per-address one is the one reached here.
+    client.app.state.limiter = RateLimiter(LIMITS | {"new_visitor_total": Limit(10**6, 60)})
     for _ in range(allowed):
         client.cookies.clear()  # so that each team create is a first-time visitor
         assert client.request(method, path, json=body).status_code != 429
@@ -99,3 +101,14 @@ def test_a_visitor_is_counted_under_the_edges_address_header(
         "client": ("10.27.253.135", 50000),
     }
     assert client_address(Request(scope)) == expected
+
+
+def test_the_eleventh_new_visitor_in_a_minute_from_any_address_is_refused(
+    client: TestClient,
+) -> None:
+    for number in range(11):
+        client.cookies.clear()
+        address = {"cf-connecting-ip": f"198.51.100.{number + 1}"}
+        response = client.post("/api/teams", json={"name": "x"}, headers=address)
+    assert response.status_code == 429
+    assert 1 <= int(response.headers["retry-after"]) <= 60

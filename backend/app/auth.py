@@ -26,6 +26,9 @@ from app.logs import log_event, route_template
 logger = logging.getLogger(__name__)
 
 COOKIE_NAME = "uid"
+# Visitor records in all. About 14 KB each with 20 full teams (measured on 2026-11-22:
+# 100 such visitors grew the three tables by 1.39 MB), so this ceiling is about 0.7 GB.
+MAX_VISITORS = 50_000
 COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # one year, in seconds
 
 
@@ -39,8 +42,14 @@ def current_user(request: Request, conn: psycopg.Connection[Any]) -> int | None:
 
 
 def create_user(request: Request, response: Response, conn: psycopg.Connection[Any]) -> int:
-    """Create a visitor record and set its cookie on the response; counts as a new visitor."""
+    """Create a visitor record and set its cookie on the response; counts as a new visitor.
+
+    Limited per address, then for all addresses together, then by a ceiling on visitor
+    records in all; at the ceiling the answer is 503 and nothing is created.
+    """
     limits.enforce(request, "new_visitor")
+    limits.enforce(request, "new_visitor_total", key="all")
+    _refuse_at_the_ceiling(request, conn)
     value = secrets.token_urlsafe(32)
     row = conn.execute(
         "INSERT INTO users (token_hash) VALUES (%s) RETURNING id", (_hash(value),)
@@ -56,6 +65,21 @@ def create_user(request: Request, response: Response, conn: psycopg.Connection[A
         samesite="lax",
     )
     return int(row[0])
+
+
+def _refuse_at_the_ceiling(request: Request, conn: psycopg.Connection[Any]) -> None:
+    # The lock makes the count and the insert one step, so two creations cannot both
+    # pass the ceiling; creations are at most ten a minute, so it costs nothing.
+    conn.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
+    row = conn.execute("SELECT count(*) FROM users").fetchone()
+    count = int(row[0]) if row else 0
+    if count < MAX_VISITORS:
+        return
+    if request.app.state.limiter.first_refusal("new_visitor_total", "ceiling"):
+        log_event(
+            logger, logging.WARNING, "visitor_ceiling_reached", count=count, limit=MAX_VISITORS
+        )
+    raise HTTPException(503, "No new visitors can be saved at the moment")
 
 
 def _hash(cookie_value: str) -> bytes:

@@ -31,6 +31,7 @@ LIMITS = {
     "read": Limit(600, 60),  # every GET under /api, checked before any cookie or database work
     "write": Limit(120, 60),  # team and alert writes
     "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
+    "new_visitor_total": Limit(10, 60),  # the same, all addresses together (one shared key)
     "counter": Limit(20, 60),  # counter-team searches: 250,000 steps a strictness level
     "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
 }
@@ -110,9 +111,9 @@ def client_address(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def enforce(request: Request, bucket: str) -> None:
-    """Raise a 429 if the caller's address is over the bucket's limit."""
-    refusal = request.app.state.limiter.hit(bucket, client_address(request))
+def enforce(request: Request, bucket: str, key: str | None = None) -> None:
+    """Raise a 429 if the caller's address (or a shared `key`) is over the bucket's limit."""
+    refusal = request.app.state.limiter.hit(bucket, key or client_address(request))
     if refusal is None:
         return
     if refusal.first:
