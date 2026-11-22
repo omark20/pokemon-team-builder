@@ -221,7 +221,7 @@ REASONS = [
         "charizard",
         "golem tyranitar blastoise",
         0,
-        "Tyranitar (rock, dark) hits Charizard for 4× with rock attacks; "
+        "Tyranitar (rock, dark) hits Charizard for 4× with rock attacks. "
         "Charizard's best attack back does ½×. "
         "Across the whole opposing team its matchups add up to +3.",
         id="example 1: a positive coverage carries its sign",
@@ -230,7 +230,7 @@ REASONS = [
         "venusaur charizard",
         "golem lapras jolteon",
         1,
-        "Jolteon (electric) hits Charizard for 2× with electric attacks; "
+        "Jolteon (electric) hits Charizard for 2× with electric attacks. "
         "Charizard's best attack back does 1×. "
         "Across the whole opposing team its matchups add up to 0.",
         id="example 3: a coverage of zero has no sign",
