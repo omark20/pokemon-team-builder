@@ -91,8 +91,9 @@ export class TeamStore {
     this.update({ notice: null });
   }
 
-  // Shows a message from elsewhere on the page in the same notice bar.
-  inform(notice: Notice): void {
+  // Shows a message from elsewhere on the page in the same notice bar, or
+  // clears it (null).
+  inform(notice: Notice | null): void {
     this.update({ notice });
   }
 

@@ -40,7 +40,7 @@ export function accountErrorText(error: unknown): string {
 
 interface AccountEvents {
   reload: () => Promise<void>; // the teams and alerts on screen now belong to someone else
-  notify: (notice: Notice) => void;
+  notify: (notice: Notice | null) => void; // null clears the message on screen
 }
 
 // Signs up or in: the account's name, and the sentence that reports it.
@@ -150,7 +150,12 @@ export function useAccount(events: AccountEvents) {
     username,
     dialog,
     noticeClosed,
-    open,
+    // A message from before (such as "Signed in as …") would contradict the
+    // dialog, so opening one clears it.
+    open: (mode: DialogMode) => {
+      events.notify(null);
+      open(mode);
+    },
     close,
     closeNotice,
     submit: (mode: EntryMode, name: string, password: string) => submitEntry(page, mode, name, password),

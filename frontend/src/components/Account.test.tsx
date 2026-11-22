@@ -232,3 +232,11 @@ test("signing out clears a message left from before", async () => {
   await act(async () => fireEvent.click(within(topRight()!).getByRole("button", { name: "Sign out" })));
   expect(document.querySelector(".notice-bar")).toBeNull();
 });
+
+test("opening an account dialog clears a message from before", async () => {
+  await start([TEAM]);
+  await act(async () => fireEvent.click(screen.getAllByRole("button", { name: "Add to team" })[0]!));
+  expect(document.querySelector(".notice-bar span")?.textContent).toBe("Bulbasaur added to Team 1.");
+  openDialog("Sign in");
+  expect(document.querySelector(".notice-bar")).toBeNull();
+});
