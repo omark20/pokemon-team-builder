@@ -196,13 +196,32 @@ def test_worked_example(opponents: str, pool: str, expected_team: str, expected_
     assert not result.relaxed
 
 
-def test_reason_sentence_states_the_true_multipliers_and_coverage():
-    result = build_counter_team(team("charizard"), team("golem tyranitar blastoise"), CHART)
-    assert result.picks[0].reason == (
+REASONS = [
+    pytest.param(
+        "charizard",
+        "golem tyranitar blastoise",
+        0,
         "Tyranitar (rock, dark) hits Charizard for 4× with rock attacks; "
         "Charizard's best attack back does ½×. "
-        "Across the whole opposing team its matchups add up to +3."
-    )
+        "Across the whole opposing team its matchups add up to +3.",
+        id="example 1: a positive coverage carries its sign",
+    ),
+    pytest.param(
+        "venusaur charizard",
+        "golem lapras jolteon",
+        1,
+        "Jolteon (electric) hits Charizard for 2× with electric attacks; "
+        "Charizard's best attack back does 1×. "
+        "Across the whole opposing team its matchups add up to 0.",
+        id="example 3: a coverage of zero has no sign",
+    ),
+]
+
+
+@pytest.mark.parametrize(("opponents", "pool", "slot", "expected"), REASONS)
+def test_reason_sentence_states_the_true_multipliers_and_coverage(opponents, pool, slot, expected):
+    result = build_counter_team(team(opponents), team(pool), CHART)
+    assert result.picks[slot].reason == expected
 
 
 def test_empty_team_gives_an_empty_result():

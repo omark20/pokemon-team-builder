@@ -222,11 +222,12 @@ def describe_pick(counter: Pokemon, opponent: Pokemon, opponents: Opponents, cha
     hit, hit_type = best_attack(counter, opponent, chart)
     back, _ = best_attack(opponent, counter, chart)
     across = coverage(counter, opponent, opponents, chart)
+    written_across = f"{across:+d}" if across else "0"  # zero has no sign, as in the table
     theirs, ours = opponent.name.capitalize(), counter.name.capitalize()
     reason = (
         f"{ours} ({', '.join(counter.types)}) hits {theirs} for {WRITTEN[hit]} "
         f"with {hit_type} attacks; {theirs}'s best attack back does {WRITTEN[back]}. "
-        f"Across the whole opposing team its matchups add up to {across:+d}."
+        f"Across the whole opposing team its matchups add up to {written_across}."
     )
     points = matchup(counter, opponent, chart)
     return Pick(opponent, counter, hit, hit_type, back, points, across, sum(counter.stats), reason)
