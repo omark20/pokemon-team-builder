@@ -1,0 +1,31 @@
+# Lint and every test on each push to main and each pull request: the same two commands
+# SETUP.md gives. The Makefile writes its own .env with fresh local values and starts
+# Postgres in Docker, so no secret and no database service are needed here.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The same uv as the Dockerfile and the same Node.js major version as SETUP.md.
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.11.11"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      # Tests first: they install the frontend's packages, which its lint needs.
+      - run: make test
+      - run: make lint

@@ -21,7 +21,8 @@ access to PokéAPI is needed.
 make lint
 ```
 
-runs ruff, mypy, the size checks and the frontend's ESLint and type check.
+runs ruff, mypy, the size checks and the frontend's ESLint and type check. Both commands
+also run on every push to `main` and every pull request (`.github/workflows/ci.yml`).
 
 ## The app
 
