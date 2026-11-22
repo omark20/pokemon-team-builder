@@ -10,19 +10,17 @@ R3  no Pokémon twice;
 R4  no opposing type hits more than half the counters for 2x or more. If no team
     can keep R4, the limit is raised one at a time until one can.
 
-The search itself is in `counter_search.py`. This module scores candidates, cuts
-each slot down to the candidates that can matter, runs the search level by level
-and describes the result. Nothing here touches the database or the web.
+This module decides who may be picked, scores candidates, cuts each slot down to
+the candidates that can matter, and describes the result. The search, run level
+by level under its step limit, is in `counter_search.py`. Nothing here touches
+the database or the web.
 """
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 
-from app.domain.counter_search import PatternGroup, Scored, SearchState, search_patterns
+from app.domain.counter_search import STEP_LIMIT, PatternGroup, Scored, best_first, search_levels
 from app.domain.types import Chart, effectiveness
-
-# Most search steps one strictness level may take; see `search_levels`.
-STEP_LIMIT = 250_000
 
 # A damage multiplier as points, one per doubling, and as it is written for a reader.
 POINTS: dict[float, int] = {4: 2, 2: 1, 1: 0, 0.5: -1, 0.25: -2, 0: -3}
@@ -39,15 +37,25 @@ class Pokemon:
     stats: tuple[int, ...]
     is_default: bool = True
     removed: bool = False
+    is_legendary: bool | None = None  # PokéAPI's species flags; None until the scan reads them
+    is_mythical: bool | None = None
 
 
-def candidate_pool(pokemon: Iterable[Pokemon]) -> list[Pokemon]:
+def candidate_pool(pokemon: Iterable[Pokemon], leave_out_legendary: bool = False) -> list[Pokemon]:
     """Who may be picked as a counter: default forms that PokéAPI still lists.
 
     Special versions (Mega and the like) are left out because many exist only in
-    the middle of a battle. A new rule about who may be picked goes here.
+    the middle of a battle. With `leave_out_legendary`, a Pokémon is allowed only if
+    both flags are known to be false: an unread flag is left out, so the filter never
+    lets a legendary through. A new rule about who may be picked goes here.
     """
-    return [entry for entry in pokemon if entry.is_default and not entry.removed]
+    return [
+        entry
+        for entry in pokemon
+        if entry.is_default
+        and not entry.removed
+        and not (leave_out_legendary and (entry.is_legendary, entry.is_mythical) != (False, False))
+    ]
 
 
 def best_attack(attacker: Pokemon, defender: Pokemon, chart: Chart) -> tuple[float, str]:
@@ -148,11 +156,6 @@ class CounterResult:
     pool_size: int = 0
 
 
-def best_first(candidate: Scored) -> tuple[int, int]:
-    """Sort key: higher score first, then lower ID."""
-    return -candidate.score, candidate.id
-
-
 def score_slot(
     opponent: Pokemon, opponents: Opponents, pool: list[Pokemon], chart: Chart, levels: Levels
 ) -> list[Scored]:
@@ -181,40 +184,6 @@ def reduce_slot(
         for pattern, members in by_pattern.items()
     ]
     return sorted(groups, key=lambda group: best_first(group.kept[0]))
-
-
-def last_resort(slots: list[list[PatternGroup]]) -> list[int] | None:
-    """Each slot in turn takes its best kept candidate not already taken."""
-    team: list[int] = []
-    for groups in slots:
-        free = [c for group in groups for c in group.kept if c.id not in team]
-        if not free:
-            return None
-        team.append(min(free, key=best_first).id)
-    return team
-
-
-def search_levels(
-    slots: list[list[PatternGroup]], repeats_previous: list[bool], step_limit: int
-) -> tuple[list[int] | None, int, bool]:
-    """Run the search at each weakness limit, strictest first, until a team is found.
-
-    Returns the team as candidate IDs, the steps taken, and whether any level hit
-    its step limit. If levels were cut off and none found a team, the last resort
-    fills the slots, at one more step per slot.
-    """
-    size = len(slots)
-    steps, stopped = 0, False
-    for weak_limit in range(size // 2, size + 1):
-        state = SearchState(slots, repeats_previous, weak_limit, step_limit)
-        search_patterns(state, 0)
-        steps += state.steps
-        stopped = stopped or state.stopped
-        if state.best_team is not None:
-            return state.best_team, steps, stopped
-    if stopped:
-        return last_resort(slots), steps + size, True
-    return None, steps, False
 
 
 def describe_pick(counter: Pokemon, opponent: Pokemon, opponents: Opponents, chart: Chart) -> Pick:

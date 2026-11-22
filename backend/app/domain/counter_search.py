@@ -11,12 +11,16 @@ candidate for 2x or more. This module then finds the best team in two stages.
    chose the same pattern, so only those slots need a search (`hand_out_shared`).
 
 Both searches count their steps and stop at the limit, so the work per request is
-bounded. Candidates are known here by ID and score only.
+bounded. `search_levels` runs them at each weakness limit in turn, strictest first.
+Candidates are known here by ID and score only.
 """
 
 import math
 from collections import Counter
 from dataclasses import dataclass, field
+
+# Most search steps one strictness level may take.
+STEP_LIMIT = 250_000
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,11 @@ class PatternGroup:
 
     pattern: frozenset[str]
     kept: tuple[Scored, ...]
+
+
+def best_first(candidate: Scored) -> tuple[int, int]:
+    """Sort key: higher score first, then lower ID."""
+    return -candidate.score, candidate.id
 
 
 @dataclass
@@ -189,3 +198,37 @@ def hand_out_shared(state: SearchState, deal: Deal, position: int, total: int) -
         deal.picks.pop()
         if state.stopped:
             return
+
+
+def last_resort(slots: list[list[PatternGroup]]) -> list[int] | None:
+    """Each slot in turn takes its best kept candidate not already taken."""
+    team: list[int] = []
+    for groups in slots:
+        free = [c for group in groups for c in group.kept if c.id not in team]
+        if not free:
+            return None
+        team.append(min(free, key=best_first).id)
+    return team
+
+
+def search_levels(
+    slots: list[list[PatternGroup]], repeats_previous: list[bool], step_limit: int
+) -> tuple[list[int] | None, int, bool]:
+    """Run the search at each weakness limit, strictest first, until a team is found.
+
+    Returns the team as candidate IDs, the steps taken, and whether any level hit
+    its step limit. If levels were cut off and none found a team, the last resort
+    fills the slots, at one more step per slot.
+    """
+    size = len(slots)
+    steps, stopped = 0, False
+    for weak_limit in range(size // 2, size + 1):
+        state = SearchState(slots, repeats_previous, weak_limit, step_limit)
+        search_patterns(state, 0)
+        steps += state.steps
+        stopped = stopped or state.stopped
+        if state.best_team is not None:
+            return state.best_team, steps, stopped
+    if stopped:
+        return last_resort(slots), steps + size, True
+    return None, steps, False

@@ -31,17 +31,34 @@ Team = tuple[Pokemon, ...]
 Totals = tuple[int, ...]
 
 
+def load_species_flags() -> dict[int, tuple[bool, bool]]:
+    """(is_legendary, is_mythical) by Pokémon id, from samples/census_all_species.tsv.
+
+    Each species row lists its varieties as Pokémon ids; every one takes the species' flags.
+    """
+    flags = {}
+    for row in (SAMPLES / "census_all_species.tsv").read_text().splitlines()[1:]:
+        _id, _name, legendary, mythical, _baby, varieties = row.split("\t")
+        for variety in varieties.split(","):
+            flags[int(variety.split(":")[0])] = (legendary == "true", mythical == "true")
+    return flags
+
+
 def load_census() -> dict[str, Pokemon]:
-    """Every Pokémon in samples/census_all_pokemon.tsv, by name."""
+    """Every Pokémon in samples/census_all_pokemon.tsv, by name, with its species' flags."""
+    flags = load_species_flags()
     census = {}
     for row in (SAMPLES / "census_all_pokemon.tsv").read_text().splitlines()[1:]:
         number, name, _species, is_default, types, *rest = row.split("\t")
+        legendary, mythical = flags[int(number)]
         census[name] = Pokemon(
             id=int(number),
             name=name,
             types=tuple(types.split("/")),
             stats=tuple(int(value) for value in rest[:6]),
             is_default=is_default == "true",
+            is_legendary=legendary,
+            is_mythical=mythical,
         )
     return census
 
@@ -66,6 +83,9 @@ def own_chart(type_files: list[dict]) -> dict[tuple[str, str], float]:
 
 CENSUS = load_census()
 POOL = candidate_pool(CENSUS.values())
+POOL_931 = candidate_pool(CENSUS.values(), leave_out_legendary=True)
+# The exactness tests run on both pools the product can be asked to search.
+BOTH_POOLS = [pytest.param(POOL, id="all 1,025"), pytest.param(POOL_931, id="931, no legendary")]
 TYPE_FILES = load_type_files()
 CHART = build_chart(TYPE_FILES)  # the product's chart, passed to the product
 OWN_CHART = own_chart(TYPE_FILES)  # this file's chart, used by the enumerator only
@@ -235,7 +255,7 @@ def test_empty_team_gives_an_empty_result():
 CASES_PER_SIZE = 500
 
 
-def small_case(rng: random.Random, size: int) -> tuple[Team, Team]:
+def small_case(rng: random.Random, size: int, candidates: list[Pokemon]) -> tuple[Team, Team]:
     """One seeded case: random, repeated or one-type opponents, and a small pool."""
     everyone = list(CENSUS.values())
     kind = rng.choice(["random", "repeated", "one type"])
@@ -246,21 +266,24 @@ def small_case(rng: random.Random, size: int) -> tuple[Team, Team]:
     else:
         shared = rng.choice(sorted({t for p in everyone for t in p.types}))
         opponents = rng.sample([p for p in everyone if shared in p.types], size)
-    useful = [c for c in POOL if any(attack(c, e) >= 2 for e in opponents)]
-    source = useful if rng.random() < 0.7 else POOL
+    useful = [c for c in candidates if any(attack(c, e) >= 2 for e in opponents)]
+    source = useful if rng.random() < 0.7 else candidates
     pool = rng.sample(source, rng.randint(size, 14 if size <= 4 else 8))
     return tuple(opponents), tuple(pool)
 
 
 @functools.cache
-def small_cases(size: int) -> list[tuple[Team, Team]]:
-    rng = random.Random(2026 + size)
-    return [small_case(rng, size) for _ in range(CASES_PER_SIZE)]
+def small_cases(size: int, leave_out_legendary: bool = False) -> list[tuple[Team, Team]]:
+    """Seeded cases whose pools are drawn from all candidates or from the 931."""
+    rng = random.Random(2026 + size + 100 * leave_out_legendary)
+    candidates = POOL_931 if leave_out_legendary else POOL
+    return [small_case(rng, size, candidates) for _ in range(CASES_PER_SIZE)]
 
 
+@pytest.mark.parametrize("leave_out_legendary", [False, True], ids=["all", "no legendary"])
 @pytest.mark.parametrize("size", range(1, 7))
-def test_search_matches_brute_force_on_small_pools(size: int):
-    for opponents, pool in small_cases(size):
+def test_search_matches_brute_force_on_small_pools(size: int, leave_out_legendary: bool):
+    for opponents, pool in small_cases(size, leave_out_legendary):
         result = build_counter_team(opponents, pool, CHART)
         truth = brute_force(opponents, pool)
         assert found(result, opponents) == truth, (opponents, pool)
@@ -339,10 +362,11 @@ def test_full_pool_reference_result(opponents: str, expected_totals: Totals, exp
     assert not result.relaxed
 
 
+@pytest.mark.parametrize("pool", BOTH_POOLS)
 @pytest.mark.parametrize("opponents", [ORICORIO, EISCUE, SIX_ROTOM])
-def test_step_limit_bounds_the_work_and_still_returns_a_team(opponents: str):
+def test_step_limit_bounds_the_work_and_still_returns_a_team(opponents: str, pool: list[Pokemon]):
     enemy = team(opponents)
-    result = build_counter_team(enemy, POOL, CHART, step_limit=50)
+    result = build_counter_team(enemy, pool, CHART, step_limit=50)
     counters = tuple(pick.counter for pick in result.picks)
     assert len(set(counters)) == 6
     assert all(attack(c, e) >= 2 for c, e in zip(counters, enemy, strict=True))
@@ -400,21 +424,32 @@ def reduction_teams() -> list[Team]:
     return teams
 
 
-def test_keeping_n_per_pattern_gives_the_same_score_as_keeping_4n():
+@pytest.mark.parametrize("pool", BOTH_POOLS)
+def test_keeping_n_per_pattern_gives_the_same_score_as_keeping_4n(pool: list[Pokemon]):
     """Checks the reduction only: two runs of the same search, one four times wider."""
     teams = reduction_teams()
     skipped = 0
     for enemy in teams:
-        wider = build_counter_team(enemy, POOL, CHART, keep=4 * len(enemy))
+        wider = build_counter_team(enemy, pool, CHART, keep=4 * len(enemy))
         if wider.stopped_early:
             skipped += 1
             continue
-        assert found(build_counter_team(enemy, POOL, CHART), enemy) == found(wider, enemy)
+        assert found(build_counter_team(enemy, pool, CHART), enemy) == found(wider, enemy)
     print(f"{skipped} of {len(teams)} wider searches hit the step limit and were not compared")
     assert skipped * 10 <= len(teams)
 
 
 # ---- The seams: who may be picked, and the table of score levels.
+
+
+def test_leaving_out_legendary_keeps_only_pokemon_known_to_be_neither():
+    # Mewtwo is legendary and Mew mythical (samples/species_150_*, species_151_*); a
+    # Pokémon whose flags were never read is left out too.
+    unread = dataclasses.replace(CENSUS["pikachu"], is_legendary=None, is_mythical=None)
+    entries = [CENSUS["charizard"], CENSUS["mewtwo"], CENSUS["mew"], unread]
+    assert candidate_pool(entries, leave_out_legendary=True) == [CENSUS["charizard"]]
+    assert candidate_pool(entries) == entries  # off by default
+    assert len(POOL_931) == 931
 
 
 def test_candidate_pool_drops_special_versions_and_removed_entries_only():
