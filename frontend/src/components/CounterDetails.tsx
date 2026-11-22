@@ -1,14 +1,15 @@
 // What "Show details" opens under the face-off: the view of the team as a
 // whole. How the team was chosen, each pick with its matchup, every counter's
 // matchup against every member of the team, the team's three totals, and how
-// many counters each of the team's types hits hard. The sentence saying why a
-// counter was picked is on its own card, behind "Why?".
+// many counters each of the team's types hits hard. Each pick's line has a
+// "Why?" button that shows the sentence saying why it was picked.
 //
 // A matchup is how hard the counter hits that Pokémon minus how hard it is
 // hit back, in points (one per doubling of damage), from -5 to 5. A counter's
 // coverage is its row of the table added up.
+import { useState } from "react";
 import { matchupStyle, matchupWord, signed } from "../matchupWords";
-import { displayName, type CounterResult } from "../types";
+import { displayName, type CounterPick, type CounterResult } from "../types";
 
 
 // The scoring is this app's own, not the game's, so it is explained first.
@@ -38,18 +39,37 @@ function Matchup({ points }: { points: number }) {
   );
 }
 
-// Each pick on one line: "Rhyperior beats Charizard", then its matchup.
+// One pick: "Rhyperior beats Charizard", its matchup, and a "Why?" button
+// that shows the reason under the line. The open state lives here, so it
+// starts hidden whenever the details are opened again; a new counter team
+// always closes the details first.
+function PickLine({ pick, slot }: { pick: CounterPick; slot: number }) {
+  const [open, setOpen] = useState(false);
+  const reasonId = `pick-why-${slot}`;
+  return (
+    <li>
+      <strong>{displayName(pick.counter.name)}</strong> <span className="muted">beats</span>{" "}
+      <strong>{displayName(pick.opponent.name)}</strong>{" "}
+      <span className="matchup" style={matchupStyle(pick.matchup)}>
+        <Matchup points={pick.matchup} />
+      </span>{" "}
+      <button type="button" className="why-toggle" aria-expanded={open} aria-controls={reasonId} onClick={() => setOpen(!open)}>
+        {open ? "Hide why" : "Why?"}
+      </button>
+      {open && (
+        <p id={reasonId} className="why">
+          {pick.reason}
+        </p>
+      )}
+    </li>
+  );
+}
+
 function PickList({ counter }: { counter: CounterResult }) {
   return (
     <ul className="pick-list">
-      {counter.picks.map((pick, index) => (
-        <li key={index}>
-          <strong>{displayName(pick.counter.name)}</strong> <span className="muted">beats</span>{" "}
-          <strong>{displayName(pick.opponent.name)}</strong>{" "}
-          <span className="matchup" style={matchupStyle(pick.matchup)}>
-            <Matchup points={pick.matchup} />
-          </span>
-        </li>
+      {counter.picks.map((pick, slot) => (
+        <PickLine key={slot} pick={pick} slot={slot} />
       ))}
     </ul>
   );

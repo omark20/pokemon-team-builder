@@ -954,18 +954,14 @@ button:disabled {
   color: #ffffff;
 }
 
-/* A counter card's "Why?" button and the reason it shows under the card. */
+/* A pick line's "Why?" button and the reason it shows under the line. */
 .why-toggle {
   min-height: 24px;
-  margin-top: 4px;
   padding: 0 8px;
   font-size: 11px;
 }
 
 .why {
   margin: 4px 0 0;
-  font-size: 11px;
-  line-height: 1.4;
   color: var(--text-soft);
-  text-align: left;
 }

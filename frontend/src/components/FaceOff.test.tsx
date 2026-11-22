@@ -43,6 +43,7 @@ test("after a build, counter i faces member i, and the footer reports the pool s
   expect(counterNames()).toEqual(["Archeops", "Hydrapple", "Celesteela"]);
   const beats = [...document.querySelectorAll(".beats")].map((el) => el.textContent);
   expect(beats).toEqual(["beats Charizard", "beats Blastoise", "beats Venusaur"]);
+  expect(counterHalf().queryByRole("button", { name: "Why?" })).toBeNull(); // the reasons are in the details
   expect(footer().getByText("Best team out of 1,025 candidates.")).toBeTruthy();
   expect(primary().textContent).toBe("Rebuild");
 });
@@ -74,10 +75,12 @@ test("the details open on request: each pick with its label but no reason, and a
   expect(document.querySelector(".counter-details")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
   expect([...document.querySelectorAll(".pick-list li")].map((line) => line.textContent)).toEqual([
-    "Archeops beats Charizard Strong +3", "Hydrapple beats Blastoise Strong +3", "Celesteela beats Venusaur Strong +3",
+    "Archeops beats Charizard Strong +3 Why?",
+    "Hydrapple beats Blastoise Strong +3 Why?",
+    "Celesteela beats Venusaur Strong +3 Why?",
   ]);
   const details = document.querySelector(".counter-details")!.textContent;
-  expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]); // reasons are on the cards
+  expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]); // a reason shows only when its Why? is pressed
   const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];
   expect(rows.map((row) => row.querySelectorAll("td:not(.row-sum)").length)).toEqual([3, 3, 3]);
   const sums = rows.map((row) => Number(row.querySelector(".row-sum")!.textContent));
@@ -159,12 +162,18 @@ test("a finished build is announced once, politely, with the counters' names", a
   expect(live.textContent).toBe("Counter team ready: Archeops, Hydrapple, Celesteela.");
 });
 
-const whyButtons = () => counterHalf().getAllByRole("button", { name: /^(Why\?|Hide why)$/ });
+const pickList = () => within(document.querySelector<HTMLElement>(".pick-list")!);
+const whyButtons = () => pickList().getAllByRole("button", { name: /^(Why\?|Hide why)$/ });
 const shownReasons = () => [...document.querySelectorAll(".why")].map((el) => el.textContent);
 
-test("a card's Why? shows that pick's reason under it, and only that one, until pressed again", async () => {
-  await start();
+async function openDetails() {
   await build();
+  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+}
+
+test("a pick line's Why? shows that pick's reason under it, and only that one, until pressed again", async () => {
+  await start();
+  await openDetails();
   const second = whyButtons()[1]!;
   expect([second.tagName, second.getAttribute("type")]).toEqual(["BUTTON", "button"]); // reachable with Tab, works with Enter
   fireEvent.click(second);
@@ -177,10 +186,11 @@ test("a card's Why? shows that pick's reason under it, and only that one, until 
 
 test("a rebuild hides every open reason", async () => {
   await start();
-  await build();
-  act(() => whyButtons().forEach((button) => button.click())); // three presses before one render
+  await openDetails();
+  whyButtons().forEach((button) => fireEvent.click(button));
   expect(shownReasons()).toHaveLength(3);
   fireEvent.click(primary());
   await screen.findByText("beats Charizard");
+  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
   expect(shownReasons()).toEqual([]);
 });
