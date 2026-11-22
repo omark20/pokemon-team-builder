@@ -1,0 +1,41 @@
+# Scheduled scan of PokéAPI: asks the deployed app to scan, then waits for the result.
+# The app's address is the APP_URL variable and the token the SCAN_TOKEN secret; that
+# token can start a scan and do nothing else.
+name: scan
+
+on:
+  schedule:
+    # Every six hours during the build weekend, at 17 minutes past to avoid the busy
+    # top of the hour. To be switched to daily ("17 9 * * *").
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Trigger the scan and wait for it to finish
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SCAN_TOKEN: ${{ secrets.SCAN_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=$(curl -fsS -X POST -H "Authorization: Bearer ${SCAN_TOKEN}" \
+            "${APP_URL}/api/admin/scan" | jq -r .run_id)
+          echo "started run ${run_id}"
+          # Poll every 15 seconds for up to 15 minutes.
+          for _ in $(seq 60); do
+            sleep 15
+            run=$(curl -fsS "${APP_URL}/api/scan/status" \
+              | jq -c --argjson id "${run_id}" '.runs[] | select(.id == $id)')
+            if [ "$(echo "${run}" | jq -r .finished_at)" != "null" ]; then
+              echo "finished: ${run}"
+              [ "$(echo "${run}" | jq -r .status)" != "failed" ]
+              exit
+            fi
+          done
+          echo "run ${run_id} did not finish within 15 minutes"
+          exit 1

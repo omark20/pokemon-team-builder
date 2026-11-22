@@ -1,0 +1,26 @@
+# Secrets and local settings. Only the placeholder file is committed.
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+*.tsbuildinfo
+
+# Build output
+dist/
+build/
+coverage/
+
+# Editors and operating system
+.DS_Store
+.idea/
+.vscode/

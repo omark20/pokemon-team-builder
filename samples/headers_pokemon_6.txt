@@ -1,0 +1,28 @@
+HTTP/2 200 
+date: Fri, 20 Nov 2026 02:20:51 GMT
+content-type: application/json; charset=utf-8
+access-control-allow-origin: *
+access-control-expose-headers: X-PokeAPI-Hash,X-PokeAPI-Deploy-Date
+cache-control: public, max-age=86400, s-maxage=86400
+age: 47255
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=wVUioDfnQuyLk7tftc0ldMayY8t2LyejuLRgbfKlGWK7MlrzhOyG4E1Mf0dTFaequVZefUKdwNBgaUgjpKIfSVPSf5oYpFR05hPtb%2FB9J8AJwUpd3wdRbo8kHzg3eqKJWcg3yOj7Viql"}]}
+etag: W/"677f8-3Krcf7jpPYlpXGuwcBxA8vW6glE"
+function-execution-id: vdxfy7x5mujc
+server: cloudflare
+strict-transport-security: max-age=31556926
+x-cloud-trace-context: 673cf462f819d054f6c8616465afab60
+x-country-code: US
+x-orig-accept-language: ja,en;q=0.9,en-GB;q=0.8,en-US;q=0.7
+x-pokeapi-deploy-date: 1794994134
+x-pokeapi-hash: e98f2ad82fc61c46036689ecb10c3aa89d562d6b
+x-powered-by: Express
+x-served-by: cache-chi-klot8100142-CHI
+x-cache: HIT
+x-cache-hits: 1
+x-timer: S1795007586.841943,VS0,VE2
+vary: Accept-Encoding,cookie,authorization, x-fh-requested-host, accept-encoding
+alt-svc: h3=":443"; ma=86400
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+cf-cache-status: HIT
+cf-ray: a5d3fa575a767b0d-IAD
+

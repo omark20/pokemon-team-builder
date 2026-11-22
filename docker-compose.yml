@@ -1,0 +1,26 @@
+# Local Postgres for development and tests only. The deployed site uses a
+# managed database; nothing here is used in production.
+services:
+  db:
+    # The one place the Postgres version is written. Keep it on the same major
+    # version as the deployed database.
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pokemon
+      POSTGRES_DB: pokemon
+      # Generated into the git-ignored .env by `make .env`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run "make .env" first}
+    ports:
+      # Reachable from this computer only. 5433, so that a Postgres already
+      # installed on the default port 5432 does not clash.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokemon -d pokemon"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

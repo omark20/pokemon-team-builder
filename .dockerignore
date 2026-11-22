@@ -1,0 +1,12 @@
+# Keep secrets, local environments, build output and documents out of the build context.
+.env
+.env.*
+.git
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+frontend/dist
+*.md
