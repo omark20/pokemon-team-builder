@@ -95,7 +95,7 @@ function MatchupTable({ counter }: { counter: CounterResult }) {
                 {displayName(pick.opponent.name)}
               </th>
             ))}
-            <th scope="col">Vs whole team</th>
+            <th scope="col">vs whole team</th>
           </tr>
         </thead>
         <tbody>
