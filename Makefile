@@ -5,7 +5,7 @@
 include .env
 export
 
-.PHONY: burst db dev lint smoke sync test
+.PHONY: audit burst db dev lint smoke sync test
 
 # Local settings with freshly generated secrets. Git-ignored; never committed.
 .env:
@@ -41,6 +41,14 @@ burst: .env
 	docker compose --profile burst up --detach --wait db-burst
 	cd backend && uv run python scripts/burst.py; status=$$?; \
 		cd .. && docker compose --profile burst rm --stop --force db-burst; exit $$status
+
+# Known vulnerabilities in every locked backend package and in the frontend's packages.
+# pipefail, so a failed export cannot pass as "nothing found".
+audit:
+	cd backend && bash -o pipefail -c \
+		'uv export --frozen --no-emit-project --format requirements-txt \
+		| uvx pip-audit@2.10.1 --disable-pip -r /dev/stdin'
+	@if [ -f frontend/package.json ]; then npm --prefix frontend audit --audit-level=high; fi
 
 lint:
 	cd backend && uv run ruff check .
