@@ -30,7 +30,7 @@ sync: db
 	cd backend && uv run python -m app.scan
 
 # Drive the real app through its API, scanning the live PokéAPI. Not part of `make test`:
-# it needs the network and takes over a minute.
+# it needs the network and takes under a minute.
 smoke: db
 	cd backend && uv run python scripts/smoke.py
 

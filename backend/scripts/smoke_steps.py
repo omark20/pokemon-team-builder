@@ -20,8 +20,8 @@ DEFAULT_FORMS = 1025
 WITHOUT_SPRITE = 9
 CHARIZARD = {"name": "charizard", "types": ["fire", "flying"], "stats": [78, 84, 78, 109, 85, 100]}
 PIKACHU = {"name": "pikachu", "types": ["electric"]}
-# Visitor A's team and its counter team on the full pool (the plan's worked full-pool
-# figure, also returned by an independently written search).
+# Visitor A's team and its expected counter team on the full pool, the same answer an
+# independently written search returns.
 TEAM_A = [6, 9, 3]
 COUNTERS_A = ["archeops", "hydrapple", "celesteela"]
 TOTALS_A = {"assigned_points": 9, "coverage": 6, "base_stats": 1677}

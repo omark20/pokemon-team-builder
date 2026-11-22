@@ -13,7 +13,7 @@ from typing import Any, Protocol
 import httpx
 
 BASE_URL = "https://pokeapi.co/api/v2/"
-USER_AGENT = "pokemon-team-builder (server-side daily sync)"
+USER_AGENT = "pokemon-team-builder (server-side scheduled sync)"
 TIMEOUT_SECONDS = 10
 RETRY_WAITS = (1, 2, 4)  # seconds before the second, third and fourth attempt
 
