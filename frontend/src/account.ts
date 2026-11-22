@@ -3,10 +3,13 @@
 // signs up stays anonymous, exactly as before.
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ApiError, createAccount, fetchSession, signIn, signOut } from "./api";
+import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut } from "./api";
 import type { Notice } from "./teamStore";
 
-export type DialogMode = "create" | "signin";
+export type DialogMode = "create" | "signin" | "delete";
+export type EntryMode = Exclude<DialogMode, "delete">;
+
+export const ACCOUNT_DELETED = "Your account was deleted.";
 
 // After signing in: what happened to the teams this browser had.
 export function signedInText(username: string, added: number, notAdded: number): string {
@@ -40,7 +43,7 @@ interface AccountEvents {
 }
 
 // Signs up or in: the account's name, and the sentence that reports it.
-async function enter(mode: DialogMode, name: string, password: string) {
+async function enter(mode: EntryMode, name: string, password: string) {
   if (mode === "create") {
     const made = await createAccount(name, password);
     return { username: made.username, text: `Account created. Signed in as ${made.username}.` };
@@ -79,41 +82,80 @@ function useDialog() {
   return { dialog, open, close };
 }
 
-export function useAccount({ reload, notify }: AccountEvents) {
+// What the account's actions change on the page.
+interface AccountContext extends AccountEvents {
+  setUsername: (username: string | null) => void;
+  setNoticeClosed: (closed: boolean) => void;
+  close: () => void; // closes the dialog
+}
+
+// After signing out or deleting the account: the page as for a first visit,
+// with focus on the account links, since what had it is gone.
+async function becomeAnonymous(page: AccountContext) {
+  await page.reload(); // no teams now, so the links, not the notice, show next
+  flushSync(() => {
+    page.setUsername(null);
+    page.setNoticeClosed(false);
+  });
+  document.querySelector<HTMLElement>(".account-links button")?.focus();
+}
+
+// Signs up or in; resolves to the sentence to show in the dialog, or null when done.
+async function submitEntry(page: AccountContext, mode: EntryMode, name: string, password: string) {
+  try {
+    const entered = await enter(mode, name, password);
+    page.setUsername(entered.username);
+    page.close();
+    await page.reload();
+    page.notify({ kind: "info", text: entered.text });
+    return null;
+  } catch (error) {
+    return accountErrorText(error);
+  }
+}
+
+async function signOutHere(page: AccountContext) {
+  try {
+    await signOut();
+  } catch {
+    return page.notify({ kind: "error", text: "Couldn't sign out. Try again." });
+  }
+  await becomeAnonymous(page);
+}
+
+// Deletes the account; resolves to the sentence to show in the dialog, or null when done.
+async function deleteHere(page: AccountContext, password: string) {
+  try {
+    await deleteAccount(password);
+  } catch (error) {
+    return accountErrorText(error);
+  }
+  page.close();
+  await becomeAnonymous(page);
+  page.notify({ kind: "info", text: ACCOUNT_DELETED });
+  return null;
+}
+
+export function useAccount(events: AccountEvents) {
   const [username, setUsername] = useUsername();
   const { dialog, open, close } = useDialog();
   const [noticeClosed, setNoticeClosed] = useState(false);
-  // Signs up or in; returns the sentence to show in the dialog, or null when done.
-  async function submit(mode: DialogMode, name: string, password: string): Promise<string | null> {
-    try {
-      const entered = await enter(mode, name, password);
-      setUsername(entered.username);
-      close();
-      await reload();
-      notify({ kind: "info", text: entered.text });
-      return null;
-    } catch (error) {
-      return accountErrorText(error);
-    }
-  }
-  async function leave() {
-    try {
-      await signOut();
-    } catch {
-      return notify({ kind: "error", text: "Couldn't sign out. Try again." });
-    }
-    await reload(); // no teams now, so the links, not the notice, show next
-    flushSync(() => {
-      setUsername(null);
-      setNoticeClosed(false);
-    });
-    document.querySelector<HTMLElement>(".account-links button")?.focus(); // Sign out is gone
-  }
+  const page: AccountContext = { ...events, setUsername, setNoticeClosed, close };
   function closeNotice() {
     flushSync(() => setNoticeClosed(true));
     document.querySelector<HTMLElement>(".account-links button")?.focus(); // the actions moved there
   }
-  return { username, dialog, noticeClosed, open, close, submit, signOut: leave, closeNotice };
+  return {
+    username,
+    dialog,
+    noticeClosed,
+    open,
+    close,
+    closeNotice,
+    submit: (mode: EntryMode, name: string, password: string) => submitEntry(page, mode, name, password),
+    signOut: () => signOutHere(page),
+    deleteAccount: (password: string) => deleteHere(page, password),
+  };
 }
 
 export type Account = ReturnType<typeof useAccount>;

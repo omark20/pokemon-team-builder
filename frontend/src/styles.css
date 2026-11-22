@@ -922,3 +922,13 @@ button:disabled {
 .dialog > .link-button {
   margin-top: 12px;
 }
+
+.link-button.quiet {
+  color: var(--text-soft);
+}
+
+.destructive {
+  border-color: #a32d2d;
+  background: #a32d2d;
+  color: #ffffff;
+}

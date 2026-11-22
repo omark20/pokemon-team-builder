@@ -1,8 +1,8 @@
 // The account's two places on the page. At the top right: "Create account"
-// and "Sign in", or the username and "Sign out" when signed in. Above the
-// teams, for a visitor who is not signed in and has a team: a notice that the
-// teams are saved in this browser only, with the same two actions; while it
-// shows, the top-right links do not.
+// and "Sign in", or, when signed in, the username, "Sign out" and a quieter
+// "Delete account". Above the teams, for a visitor who is not signed in and
+// has a team: a notice that the teams are saved in this browser only, with the
+// same two actions; while it shows, the top-right links do not.
 import type { Account } from "../account";
 
 export const BROWSER_ONLY = "Your teams are saved in this browser only.";
@@ -36,6 +36,9 @@ export function AccountLinks({ account, hasTeams }: { account: Account; hasTeams
           <span className="account-name">{account.username}</span>
           <button type="button" className="link-button" onClick={() => void account.signOut()}>
             Sign out
+          </button>
+          <button type="button" className="link-button quiet" onClick={() => account.open("delete")}>
+            Delete account
           </button>
         </>
       )}

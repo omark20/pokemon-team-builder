@@ -84,7 +84,7 @@ export class FakeServer {
     }
     if (path.startsWith("/api/alerts")) return this.answerAlerts(method, path);
     if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: false });
-    if (path === "/api/session" || path === "/api/account") return this.answerAccount(method, path, body);
+    if (path === "/api/session" || path.startsWith("/api/account")) return this.answerAccount(method, path, body);
     if (method === "GET") return json(path === "/api/pokemon" ? CENSUS : this.teams);
     return this.answerTeams(method, path, body);
   }
@@ -107,8 +107,8 @@ export class FakeServer {
 
   private answerAccount(method: string, path: string, body: Call["body"]): Response {
     if (method === "GET") return json({ username: this.username });
-    if (method === "DELETE") {
-      [this.username, this.teams] = [null, []];
+    if (method === "DELETE" || path === "/api/account/delete") {
+      [this.username, this.teams] = [null, []]; // signed out, or the account and its teams gone
       return new Response(null, { status: 204 });
     }
     this.username = body.username ?? null;

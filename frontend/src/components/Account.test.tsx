@@ -55,9 +55,9 @@ test("closing the notice puts the two actions back at the top right", async () =
   expect(within(topRight()!).getByRole("button", { name: "Sign in" })).toBeTruthy();
 });
 
-test("signed in: the username and Sign out at the top right, and no notice", async () => {
+test("signed in: the username, Sign out and Delete account at the top right, and no notice", async () => {
   await start([TEAM], "ash");
-  expect(topRight()!.textContent).toBe("ashSign out");
+  expect(topRight()!.textContent).toBe("ashSign outDelete account");
   expect(notice()).toBeNull();
 });
 
@@ -113,7 +113,7 @@ test("after signing in, the account's teams are loaded and the counts are shown"
   expect(document.querySelector(".notice-bar span")?.textContent).toBe(
     "Signed in as ash. 1 team from this browser added to your account.",
   );
-  expect(topRight()!.textContent).toBe("ashSign out");
+  expect(topRight()!.textContent).toBe("ashSign outDelete account");
 });
 
 test("after signing out there are no teams, and the page is as for a first visit", async () => {
@@ -153,4 +153,63 @@ test("a second submit while the first is in flight sends nothing more", async ()
   fireEvent.submit(form);
   await act(async () => release());
   expect(server.calls.filter((call) => call.path === "/api/session" && call.method === "POST")).toHaveLength(1);
+});
+
+// ---- Deleting the account.
+
+const deleteForm = () => within(screen.getByRole("dialog", { name: "Delete account" }));
+
+async function openDelete() {
+  const server = await start([TEAM], "ash");
+  fireEvent.click(within(topRight()!).getByRole("button", { name: "Delete account" }));
+  return server;
+}
+
+const deleteRequests = (server: FakeServer) => server.calls.filter((call) => call.path === "/api/account/delete");
+
+test("Delete account is offered only when signed in", async () => {
+  await start();
+  expect(screen.queryByRole("button", { name: "Delete account" })).toBeNull();
+});
+
+test("the delete dialog names the account, asks for its password and says it cannot be undone", async () => {
+  await openDelete();
+  expect(
+    deleteForm().getByText("This deletes the account ash, its teams and its sign-ins on every device. It cannot be undone."),
+  ).toBeTruthy();
+  const password = deleteForm().getByLabelText("Password");
+  expect([password.getAttribute("type"), password.getAttribute("autocomplete")]).toEqual(["password", "current-password"]);
+});
+
+test("a wrong password shows the server's sentence and keeps the dialog open", async () => {
+  const server = await openDelete();
+  server.refuseNext("POST", 401, undefined, "/api/account/delete", "Wrong password.");
+  fireEvent.change(deleteForm().getByLabelText("Password"), { target: { value: "nope-nope" } });
+  await act(async () => fireEvent.click(deleteForm().getByRole("button", { name: "Delete account" })));
+  expect(deleteForm().getByRole("alert").textContent).toBe("Wrong password.");
+});
+
+test.each([
+  { close: "Cancel", act: () => fireEvent.click(deleteForm().getByRole("button", { name: "Cancel" })) },
+  { close: "Escape", act: () => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }) },
+])("$close closes the delete dialog, sends nothing and returns focus to the link", async ({ act: close }) => {
+  const server = await start([TEAM], "ash");
+  const link = within(topRight()!).getByRole("button", { name: "Delete account" });
+  link.focus();
+  fireEvent.click(link);
+  close();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(deleteRequests(server)).toEqual([]);
+  expect(document.activeElement).toBe(link);
+});
+
+test("after deleting, the page is as for a first visit and says the account was deleted", async () => {
+  const server = await openDelete();
+  fireEvent.change(deleteForm().getByLabelText("Password"), { target: { value: "pikachu-rules" } });
+  await act(async () => fireEvent.click(deleteForm().getByRole("button", { name: "Delete account" })));
+  expect(deleteRequests(server).map((call) => call.body)).toEqual([{ password: "pikachu-rules" }]);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByText("Build your first team")).toBeTruthy();
+  expect(within(topRight()!).getAllByRole("button").map((b) => b.textContent)).toEqual(["Create account", "Sign in"]);
+  expect(document.querySelector(".notice-bar span")?.textContent).toBe("Your account was deleted.");
 });

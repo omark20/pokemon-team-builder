@@ -88,3 +88,7 @@ export const signIn = (username: string, password: string) =>
   request<SignedIn>("POST", "/api/session", { username, password });
 
 export const signOut = () => request<void>("DELETE", "/api/session");
+
+// Deletes the signed-in account, its teams and its sessions; needs its password.
+export const deleteAccount = (password: string) =>
+  request<void>("POST", "/api/account/delete", { password });

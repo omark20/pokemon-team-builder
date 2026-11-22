@@ -10,6 +10,7 @@ import { touchesTeams } from "./alertText";
 import { useAlerts } from "./alerts";
 import { AccountDialog } from "./components/AccountDialog";
 import { AccountLinks, AccountNotice } from "./components/AccountLinks";
+import { DeleteAccountDialog } from "./components/DeleteAccountDialog";
 import { AlertPanel, PAGE_TITLE_ID } from "./components/AlertPanel";
 import { FaceOff } from "./components/FaceOff";
 import { NoticeBar } from "./components/NoticeBar";
@@ -86,6 +87,7 @@ export default function App() {
       <StatusFooter />
       <NoticeBar notice={teams.notice} onClose={() => store.dismissNotice()} />
       <AccountDialog account={account} hasTeams={hasTeams} />
+      <DeleteAccountDialog account={account} />
     </main>
   );
 }
