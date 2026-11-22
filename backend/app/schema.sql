@@ -21,6 +21,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS scan_runs_one_running
 -- The stored copy of PokéAPI. One column per field of PokemonRecord (domain/diff.py),
 -- same names; a new field is a new column added nullable with no default, with an
 -- ALTER TABLE ... ADD COLUMN IF NOT EXISTS line here. Rows are never deleted.
+-- The limit of the first-sight rule: a new column that PokéAPI itself may send as null
+-- (one listed in OPTIONAL_UPSTREAM) would have its first fill recorded as changes.
 CREATE TABLE IF NOT EXISTS pokemon (
     id integer PRIMARY KEY,
     name text NOT NULL,

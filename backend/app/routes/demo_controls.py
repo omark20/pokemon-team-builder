@@ -51,7 +51,15 @@ def _multiplier(value: float) -> float:
 
 TypeName = Annotated[str, AfterValidator(_standard_type)]
 BaseStat = Annotated[int, Field(ge=0, le=MAX_BASE_STAT)]
-PokemonKey = Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]{0,9}$")]
+
+
+def _pokemon_key(key: str) -> str:
+    if not (key.isdecimal() and key[0] != "0" and int(key) <= MAX_ID):
+        raise ValueError("a Pokémon ID from 1 to 2147483647")
+    return key
+
+
+PokemonKey = Annotated[str, AfterValidator(_pokemon_key)]
 
 
 class PokemonPatch(BaseModel):
@@ -99,7 +107,7 @@ def put_overrides(request: Request, body: OverridesBody) -> dict[str, Any]:
         _refuse_while_scanning(conn)
         wanted = {int(key) for key in body.pokemon}
         found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
-        if max(wanted, default=0) > MAX_ID or {pid for (pid,) in found} != wanted:
+        if {pid for (pid,) in found} != wanted:
             raise HTTPException(422, "Unknown Pokémon ID")
         doc = {
             "pokemon": {

@@ -11,14 +11,12 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
-import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
+from app.db import Conn
 from app.domain.diff import RECORD_FIELDS, PokemonRecord
 from app.domain.types import Chart
-
-Conn = psycopg.Connection[Any]
 
 
 @dataclass(frozen=True)
@@ -121,6 +119,8 @@ def _restore(
             (old, attacker, defender),
         )
     elif name == "status":
+        # "removed" comes back when a demo removal was undone before reset: unwinding
+        # newest first passes through it on the way to the older "available".
         removed_at = sql.SQL("NULL" if old == "available" else "now()")
         conn.execute(
             sql.SQL("UPDATE pokemon SET removed_at = {} WHERE id = %s").format(removed_at),

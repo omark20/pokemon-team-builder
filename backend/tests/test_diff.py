@@ -14,7 +14,6 @@ from app.domain.diff import (
     PokemonRecord,
     diff_chart,
     diff_pokemon,
-    keep_unread,
 )
 
 SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png"
@@ -69,7 +68,7 @@ def test_a_field_not_read_in_this_run_keeps_its_stored_value(stored_value: bool 
     unread = replace(CHARIZARD, is_legendary=None)
     diff = diff_pokemon(stored, unread)
     assert (diff.changes, diff.filled) == ((), ())
-    assert keep_unread(stored, unread).is_legendary == stored_value
+    assert diff.record.is_legendary == stored_value
 
 
 def test_empty_new_column_is_filled_without_a_change() -> None:

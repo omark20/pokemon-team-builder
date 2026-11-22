@@ -3,8 +3,10 @@
 `GET /api/pokemon` is public and unlimited, so it is answered from one serialised copy
 instead of reading 1,351 rows each time. The copy is cleared whenever stored Pokémon
 can have changed: at the end of a scan that wrote a Pokémon row, and after a demo reset.
-The service is one process, so there is one copy, and the code that changes the rows
-runs in that process and clears it. Building and clearing take the same lock, so a
+The service is one process, so there is one copy, and on the site the code that changes
+the rows (the scan the trigger starts, the reset) runs in that process and clears it.
+`make sync` runs a scan in a separate process, which cannot: a running local server keeps
+its copy until restarted (SETUP.md). Building and clearing take the same lock, so a
 build that began before a scan's last write cannot outlive the clear.
 """
 

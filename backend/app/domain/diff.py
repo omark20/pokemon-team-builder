@@ -59,6 +59,7 @@ class PokemonDiff:
 
     changes: tuple[FieldChange, ...]
     filled: tuple[str, ...]
+    record: PokemonRecord  # what to store: the fetched record, unread fields as stored
 
 
 @dataclass(frozen=True)
@@ -109,7 +110,7 @@ def species_url(payload: Mapping[str, Any]) -> str:
     return url
 
 
-def keep_unread(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonRecord:
+def _keep_unread(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonRecord:
     """The fetched record, with every field not read in this run taken from the stored row.
 
     A None in a field PokéAPI never sends as null (one not in OPTIONAL_UPSTREAM) means
@@ -127,9 +128,9 @@ def diff_pokemon(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonDi
     A stored SQL NULL in a field not in OPTIONAL_UPSTREAM is a column added since the
     last scan: it is filled with no change recorded, or every user would be alerted
     about a change that never happened upstream. A field not read in this run is left
-    as stored (`keep_unread`).
+    as stored (`_keep_unread`), and the record to store is returned with the diff.
     """
-    fetched = keep_unread(stored, fetched)
+    fetched = _keep_unread(stored, fetched)
     changes: list[FieldChange] = []
     filled: list[str] = []
     for name in RECORD_FIELDS:
@@ -140,7 +141,7 @@ def diff_pokemon(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonDi
             filled.append(name)
         else:
             changes.append(FieldChange(name, old, new))
-    return PokemonDiff(tuple(changes), tuple(filled))
+    return PokemonDiff(tuple(changes), tuple(filled), fetched)
 
 
 def diff_chart(stored: Chart, fetched: Chart) -> list[CellChange]:

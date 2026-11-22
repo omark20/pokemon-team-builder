@@ -13,10 +13,10 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from functools import partial
-from typing import Any
 
 from app import db, demo, logs, pokemon_list, scan_fetch, scan_store
 from app.config import load_settings
+from app.db import Conn
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
 from app.logs import log_event, log_exception, outside
 from app.pokeapi import (
@@ -27,7 +27,8 @@ from app.pokeapi import (
     get_with_retry,
     http_client,
 )
-from app.scan_store import Conn, Run
+from app.scan_fetch import Fetch
+from app.scan_store import Run
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,6 @@ POKEMON_LIST_PATH = "pokemon?limit=100000"
 WORKERS = 4  # requests in flight: the only rate known to be accepted (census_curl_log.txt)
 MIN_LIST_SHARE = 0.9  # a list this much shorter than what is stored looks truncated
 STALE_AFTER = timedelta(minutes=30)  # a run still "running" after this was cut off
-
-Fetch = Callable[[str], Any]
 
 
 def utc_now() -> datetime:
@@ -180,27 +179,33 @@ def _scan_details(conn: Conn, fetch: Fetch, run: Run, wanted: dict[int, str]) ->
 
 
 def _apply_fetched(conn: Conn, run: Run, fetched: scan_fetch.Fetched) -> None:
-    """Save a record, with any demo patch applied, or note a removal or a skip.
+    """One of three cases: gone (a 404, or removed by the demo), read, or unreadable.
 
-    Anything about a Pokémon that could not be read counts it once in `failed`.
+    A record read without its species flags is saved and also counted as unreadable.
     """
-    removed_by_demo = run.overrides.removes(fetched.pokemon_id)
-    if fetched.record is not None and not removed_by_demo:
-        scan_store.save_pokemon(conn, run, run.overrides.apply(fetched.record))
-    elif fetched.reason is None or removed_by_demo:
+    gone = fetched.record is None and fetched.reason is None
+    if gone or run.overrides.removes(fetched.pokemon_id):
         run.missing.append(fetched.pokemon_id)
-    if fetched.reason is not None and not removed_by_demo:
-        run.failed += 1
-        rule = {"rule": fetched.rule} if fetched.rule else {}
-        log_event(
-            logger,
-            logging.WARNING,
-            "pokemon_skipped" if fetched.record is None else "species_unread",
-            run_id=run.run_id,
-            pokemon_id=fetched.pokemon_id,
-            reason=fetched.reason,
-            **rule,
-        )
+        return
+    if fetched.record is not None:
+        scan_store.save_pokemon(conn, run, run.overrides.apply(fetched.record))
+    if fetched.reason is not None:
+        _count_unread(run, fetched, fetched.reason)
+
+
+def _count_unread(run: Run, fetched: scan_fetch.Fetched, reason: str) -> None:
+    """Something about this Pokémon could not be read: count it once in `failed`, log why."""
+    run.failed += 1
+    rule = {"rule": fetched.rule} if fetched.rule else {}
+    log_event(
+        logger,
+        logging.WARNING,
+        "pokemon_skipped" if fetched.record is None else "species_unread",
+        run_id=run.run_id,
+        pokemon_id=fetched.pokemon_id,
+        reason=reason,
+        **rule,
+    )
 
 
 def _finish(conn: Conn, run: Run, status: str) -> None:

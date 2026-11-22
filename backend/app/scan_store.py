@@ -11,13 +11,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
-import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.db import Conn
 from app.demo import Overrides
-from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon, keep_unread
+from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon
 from app.domain.types import Chart
 from app.logs import log_event
 
@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 MAX_REMOVALS = 20  # more disappearances than this in one run is more likely an upstream fault
 
-Conn = psycopg.Connection[Any]
 
 COLUMNS = sql.SQL(", ").join(sql.Identifier(name) for name in RECORD_FIELDS)
 SELECT_ROW = sql.SQL("SELECT {}, removed_at FROM pokemon WHERE id = %s FOR UPDATE").format(COLUMNS)
@@ -48,7 +47,7 @@ class Run:
     changed: int = 0
     failed: int = 0
     filled: int = 0  # Pokémon that had a new column filled for the first time
-    complete: bool = True  # false once the chart or the removals had to be left alone
+    complete: bool = True  # false once the removals had to be left alone (too many)
     wrote_pokemon: bool = False  # a Pokémon row was inserted, updated or flagged
     missing: list[int] = field(default_factory=list)  # candidates for removal
     overrides: Overrides = field(default_factory=Overrides)  # the demo's patches, if any
@@ -95,7 +94,7 @@ def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
 def save_pokemon(conn: Conn, run: Run, record: PokemonRecord) -> None:
     """Insert a first sight, or diff against the stored row and write what moved.
 
-    A field not read in this run keeps its stored value (`keep_unread`).
+    A field not read in this run keeps its stored value (the diff's `record`).
     """
     with conn.transaction():
         stored = conn.cursor(row_factory=dict_row).execute(SELECT_ROW, (record.id,)).fetchone()
@@ -103,16 +102,13 @@ def save_pokemon(conn: Conn, run: Run, record: PokemonRecord) -> None:
             conn.execute(INSERT_ROW, [getattr(record, name) for name in RECORD_FIELDS])
             run.wrote_pokemon = True
         else:
-            kept = keep_unread(stored, record)
-            values = [getattr(kept, name) for name in RECORD_FIELDS]
-            _update_if_changed(conn, run, stored, kept, values)
+            _update_if_changed(conn, run, stored, record)
     run.scanned += 1
 
 
-def _update_if_changed(
-    conn: Conn, run: Run, stored: dict[str, Any], record: PokemonRecord, values: list[Any]
-) -> None:
+def _update_if_changed(conn: Conn, run: Run, stored: dict[str, Any], record: PokemonRecord) -> None:
     diff = diff_pokemon(stored, record)
+    values = [getattr(diff.record, name) for name in RECORD_FIELDS]
     restored = stored["removed_at"] is not None
     demo = _demo_fields(conn, run, record.id) if diff.changes or restored else set()
     rows = [

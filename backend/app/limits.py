@@ -31,7 +31,7 @@ LIMITS = {
     "read": Limit(600, 60),  # every GET under /api, checked before any cookie or database work
     "write": Limit(120, 60),  # team and alert writes
     "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
-    "counter": Limit(20, 60),  # counter-team searches, each up to 1,000,000 steps
+    "counter": Limit(20, 60),  # counter-team searches: 250,000 steps a strictness level
     "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
 }
 
@@ -96,8 +96,10 @@ def client_address(request: Request) -> str:
     On the host, requests arrive from changing proxy nodes, and the left end of
     X-Forwarded-For is whatever the visitor sent; CF-Connecting-IP held the visitor's true
     address on every request that arrived, and the edge refused requests that set it
-    themselves (probes of the deployed site, 2026-11-22). Without a valid one (local use,
-    tests, the host's own health checks), the connecting address is used.
+    themselves (probes of the deployed site, 2026-11-22 02:03 UTC). Render's web-services
+    page says a service is not directly reachable from the internet, so every request
+    passes that edge. Without a valid header (local use, tests, the host's own health
+    checks), the connecting address is used.
     """
     forwarded = request.headers.get("cf-connecting-ip")
     if forwarded is not None:

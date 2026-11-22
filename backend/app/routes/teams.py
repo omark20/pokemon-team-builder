@@ -104,6 +104,8 @@ def set_members(team_id: PathId, body: MembersBody, request: Request) -> dict[st
     with db.connection_for(request) as conn:
         user_id = _owner(request, conn, team_id)
         wanted = set(body.pokemon_ids)
+        # A Pokémon flagged removed upstream is still allowed: a team that holds one must
+        # still be able to save its other changes.
         found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
         if {pokemon_id for (pokemon_id,) in found} != wanted:
             raise HTTPException(422, "Unknown Pokémon ID")

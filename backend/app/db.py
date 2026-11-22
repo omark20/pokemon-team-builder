@@ -1,11 +1,11 @@
 """Database access: a small fixed set of reused connections, and schema.sql at start-up.
 
-Opening a Postgres connection costs the database far more than a query: on a test
-database held to the deployed size (0.1 CPU, TLS), 11 to 14 new connections a second
-against about 3,800 queries a second on an open one. So requests borrow one of a few
-connections opened once, and wait at most two seconds for one before answering 503.
-A borrowed connection commits when the request succeeds and rolls back when it fails.
-There is no ORM.
+Opening a Postgres connection costs the database far more than a query: on a Postgres
+18 container held to the deployed size (0.1 CPU, 256 MB, TLS), measured on 2026-11-22,
+11 to 14 new connections a second against about 3,800 queries a second on an open one.
+So requests borrow one of a few connections opened once, and wait at most two seconds
+for one before answering 503. A borrowed connection commits when the request succeeds
+and rolls back when it fails. There is no ORM.
 """
 
 import logging
