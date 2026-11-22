@@ -16,6 +16,7 @@ An endpoint whose token is not set stays closed.
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -35,6 +36,9 @@ COOKIE_NAME = "uid"
 MAX_VISITORS = 50_000
 COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # an anonymous visitor's cookie: one year, in seconds
 SESSION_LIFETIME = timedelta(days=30)  # a signed-in browser's, from sign-in
+# A Host header naming this computer, any port. Safari refuses a Secure cookie from
+# http://localhost (MDN's cookie guide; WebKit bug 232088), so locally it is left off.
+THIS_COMPUTER = re.compile(r"(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?")
 
 # Both kinds of token in one query; the hash is unique within each table and a value of
 # 32 random bytes is in at most one of them.
@@ -76,7 +80,7 @@ def create_user(request: Request, response: Response, conn: psycopg.Connection[A
         "INSERT INTO users (token_hash) VALUES (%s) RETURNING id", (token_hash,)
     ).fetchone()
     assert row is not None  # INSERT ... RETURNING always returns the new row
-    set_cookie(response, value, COOKIE_MAX_AGE)
+    set_cookie(request, response, value, COOKIE_MAX_AGE)
     return int(row[0])
 
 
@@ -103,16 +107,33 @@ def cookie_hash(request: Request) -> bytes | None:
     return _hash(value) if value else None
 
 
-def set_cookie(response: Response, value: str, max_age: int) -> None:
+def set_cookie(request: Request, response: Response, value: str, max_age: int) -> None:
     """Set the one visitor cookie, with the same attributes for both kinds of token."""
     response.set_cookie(
-        COOKIE_NAME, value, max_age=max_age, path="/", secure=True, httponly=True, samesite="lax"
+        COOKIE_NAME,
+        value,
+        max_age=max_age,
+        path="/",
+        secure=cookie_is_secure(request),
+        httponly=True,
+        samesite="lax",
     )
 
 
-def clear_cookie(response: Response) -> None:
+def clear_cookie(request: Request, response: Response) -> None:
     """Tell the browser to drop the cookie, with the attributes it was set with."""
-    response.delete_cookie(COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax")
+    secure = cookie_is_secure(request)
+    response.delete_cookie(COOKIE_NAME, path="/", secure=secure, httponly=True, samesite="lax")
+
+
+def cookie_is_secure(request: Request) -> bool:
+    """Secure, except in an answer to a request whose Host header names this computer.
+
+    Only the Host header decides: not the scheme (behind the host's proxy the app may see
+    http), not a forwarded header, not a setting. A visitor who forges the header changes
+    only the cookie in the answer to their own request.
+    """
+    return THIS_COMPUTER.fullmatch(request.headers.get("host", "")) is None
 
 
 def _refuse_at_the_ceiling(request: Request, conn: psycopg.Connection[Any]) -> None:

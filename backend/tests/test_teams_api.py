@@ -222,3 +222,48 @@ def test_at_the_visitor_ceiling_no_one_new_is_saved_but_others_still_save(
     assert user_count(conn) == 1
     assert visitor.patch(f"{TEAMS}/{team['id']}", json={"name": "Still mine"}).status_code == 200
     assert visitor.post(TEAMS, json={"name": "Team 2"}).status_code == 201
+
+
+def cookie_flags(response: Any) -> set[str]:
+    """The attributes of the one Set-Cookie header, in lower case."""
+    return {part.strip().lower() for part in response.headers["set-cookie"].split(";")}
+
+
+@pytest.mark.parametrize(
+    ("scheme", "host", "secure"),
+    [
+        ("http", "localhost:5173", False),
+        ("http", "127.0.0.1:8000", False),
+        ("http", "[::1]:8000", False),
+        ("https", "localhost:5173", False),
+        ("https", "pokemon-team-builder-c97p.onrender.com", True),
+        ("http", "pokemon-team-builder-c97p.onrender.com", True),
+        ("http", "localhost.example.com", True),
+        ("http", "notlocalhost", True),
+        ("http", "", True),
+    ],
+    ids=[
+        "localhost",
+        "ipv4",
+        "ipv6",
+        "localhost-https",
+        "public",
+        "public-http",
+        "localhost-prefix",
+        "localhost-suffix",
+        "no-host",
+    ],
+)
+def test_the_cookie_is_secure_except_for_a_request_to_this_computer(
+    visitor: TestClient, scheme: str, host: str, secure: bool
+) -> None:
+    client = TestClient(visitor.app, base_url=f"{scheme}://testserver")
+    headers = {"Host": host}
+    team = client.post(TEAMS, json={"name": "Team 1"}, headers=headers)
+    account = {"username": "Misty", "password": "correct horse battery"}
+    signed_up = client.post("/api/account", json=account, headers=headers)
+    cookie = signed_up.cookies["uid"]
+    client.cookies.clear()
+    signed_out = client.delete("/api/session", headers=headers | {"Cookie": f"uid={cookie}"})
+    answers = [("secure" in cookie_flags(r), r.status_code) for r in (team, signed_up, signed_out)]
+    assert answers == [(secure, 201), (secure, 201), (secure, 204)]

@@ -128,7 +128,7 @@ def sign_out(request: Request) -> Response:
     with db.connection_for(request) as conn:
         account_id = account_store.end_session(conn, request)
     if account_id is not None:
-        auth.clear_cookie(response)
+        auth.clear_cookie(request, response)
         _log(request, "signed_out", account_id)
     return response
 
@@ -161,7 +161,7 @@ def delete_account(body: PasswordBody, request: Request) -> Response:
         account_store.delete_account(conn, account_id)
     _log(request, "account_deleted", account_id)
     response = Response(status_code=204)
-    auth.clear_cookie(response)
+    auth.clear_cookie(request, response)
     return response
 
 

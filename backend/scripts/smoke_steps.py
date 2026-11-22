@@ -69,8 +69,8 @@ class Smoke:
         return bool(self.http.get("/api/scan/status").json()["demo_active"])
 
     def as_visitor(self, visitor: str, method: str, path: str, **options: Any) -> httpx.Response:
-        """A request carrying the visitor's cookie, sent by hand: a Secure cookie is not
-        sent back over plain http by standard cookie handling."""
+        """A request carrying the visitor's cookie, sent by hand, so each request carries
+        exactly the visitor it names and never a cookie left from another step."""
         cookie = {"Cookie": f"uid={self.cookies[visitor]}"}
         return self.http.request(method, path, headers=cookie, **options)
 

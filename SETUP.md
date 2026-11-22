@@ -2,8 +2,9 @@
 
 You need **Docker** (with Compose), **uv** and **Node.js 24** with npm. Everything else
 (Python 3.13, the Python and npm packages, Postgres 18) is fetched by the commands below.
-Use Chrome or Firefox locally: the visitor cookie is marked Secure, which those browsers
-accept on `http://localhost`.
+Open the page at `http://localhost:5173`, not at this computer's network address: the
+visitor cookie is marked Secure, which browsers refuse over plain http, everywhere except
+in answers to a request addressed to `localhost`, `127.0.0.1` or `[::1]`.
 
 ## Tests
 

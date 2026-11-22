@@ -85,7 +85,7 @@ def make_account(
             account_id = _convert(conn, identity.user_id, username, password_hash)
     except psycopg.errors.UniqueViolation:
         raise HTTPException(409, TAKEN) from None  # the same name, made a moment before
-    start_session(response, conn, account_id, now)
+    start_session(request, response, conn, account_id, now)
     return account_id
 
 
@@ -129,7 +129,7 @@ def sign_in(
         conn.execute("DELETE FROM sessions WHERE token_hash = %s", (auth.cookie_hash(request),))
     elif identity is not None:
         merge = _merge(conn, account_id, identity.user_id)
-    start_session(response, conn, account_id, now)
+    start_session(request, response, conn, account_id, now)
     return merge
 
 
@@ -154,7 +154,9 @@ def _team_count(conn: db.Conn, user_id: int) -> int:
     return int(row[0]) if row else 0
 
 
-def start_session(response: Response, conn: db.Conn, account_id: int, now: datetime) -> None:
+def start_session(
+    request: Request, response: Response, conn: db.Conn, account_id: int, now: datetime
+) -> None:
     """A new session for this browser, its cookie set to last as long; then the account's
     expired sessions and all but its newest MAX_SESSIONS are removed."""
     value, token_hash = auth.new_token()
@@ -164,7 +166,7 @@ def start_session(response: Response, conn: db.Conn, account_id: int, now: datet
     )
     since = now - auth.SESSION_LIFETIME
     conn.execute(PRUNE_SESSIONS, {"account": account_id, "since": since, "keep": MAX_SESSIONS})
-    auth.set_cookie(response, value, int(auth.SESSION_LIFETIME.total_seconds()))
+    auth.set_cookie(request, response, value, int(auth.SESSION_LIFETIME.total_seconds()))
 
 
 def end_session(conn: db.Conn, request: Request) -> int | None:
