@@ -1,5 +1,5 @@
--- Applied at every start-up, so every statement is safe to run again.
--- Each milestone adds its tables here.
+-- Every table and index the app uses, applied at every start-up, so every statement is
+-- safe to run again. A column added to a table that already exists is an ALTER here.
 
 -- One row per scan run: the visible record that the scheduled job runs.
 CREATE TABLE IF NOT EXISTS scan_runs (
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Optional accounts, added later: a record is either anonymous (a token, no username)
+-- Optional accounts, added to a table that already existed: a record is either anonymous (a token, no username)
 -- or an account (a username and a password hash, no token); the code keeps it so.
 -- username_key is the name in lower case, so Ash and ash are one name.
 ALTER TABLE users ALTER COLUMN token_hash DROP NOT NULL;
