@@ -9,6 +9,7 @@ that before borrowing a connection, so none is held while hashing.
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import NamedTuple
 
 import psycopg
 from fastapi import HTTPException, Request, Response
@@ -43,19 +44,27 @@ PRUNE_SESSIONS = """
 """
 
 
+class Account(NamedTuple):
+    """An account's record: its internal ID, its name as first typed, its password hash."""
+
+    id: int
+    username: str
+    password_hash: str
+
+
 @dataclass(frozen=True)
 class Merge:
     teams_added: int
     teams_not_added: int
 
 
-def find_account(conn: db.Conn, username: str) -> tuple[int, str, str] | None:
-    """The account's ID, its name as first typed, and its password hash; whatever capitals."""
+def find_account(conn: db.Conn, username: str) -> Account | None:
+    """The account with this name, whatever capitals, or None."""
     row = conn.execute(
         "SELECT id, username, password_hash FROM users WHERE username_key = %s",
         (username.lower(),),
     ).fetchone()
-    return None if row is None else (int(row[0]), str(row[1]), str(row[2]))
+    return None if row is None else Account(*row)
 
 
 def make_account(
@@ -141,7 +150,8 @@ def _merge(conn: db.Conn, account_id: int, browser_id: int) -> Merge:
     ).fetchone()
     if locked is None:  # merged or turned into an account by another request meanwhile
         return Merge(0, 0)
-    held, brought = (_team_count(conn, user_id) for user_id in (account_id, browser_id))
+    held = _team_count(conn, account_id)
+    brought = _team_count(conn, browser_id)
     ids = {"account": account_id, "browser": browser_id, "room": max(0, MAX_TEAMS - held)}
     moved = conn.execute(MOVE_TEAMS, ids).rowcount
     conn.execute(COPY_DISMISSALS, ids)
@@ -178,17 +188,15 @@ def end_session(conn: db.Conn, request: Request) -> int | None:
     return None if row is None else int(row[0])
 
 
-def signed_in_account(
-    conn: db.Conn, request: Request, now: datetime
-) -> tuple[int, str, str] | None:
-    """The account this browser is signed in to, as `find_account` gives it, or None."""
+def signed_in_account(conn: db.Conn, request: Request, now: datetime) -> Account | None:
+    """The account this browser is signed in to, or None."""
     identity = auth.identify(request, conn, now)
     if identity is None or not identity.signed_in:
         return None
     row = conn.execute(
         "SELECT id, username, password_hash FROM users WHERE id = %s", (identity.user_id,)
     ).fetchone()
-    return None if row is None else (int(row[0]), str(row[1]), str(row[2]))
+    return None if row is None else Account(*row)
 
 
 def delete_account(conn: db.Conn, account_id: int) -> None:

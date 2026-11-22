@@ -56,7 +56,7 @@ def create_app(settings: Settings) -> FastAPI:
     """Build the app for the given settings. Documentation routes are switched off."""
 
     @asynccontextmanager
-    async def apply_schema_at_start(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         pool = db.open_pool(settings.database_url)
         try:
             with db.connect(settings.database_url) as conn:
@@ -79,7 +79,7 @@ def create_app(settings: Settings) -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        lifespan=apply_schema_at_start,
+        lifespan=lifespan,
         dependencies=[Depends(limits.limit_reads)],
     )
     app.state.settings = settings

@@ -15,10 +15,8 @@ import logging
 import threading
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from typing import Any
 
-import psycopg
-
+from app import db
 from app.logs import log_event
 
 logger = logging.getLogger(__name__)
@@ -34,7 +32,7 @@ LIST_QUERY = """
 """
 
 
-def get(connect: Callable[[], AbstractContextManager[psycopg.Connection[Any]]]) -> bytes:
+def get(connect: Callable[[], AbstractContextManager[db.Conn]]) -> bytes:
     """The serialised list, built with one query on a connection from `connect` if not held.
 
     The connection is borrowed before the lock is taken, so a request waiting for one (or
@@ -58,7 +56,7 @@ def clear(cause: str, **fields: int | str) -> None:
     log_event(logger, logging.INFO, "list_cache_cleared", cause=cause, **fields)
 
 
-def _serialise(conn: psycopg.Connection[Any]) -> bytes:
+def _serialise(conn: db.Conn) -> bytes:
     columns = ("id", "name", "is_default", "types", "stats", "sprite_url", "removed")
     rows = conn.execute(LIST_QUERY).fetchall()
     entries = [dict(zip(columns, row, strict=True)) for row in rows]

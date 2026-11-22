@@ -29,7 +29,10 @@ class Overrides:
     def patched_fields(self, pokemon_id: int) -> set[str]:
         """The fields a patch names; a removal is recorded on the `status` field."""
         names = set(self.pokemon.get(pokemon_id, {}))
-        return names - {"removed"} | ({"status"} if "removed" in names else set())
+        if "removed" in names:
+            names.remove("removed")
+            names.add("status")
+        return names
 
     def removes(self, pokemon_id: int) -> bool:
         return bool(self.pokemon.get(pokemon_id, {}).get("removed"))

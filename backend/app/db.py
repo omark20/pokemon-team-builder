@@ -30,14 +30,14 @@ POOL_WAIT_SECONDS = 2.0  # then 503, rather than holding a worker thread longer
 CONNECT_TIMEOUT_SECONDS = 5  # a struggling database fails fast instead of hanging
 
 
-def connect(database_url: str) -> psycopg.Connection[Any]:
+def connect(database_url: str) -> Conn:
     """Open one connection, for start-up and for a scan (one per run)."""
     return psycopg.connect(database_url, connect_timeout=CONNECT_TIMEOUT_SECONDS)
 
 
-def open_pool(database_url: str) -> ConnectionPool[psycopg.Connection[Any]]:
+def open_pool(database_url: str) -> ConnectionPool[Conn]:
     """The connections requests borrow, each checked before it is lent."""
-    pool: ConnectionPool[psycopg.Connection[Any]] = ConnectionPool(
+    pool: ConnectionPool[Conn] = ConnectionPool(
         database_url,
         min_size=POOL_SIZE,
         max_size=POOL_SIZE,
@@ -50,13 +50,13 @@ def open_pool(database_url: str) -> ConnectionPool[psycopg.Connection[Any]]:
     return pool
 
 
-def apply_schema(conn: psycopg.Connection[Any]) -> None:
+def apply_schema(conn: Conn) -> None:
     """Create any missing table or index. Every statement in the file is idempotent."""
     conn.execute(SCHEMA_FILE.read_bytes())
 
 
 @contextmanager
-def connection_for(request: Request) -> Iterator[psycopg.Connection[Any]]:
+def connection_for(request: Request) -> Iterator[Conn]:
     """Borrow a connection for a request, or answer 503 if none is free in time.
 
     The failure is logged by error class only: a database error's message can name

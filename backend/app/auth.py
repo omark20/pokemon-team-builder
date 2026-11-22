@@ -20,12 +20,10 @@ import re
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
-import psycopg
 from fastapi import HTTPException, Request, Response
 
-from app import limits
+from app import db, limits
 from app.logs import log_event, route_template
 
 logger = logging.getLogger(__name__)
@@ -56,7 +54,7 @@ class Identity:
     signed_in: bool  # True for an account's session, False for an anonymous visitor
 
 
-def identify(request: Request, conn: psycopg.Connection[Any], now: datetime) -> Identity | None:
+def identify(request: Request, conn: db.Conn, now: datetime) -> Identity | None:
     """Who the cookie belongs to at `now`, or None for no, an unknown or an expired cookie."""
     token_hash = cookie_hash(request)
     if token_hash is None:
@@ -66,13 +64,13 @@ def identify(request: Request, conn: psycopg.Connection[Any], now: datetime) -> 
     return None if row is None else Identity(int(row[0]), bool(row[1]))
 
 
-def current_user(request: Request, conn: psycopg.Connection[Any]) -> int | None:
+def current_user(request: Request, conn: db.Conn) -> int | None:
     """The visitor's record ID from their cookie, or None for no or an unknown cookie."""
     identity = identify(request, conn, datetime.now(UTC))
     return None if identity is None else identity.user_id
 
 
-def create_user(request: Request, response: Response, conn: psycopg.Connection[Any]) -> int:
+def create_user(request: Request, response: Response, conn: db.Conn) -> int:
     """Create an anonymous visitor record and set its cookie; counts as a new visitor."""
     admit_new_visitor(request, conn)
     value, token_hash = new_token()
@@ -84,7 +82,7 @@ def create_user(request: Request, response: Response, conn: psycopg.Connection[A
     return int(row[0])
 
 
-def admit_new_visitor(request: Request, conn: psycopg.Connection[Any]) -> None:
+def admit_new_visitor(request: Request, conn: db.Conn) -> None:
     """Allow one more visitor record, anonymous or an account, or raise.
 
     Limited per address, then for all addresses together, then by a ceiling on visitor
@@ -136,7 +134,7 @@ def cookie_is_secure(request: Request) -> bool:
     return THIS_COMPUTER.fullmatch(request.headers.get("host", "")) is None
 
 
-def _refuse_at_the_ceiling(request: Request, conn: psycopg.Connection[Any]) -> None:
+def _refuse_at_the_ceiling(request: Request, conn: db.Conn) -> None:
     # The lock makes the count and the insert one step, so two creations cannot both
     # pass the ceiling; creations are at most ten a minute, so it costs nothing.
     conn.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")

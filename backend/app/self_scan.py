@@ -14,12 +14,12 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Literal
 
 import psycopg
 from psycopg_pool import ConnectionPool
 
-from app import demo, scan
+from app import db, demo, scan
 from app.logs import log_event, log_exception
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def decide(now: datetime, facts: Facts) -> Decision:
     return "paused_for_demo" if facts.demo_active else "due"
 
 
-def look(pool: ConnectionPool[Any], now: datetime, run: Callable[[int], object]) -> int | None:
+def look(pool: ConnectionPool[db.Conn], now: datetime, run: Callable[[int], object]) -> int | None:
     """Read the facts and, if a scan is due, start it and run it with `run`; the run's ID,
     or None when nothing was started. The connection is given back before the scan runs."""
     try:
@@ -86,7 +86,7 @@ async def keep_scanned(
             log_exception(logger, "self_scan_failed", exc)
 
 
-def _facts(conn: psycopg.Connection[Any]) -> Facts:
+def _facts(conn: db.Conn) -> Facts:
     row = conn.execute(FACTS_QUERY).fetchone()
     last_finished, last_attempt = row if row else (None, None)
     return Facts(last_finished, last_attempt, demo.is_active(conn))

@@ -70,7 +70,7 @@ def who_am_i(request: Request) -> dict[str, str | None]:
         return {"username": None}
     with db.connection_for(request) as conn:
         account = account_store.signed_in_account(conn, request, datetime.now(UTC))
-    return {"username": None if account is None else account[1]}
+    return {"username": None if account is None else account.username}
 
 
 @router.post("/account", status_code=201, dependencies=[Depends(limits.limit_account)])
@@ -102,20 +102,19 @@ def sign_in(body: Credentials, request: Request, response: Response) -> dict[str
     with db.connection_for(request) as conn:
         account = account_store.find_account(conn, body.username)
     with _hash_place(request):
-        stored = None if account is None else account[2]
+        stored = None if account is None else account.password_hash
         matched = accounts.password_matches(stored, body.password.get_secret_value())
     if account is None or not matched:
-        _log(request, "sign_in_failed", None if account is None else account[0])
+        _log(request, "sign_in_failed", None if account is None else account.id)
         raise HTTPException(401, WRONG)
-    account_id, username, _ = account
     now = datetime.now(UTC)
     with db.connection_for(request) as conn:
-        merge = account_store.sign_in(request, response, conn, account_id, now)
+        merge = account_store.sign_in(request, response, conn, account.id, now)
     if merge is None:  # the account was deleted while its password was being checked
-        _log(request, "sign_in_failed", account_id)
+        _log(request, "sign_in_failed", account.id)
         raise HTTPException(401, WRONG)
-    _log(request, "signed_in", account_id)
-    return {"username": username, **vars(merge)}
+    _log(request, "signed_in", account.id)
+    return {"username": account.username, **vars(merge)}
 
 
 @router.delete("/session", status_code=204, dependencies=[Depends(limits.limit_writes)])
@@ -149,17 +148,16 @@ def delete_account(body: PasswordBody, request: Request) -> Response:
         account = account_store.signed_in_account(conn, request, datetime.now(UTC))
     if account is None:
         raise HTTPException(401, NOT_SIGNED_IN)
-    account_id, _, stored = account
     session = auth.cookie_hash(request)
     assert session is not None  # the account was found by this cookie
     limits.enforce(request, "delete_session", key=session.hex())
     with _hash_place(request):
-        matched = accounts.password_matches(stored, body.password.get_secret_value())
+        matched = accounts.password_matches(account.password_hash, body.password.get_secret_value())
     if not matched:
         raise HTTPException(401, WRONG_PASSWORD)
     with db.connection_for(request) as conn:
-        account_store.delete_account(conn, account_id)
-    _log(request, "account_deleted", account_id)
+        account_store.delete_account(conn, account.id)
+    _log(request, "account_deleted", account.id)
     response = Response(status_code=204)
     auth.clear_cookie(request, response)
     return response
