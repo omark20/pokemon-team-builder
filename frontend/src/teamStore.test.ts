@@ -142,3 +142,38 @@ test("a failed load is reported, and loading again recovers", async () => {
   await store.load();
   expect(store.getState()).toMatchObject({ status: "ready", activeId: 1 });
 });
+
+test("a build waits for the team's pending save, so the server works from the latest members", async () => {
+  const { server, store, state } = await start([team(1, "Team 1", [6])]);
+  const release = server.hold();
+  store.setMembers(1, [6, 9]);
+  const building = store.buildCounter();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/members"); // no counter request yet
+  release();
+  await building;
+  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter");
+  expect(state().counter).not.toBeNull();
+});
+
+test("an answer for members that changed while it was worked out is dropped", async () => {
+  const { server, store, state } = await start([team(1, "Team 1", [6, 9])]);
+  const release = server.hold();
+  const building = store.buildCounter();
+  await vi.waitFor(() => expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter"));
+  store.setMembers(1, [9, 6]);
+  release();
+  await building;
+  expect(state().counter).toBeNull();
+});
+
+test.each([
+  { refusal: [503], text: MESSAGES.noTypeChart },
+  { refusal: [500], text: MESSAGES.counterFailed },
+  { refusal: [429, 30], text: MESSAGES.tooFastSeconds },
+])("a refused build ($refusal) shows no team and says why", async ({ refusal, text }) => {
+  const { server, store, state } = await start([team(1, "Team 1", [6])]);
+  server.refuseNext("GET", refusal[0]!, refusal[1]);
+  await store.buildCounter();
+  expect(state()).toMatchObject({ counter: null, building: false, notice: { kind: "error", text } });
+});

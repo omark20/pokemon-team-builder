@@ -1,7 +1,7 @@
 // Every call the page makes to the backend. The browser talks to this app's
 // own API only; it never calls PokéAPI. The visitor is identified by a cookie
 // the server sets, which the browser sends by itself.
-import type { Pokemon, Team } from "./types";
+import type { CounterResult, Pokemon, Team } from "./types";
 
 // A request the server refused. `retryAfter` is the number of seconds in the
 // Retry-After header, which a "too many requests" answer (429) carries; 0 if
@@ -47,3 +47,6 @@ export const saveMembers = (id: number, pokemonIds: number[]) =>
   request<Team>("PUT", `/api/teams/${id}/members`, { pokemon_ids: pokemonIds });
 
 export const deleteTeam = (id: number) => request<void>("DELETE", `/api/teams/${id}`);
+
+// The best counter team for a saved team, worked out by the server.
+export const fetchCounter = (id: number) => request<CounterResult>("GET", `/api/teams/${id}/counter`);

@@ -2,8 +2,9 @@
 // team endpoints from memory, records every request, and can be told to
 // refuse the next request or to hold it back until released.
 import { vi } from "vitest";
-import type { Team } from "../types";
+import type { CounterResult, Team } from "../types";
 import { CENSUS } from "./census";
+import { COUNTER } from "./counterFixture";
 
 interface Call {
   method: string;
@@ -21,6 +22,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 
 export class FakeServer {
   teams: Team[];
+  counter: CounterResult = COUNTER; // the answer to every counter request
   readonly calls: Call[] = [];
   private nextId: number;
   private refusals: Refusal[] = [];
@@ -66,6 +68,7 @@ export class FakeServer {
   }
 
   private answer(method: string, path: string, body: Call["body"]): Response {
+    if (path.endsWith("/counter")) return json(this.counter);
     if (method === "GET") return json(path === "/api/pokemon" ? CENSUS : this.teams);
     if (method === "POST") {
       const created = { id: this.nextId++, name: body.name ?? "", pokemon_ids: [] };

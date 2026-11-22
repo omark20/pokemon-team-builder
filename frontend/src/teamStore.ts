@@ -5,9 +5,9 @@
 // one request at a time per team, each carrying the complete list. If a save
 // fails the team goes back to what the server last confirmed.
 import { useSyncExternalStore } from "react";
-import { ApiError, createTeam, deleteTeam, fetchTeams, renameTeam, saveMembers } from "./api";
+import { ApiError, createTeam, deleteTeam, fetchCounter, fetchTeams, renameTeam, saveMembers } from "./api";
 import { TEAM_SIZE } from "./teamMoves";
-import { displayName, type Pokemon, type Team } from "./types";
+import { displayName, type CounterResult, type Pokemon, type Team } from "./types";
 
 export interface Notice {
   kind: "info" | "error";
@@ -20,6 +20,11 @@ export interface TeamsState {
   activeId: number | null; // the team whose tab is selected
   creating: boolean; // a team is being created; other adds and creates wait
   notice: Notice | null;
+  // The counter team of the selected team, built on request. It is cleared
+  // whenever that team's members change or another tab is selected, so what
+  // is shown always answers the team on screen.
+  counter: CounterResult | null;
+  building: boolean; // a counter team is being worked out
 }
 
 export const MESSAGES = {
@@ -31,6 +36,8 @@ export const MESSAGES = {
   tooManyTeams: "You already have 20 teams. Delete one to make another.",
   renameFailed: "Couldn't rename the team. Try again.",
   deleteFailed: "Couldn't delete the team. Try again.",
+  counterFailed: "Couldn't build the counter team. Try again.",
+  noTypeChart: "The type chart is not loaded yet, so no counter team can be built. Try again later.",
   halfDone: (team: string) =>
     `${team} was created, but the Pokémon could not be added. Press Add again.`,
 };
@@ -40,6 +47,12 @@ export const MESSAGES = {
 function errorText(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError) || error.status !== 429) return fallback;
   return error.retryAfter > 60 ? MESSAGES.tooFastMinutes : MESSAGES.tooFastSeconds;
+}
+
+// A 503 from the counter endpoint means the type chart has not been loaded.
+function counterErrorText(error: unknown): string {
+  const noChart = error instanceof ApiError && error.status === 503;
+  return noChart ? MESSAGES.noTypeChart : MESSAGES.counterFailed;
 }
 
 // "Team" and the next number after the highest one in use: "Team 1" first.
@@ -55,13 +68,15 @@ export class TeamStore {
     activeId: null,
     creating: false,
     notice: null,
+    counter: null,
+    building: false,
   };
   private readonly listeners = new Set<() => void>();
   // Per team: the members the server last confirmed, the newest members not
   // yet sent, and whether a save is in flight.
   private readonly confirmed = new Map<number, number[]>();
   private readonly unsent = new Map<number, number[]>();
-  private readonly saving = new Set<number>();
+  private readonly saving = new Map<number, Promise<void>>();
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -86,7 +101,7 @@ export class TeamStore {
   }
 
   select(id: number): void {
-    this.update({ activeId: id, notice: null });
+    this.update({ activeId: id, notice: null, counter: null });
   }
 
   dismissNotice(): void {
@@ -118,7 +133,7 @@ export class TeamStore {
     const teams = this.state.teams.filter((team) => team.id !== id);
     const neighbour = teams[index] ?? teams[index - 1];
     const activeId = this.state.activeId === id ? (neighbour?.id ?? null) : this.state.activeId;
-    this.update({ teams, activeId, notice: null });
+    this.update({ teams, activeId, notice: null, counter: null });
   }
 
   // Adds a Pokémon to the selected team; true when it was added. A visitor
@@ -126,7 +141,7 @@ export class TeamStore {
   async add(pokemon: Pokemon): Promise<boolean> {
     if (this.state.status !== "ready" || this.state.creating) return false;
     const team = this.activeTeam();
-    if (!team) return this.addToFirstTeam(pokemon);
+    if (!team) return (await this.createTeamWith([pokemon.id])) === true;
     if (team.pokemon_ids.length >= TEAM_SIZE) {
       this.update({ notice: { kind: "error", text: MESSAGES.teamFull } });
       return false;
@@ -141,13 +156,36 @@ export class TeamStore {
   setMembers(id: number, pokemonIds: number[]): void {
     this.changeTeam(id, { pokemon_ids: pokemonIds });
     this.unsent.set(id, pokemonIds);
-    if (!this.saving.has(id)) void this.saveUnsent(id);
+    if (!this.saving.has(id)) this.saving.set(id, this.saveUnsent(id));
+  }
+
+  // Asks the server for the selected team's counter team, once its latest
+  // members are saved. An answer for members that changed meanwhile is dropped.
+  async buildCounter(): Promise<void> {
+    const team = this.activeTeam();
+    if (!team?.pokemon_ids.length || this.state.building) return;
+    this.update({ building: true, notice: null, counter: null });
+    try {
+      await this.saving.get(team.id);
+      const asked = this.activeTeam()?.pokemon_ids;
+      const counter = await fetchCounter(team.id);
+      if (this.activeTeam()?.pokemon_ids === asked) this.update({ counter });
+    } catch (error) {
+      this.fail(error, counterErrorText(error));
+    } finally {
+      this.update({ building: false });
+    }
+  }
+
+  // "Save as new team": the counter team becomes a team of its own.
+  async saveCounterAsTeam(): Promise<void> {
+    const ids = this.state.counter?.picks.map((pick) => pick.counter.id);
+    if (ids) await this.createTeamWith(ids);
   }
 
   // Sends the newest unsent list, and again if a newer one arrived meanwhile,
   // so saves for one team never overlap and the last change always wins.
   private async saveUnsent(id: number): Promise<void> {
-    this.saving.add(id);
     try {
       for (let ids = this.unsent.get(id); ids; ids = this.unsent.get(id)) {
         this.unsent.delete(id);
@@ -162,14 +200,15 @@ export class TeamStore {
     }
   }
 
-  // The first Add of a visitor with no team: two requests, create then add.
-  // If the second fails the new team stays, empty, and the message says so.
-  private async addToFirstTeam(pokemon: Pokemon): Promise<boolean> {
-    const added = await this.whileCreating(async () => {
+  // A new team holding these Pokémon: two requests, create then set members.
+  // Used by a first Add and by "Save as new team". If the second request
+  // fails the new team stays, empty, and the message says so.
+  private createTeamWith(pokemonIds: number[]): Promise<boolean | null> {
+    return this.whileCreating(async () => {
       const team = await this.postTeam();
       if (!team) return false;
       try {
-        const saved = await saveMembers(team.id, [pokemon.id]);
+        const saved = await saveMembers(team.id, pokemonIds);
         this.confirmed.set(team.id, saved.pokemon_ids);
         this.changeTeam(team.id, { pokemon_ids: saved.pokemon_ids });
         return true;
@@ -178,7 +217,6 @@ export class TeamStore {
         return false;
       }
     });
-    return added === true;
   }
 
   // Runs one team-creating action at a time: a second one started while the
@@ -197,7 +235,7 @@ export class TeamStore {
     try {
       const team = await createTeam(nextTeamName(this.state.teams));
       this.confirmed.set(team.id, team.pokemon_ids);
-      this.update({ teams: [...this.state.teams, team], activeId: team.id });
+      this.update({ teams: [...this.state.teams, team], activeId: team.id, counter: null });
       return team;
     } catch (error) {
       const atLimit = error instanceof ApiError && error.status === 409;
@@ -206,9 +244,11 @@ export class TeamStore {
     }
   }
 
+  // A change to a team's members also clears the counter team built for it.
   private changeTeam(id: number, change: Partial<Team>): void {
     const teams = this.state.teams.map((team) => (team.id === id ? { ...team, ...change } : team));
-    this.update({ teams, notice: null });
+    const stale = change.pokemon_ids !== undefined && id === this.state.activeId;
+    this.update({ teams, notice: null, counter: stale ? null : this.state.counter });
   }
 
   private fail(error: unknown, fallback: string): void {

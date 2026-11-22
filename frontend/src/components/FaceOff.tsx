@@ -1,7 +1,11 @@
 // The face-off card: team tabs on top, then the selected team on the left
-// facing its counter team on the right, then a footer with a status line.
+// facing its counter team on the right, then "Show details" once a counter
+// team exists, and a footer row with a status line and the buttons.
+import { useState } from "react";
 import type { TeamStore, TeamsState } from "../teamStore";
-import type { Pokemon, Team } from "../types";
+import type { CounterResult, Pokemon, Team } from "../types";
+import { CounterDetails } from "./CounterDetails";
+import { CounterHalf } from "./CounterHalf";
 import { TeamHalf } from "./TeamHalf";
 import { TeamTabs } from "./TeamTabs";
 
@@ -11,10 +15,36 @@ interface FaceOffProps {
   pokemonById: Map<number, Pokemon>;
 }
 
-function statusLine(team: Team): string {
+function statusLine(team: Team, counter: CounterResult | null): string {
+  if (counter) {
+    const pool = counter.pool_size.toLocaleString("en-US");
+    return `${counter.stopped_early ? "Best team found" : "Best team"} out of ${pool} candidates.`;
+  }
   return team.pokemon_ids.length === 0
     ? "Add Pokémon from the grid below."
     : "Drag to reorder. Hover a Pokémon to remove it.";
+}
+
+// The row along the bottom of the card. Building needs at least one member.
+function Footer({ store, teams, team }: Pick<FaceOffProps, "store" | "teams"> & { team: Team }) {
+  return (
+    <footer className="face-off-footer">
+      <p className="face-off-status">{statusLine(team, teams.counter)}</p>
+      {teams.counter && (
+        <button type="button" disabled={teams.creating} onClick={() => void store.saveCounterAsTeam()}>
+          Save as new team
+        </button>
+      )}
+      <button
+        type="button"
+        className="primary"
+        disabled={team.pokemon_ids.length === 0 || teams.building}
+        onClick={() => void store.buildCounter()}
+      >
+        {teams.counter ? "Rebuild" : "Build counter team"}
+      </button>
+    </footer>
+  );
 }
 
 function FirstVisit() {
@@ -40,6 +70,8 @@ function TeamsUnavailable({ teams, store }: Pick<FaceOffProps, "teams" | "store"
 }
 
 export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
+  // The result whose details are open; a new result starts closed.
+  const [openFor, setOpenFor] = useState<CounterResult | null>(null);
   if (teams.status !== "ready") {
     return (
       <section className="face-off">
@@ -48,6 +80,8 @@ export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
     );
   }
   const team = store.activeTeam();
+  const { counter } = teams;
+  const open = counter !== null && openFor === counter;
   return (
     <section className="face-off" aria-label="Team and counter team">
       <TeamTabs
@@ -57,7 +91,8 @@ export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
         onSelect={(id) => store.select(id)}
         onNew={() => void store.newTeam()}
       />
-      {team ? (
+      {!team && <FirstVisit />}
+      {team && (
         <>
           <div className="halves">
             <TeamHalf
@@ -70,17 +105,16 @@ export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
             <span className="versus" aria-hidden="true">
               vs
             </span>
-            <section className="half" aria-label="Counter team">
-              <h2 className="half-title">Counter team</h2>
-              <div className="counter-empty">No counter team yet</div>
-            </section>
+            <CounterHalf counter={counter} pokemonById={pokemonById} />
           </div>
-          <footer className="face-off-footer">
-            <p className="face-off-status">{statusLine(team)}</p>
-          </footer>
+          {counter && (
+            <button type="button" className="details-toggle" aria-expanded={open} onClick={() => setOpenFor(open ? null : counter)}>
+              {open ? "Hide details" : "Show details"}
+            </button>
+          )}
+          {open && <CounterDetails counter={counter} />}
+          <Footer store={store} teams={teams} team={team} />
         </>
-      ) : (
-        <FirstVisit />
       )}
     </section>
   );

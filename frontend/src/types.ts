@@ -48,3 +48,30 @@ export interface Team {
   name: string;
   pokemon_ids: number[];
 }
+
+// One counter in GET /api/teams/{id}/counter: the opponent it answers and the
+// numbers behind the choice. Multipliers are 0, 0.25, 0.5, 1, 2 or 4.
+export interface CounterPick {
+  opponent: { id: number; name: string };
+  counter: { id: number; name: string };
+  attack: number; // the counter's best multiplier on its opponent
+  attack_type: string; // the counter's type that gives it
+  attack_back: number; // the opponent's best multiplier on the counter
+  matchup: number; // points: how hard it hits minus how hard it is hit, -5 to 5
+  coverage: number; // its matchups against every opponent, added up
+  base_stats: number;
+  reason: string;
+}
+
+// The counter team, in the order of the team it answers. `grid[i][j]` is the
+// matchup of counter i against opponent j. `weakness_counts` gives, for each
+// opposing type, how many counters it hits for 2x or more.
+export interface CounterResult {
+  picks: CounterPick[];
+  totals: { assigned_points: number; coverage: number; base_stats: number };
+  grid: number[][];
+  weakness_counts: Record<string, number>;
+  relaxed: boolean; // more than half the counters share a weakness: no team avoided it
+  stopped_early: boolean; // the search hit its step limit; a better team may exist
+  pool_size: number;
+}
