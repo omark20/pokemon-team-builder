@@ -1,4 +1,5 @@
-// The wording of an alert row, for each kind of change PLAN.md section 6 names.
+// The wording of an alert row for each kind of change the backend reports: a stat, the types, the picture,
+// the legendary flag, an unknown field, a removed Pokémon, and a type-chart cell.
 import { expect, test } from "vitest";
 import { describeAlert, touchesTeams } from "./alertText";
 import { CENSUS } from "./test/census";
