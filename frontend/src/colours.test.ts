@@ -2,7 +2,7 @@
 // (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), independently of the
 // product code, which only stores the colours.
 import { expect, test } from "vitest";
-import { TYPE_COLOURS } from "./colours";
+import { ALERT_COLOURS, TYPE_COLOURS } from "./colours";
 import { TYPE_NAMES } from "./types";
 
 function channel(hex: string, start: number): number {
@@ -24,9 +24,15 @@ test.each(TYPE_NAMES)("%s pill text has at least 4.5:1 contrast on its tint", (t
   expect(contrast(text, tint)).toBeGreaterThanOrEqual(4.5);
 });
 
+test.each(["text", "struck"] as const)("the alert panel's %s colour has at least 4.5:1 contrast on its fill", (key) => {
+  expect(contrast(ALERT_COLOURS[key], ALERT_COLOURS.fill)).toBeGreaterThanOrEqual(4.5);
+});
+
 test("the formula reproduces known ratios", () => {
   expect(contrast("#000000", "#FFFFFF")).toBeCloseTo(21, 5);
-  // The design table gives 5.43 for grass and 11.32 for dark.
+  // The design table gives 5.43 for grass and 11.32 for dark, and 4.80 for the
+  // alert panel's struck-through value on its fill.
   expect(contrast(TYPE_COLOURS.grass.text, TYPE_COLOURS.grass.tint)).toBeCloseTo(5.43, 2);
   expect(contrast(TYPE_COLOURS.dark.text, TYPE_COLOURS.dark.tint)).toBeCloseTo(11.32, 2);
+  expect(contrast(ALERT_COLOURS.struck, ALERT_COLOURS.fill)).toBeCloseTo(4.8, 2);
 });

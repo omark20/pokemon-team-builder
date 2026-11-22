@@ -75,3 +75,33 @@ export interface CounterResult {
   stopped_early: boolean; // the search hit its step limit; a better team may exist
   pool_size: number;
 }
+
+// A value as the scan recorded it: a number (a stat or a multiplier), text,
+// a list of type names, true or false, or null (no picture).
+export type ChangeValue = number | string | string[] | boolean | null;
+
+// One entry of GET /api/alerts: a change from the last seven days that touches
+// the visitor's Pokémon. A Pokémon change has `pokemon_id`; a type-chart change
+// has `attacker` and `defender` instead. `your_pokemon` lists, once each, the
+// visitor's Pokémon the change touches.
+export interface Alert {
+  id: number;
+  pokemon_id: number | null;
+  attacker: string | null;
+  defender: string | null;
+  field: string;
+  old_value: ChangeValue;
+  new_value: ChangeValue;
+  detected_at: string;
+  is_demo: boolean;
+  your_pokemon: number[];
+}
+
+// One run of the scan for changes, newest first in GET /api/scan/status.
+export interface ScanRun {
+  started_at: string;
+  finished_at: string | null;
+  status: "running" | "ok" | "incomplete" | "failed";
+  scanned: number;
+  changed: number;
+}

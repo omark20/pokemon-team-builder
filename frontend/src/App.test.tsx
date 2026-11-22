@@ -16,12 +16,15 @@ test("shows placeholder cards, then the grid loaded from the app's own API", asy
   render(<App />);
   expect(screen.getByLabelText("Loading Pokémon")).toBeTruthy();
   expect((await count()).textContent).toBe("Showing 1,351 of 1,351");
-  expect(server.calls.map((call) => call.path).sort()).toEqual(["/api/pokemon", "/api/teams"]);
+  // The four reads the page makes on opening, and nothing else.
+  expect(server.calls.map((call) => call.path).sort()).toEqual([
+    "/api/alerts", "/api/pokemon", "/api/scan/status", "/api/teams",
+  ]);
 });
 
 test("a failed list request shows the list-failed state, and 'Try again' loads the list", async () => {
   const server = new FakeServer();
-  server.refuseNext("GET", 500);
+  server.refuseNext("GET", 500, undefined, "/api/pokemon");
   render(<App />);
   expect(await screen.findByText("Couldn't load Pokémon")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));

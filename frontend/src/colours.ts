@@ -32,6 +32,16 @@ export const TYPE_COLOURS: Record<TypeName, TypeColour> = {
   fairy: { tint: "#FBEAF0", text: "#993556", bar: "#ED93B1" },
 };
 
+// The change-alert panel ("marigold"): its fill, border and text, and the
+// colour of a struck-through old value. Both text colours keep a 4.5 to 1
+// contrast on the fill; nothing inside the panel is white.
+export const ALERT_COLOURS = {
+  fill: "#FFE2A8",
+  border: "#EBC06A",
+  text: "#5E4300",
+  struck: "#77601F",
+};
+
 // The custom properties --type-tint, --type-text and --type-bar for one type,
 // set as a React style so the stylesheet can use them.
 export function typeStyle(type: TypeName): CSSProperties {
@@ -40,5 +50,15 @@ export function typeStyle(type: TypeName): CSSProperties {
     "--type-tint": colour.tint,
     "--type-text": colour.text,
     "--type-bar": colour.bar,
+  } as CSSProperties;
+}
+
+// The alert panel's colours as the custom properties --alert-fill and so on.
+export function alertStyle(): CSSProperties {
+  return {
+    "--alert-fill": ALERT_COLOURS.fill,
+    "--alert-border": ALERT_COLOURS.border,
+    "--alert-text": ALERT_COLOURS.text,
+    "--alert-struck": ALERT_COLOURS.struck,
   } as CSSProperties;
 }

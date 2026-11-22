@@ -1,12 +1,17 @@
-// The one screen of the app: the face-off card with the visitor's teams, then
-// the grid of every Pokémon. The Pokémon list and the teams are each loaded
+// The one screen of the app: change alerts, the face-off card with the
+// visitor's teams, the grid of every Pokémon, and when PokéAPI was last
+// checked. The list, the teams, the alerts and the scan status are each read
 // once when the page opens.
 import { useEffect, useMemo, useState } from "react";
 import { fetchPokemon } from "./api";
+import { touchesTeams } from "./alertText";
+import { useAlerts } from "./alerts";
+import { AlertPanel } from "./components/AlertPanel";
 import { FaceOff } from "./components/FaceOff";
 import { GridPlaceholder, PokemonGrid } from "./components/PokemonGrid";
+import { StatusFooter } from "./components/StatusFooter";
 import { TeamStore, useTeams, type Notice } from "./teamStore";
-import type { Pokemon } from "./types";
+import type { Pokemon, Team } from "./types";
 
 type ListState =
   | { status: "loading" }
@@ -52,6 +57,14 @@ function NoticeBar({ notice, onClose }: { notice: Notice | null; onClose: () => 
 
 const NOT_LOADED: Pokemon[] = [];
 
+// The alerts that still touch a team, and the teams that get a tab dot.
+function useTeamAlerts(teams: Team[]) {
+  const alerts = useAlerts();
+  const shown = alerts.alerts.filter((alert) => touchesTeams(alert, teams));
+  const flagged = teams.filter((team) => shown.some((alert) => touchesTeams(alert, [team])));
+  return { ...alerts, shown, alertTeamIds: new Set(flagged.map((team) => team.id)) };
+}
+
 export default function App() {
   const { state, retry } = usePokemonList();
   const [store] = useState(() => new TeamStore());
@@ -60,10 +73,20 @@ export default function App() {
   const pokemon = state.status === "ready" ? state.pokemon : NOT_LOADED;
   const pokemonById = useMemo(() => new Map(pokemon.map((entry) => [entry.id, entry])), [pokemon]);
   const addToTeam = (entry: Pokemon) => store.add(entry);
+  const alerts = useTeamAlerts(teams.teams);
   return (
     <main className="page">
       <h1>Pokémon Team Builder</h1>
-      <FaceOff store={store} teams={teams} pokemonById={pokemonById} />
+      <AlertPanel
+        {...alerts}
+        alerts={alerts.shown}
+        teams={teams.teams}
+        pokemonById={pokemonById}
+        onDismiss={(id) => void alerts.dismiss(id)}
+        onDismissAll={() => void alerts.dismissAll(alerts.shown.map((alert) => alert.id))}
+        onRetry={() => void alerts.load()}
+      />
+      <FaceOff store={store} teams={teams} pokemonById={pokemonById} alertTeamIds={alerts.alertTeamIds} />
       {state.status === "loading" && <GridPlaceholder />}
       {state.status === "failed" && (
         <div className="notice" role="alert">
@@ -75,6 +98,7 @@ export default function App() {
         </div>
       )}
       {state.status === "ready" && <PokemonGrid pokemon={state.pokemon} onAdd={addToTeam} />}
+      <StatusFooter />
       <NoticeBar notice={teams.notice} onClose={() => store.dismissNotice()} />
     </main>
   );

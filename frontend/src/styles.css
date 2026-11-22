@@ -678,3 +678,94 @@ button:disabled {
   margin: 8px 0 0;
   color: var(--text-soft);
 }
+
+/* The change-alert panel ("marigold", from colours.ts): nothing white inside. */
+
+.alert-panel {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--alert-border);
+  border-radius: 8px;
+  background: var(--alert-fill);
+  color: var(--alert-text);
+  font-size: 13px;
+}
+
+.alert-panel p {
+  margin: 4px 0;
+}
+
+.alert-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.alert-headline strong {
+  flex: 1;
+}
+
+.alert-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--alert-border);
+}
+
+.alert-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.alert-old {
+  color: var(--alert-struck);
+}
+
+.alert-meta {
+  font-size: 12px;
+}
+
+.alert-demo {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--alert-border);
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.alert-dismiss {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.tab-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #5e4300;
+  vertical-align: middle;
+}
+
+.status-footer {
+  margin-top: 24px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-soft);
+}

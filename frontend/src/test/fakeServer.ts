@@ -1,8 +1,8 @@
-// A stand-in for the backend in tests. It answers the Pokémon list and the
-// team endpoints from memory, records every request, and can be told to
+// A stand-in for the backend in tests. It answers the Pokémon list, the team,
+// counter and alert endpoints and the scan status from memory, records every request, and can be told to
 // refuse the next request or to hold it back until released.
 import { vi } from "vitest";
-import type { CounterResult, Team } from "../types";
+import type { Alert, CounterResult, ScanRun, Team } from "../types";
 import { CENSUS } from "./census";
 import { COUNTER } from "./counterFixture";
 
@@ -16,6 +16,7 @@ interface Refusal {
   method: string;
   status: number;
   retryAfter?: number;
+  path?: string; // only a request to this path; any path when absent
 }
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -23,6 +24,9 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 export class FakeServer {
   teams: Team[];
   counter: CounterResult = COUNTER; // the answer to every counter request
+  alerts: Alert[] = [];
+  runs: ScanRun[] = [];
+  demoActive = false;
   readonly calls: Call[] = [];
   private nextId: number;
   private refusals: Refusal[] = [];
@@ -42,8 +46,8 @@ export class FakeServer {
     return changing.map((call) => [`${call.method} ${call.path}`, call.body]);
   }
 
-  refuseNext(method: string, status: number, retryAfter?: number): void {
-    this.refusals.push({ method, status, retryAfter });
+  refuseNext(method: string, status: number, retryAfter?: number, path?: string): void {
+    this.refusals.push({ method, status, retryAfter, path });
   }
 
   // The next request waits until the returned function is called.
@@ -60,7 +64,9 @@ export class FakeServer {
     const gate = this.gate;
     this.gate = null;
     await gate;
-    const refusal = this.refusals.find((entry) => entry.method === method);
+    const refusal = this.refusals.find(
+      (entry) => entry.method === method && (entry.path === undefined || entry.path === path),
+    );
     if (!refusal) return this.answer(method, path, body);
     this.refusals = this.refusals.filter((entry) => entry !== refusal);
     const headers = refusal.retryAfter ? { "Retry-After": String(refusal.retryAfter) } : undefined;
@@ -69,6 +75,8 @@ export class FakeServer {
 
   private answer(method: string, path: string, body: Call["body"]): Response {
     if (path.endsWith("/counter")) return json(this.counter);
+    if (path.startsWith("/api/alerts")) return this.answerAlerts(method, path);
+    if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: this.demoActive });
     if (method === "GET") return json(path === "/api/pokemon" ? CENSUS : this.teams);
     if (method === "POST") {
       const created = { id: this.nextId++, name: body.name ?? "", pokemon_ids: [] };
@@ -83,5 +91,12 @@ export class FakeServer {
     }
     Object.assign(team, body);
     return json(team);
+  }
+
+  private answerAlerts(method: string, path: string): Response {
+    if (method === "GET") return json(this.alerts);
+    const id = Number(path.split("/")[3]);
+    this.alerts = this.alerts.filter((alert) => alert.id !== id);
+    return new Response(null, { status: 204 });
   }
 }

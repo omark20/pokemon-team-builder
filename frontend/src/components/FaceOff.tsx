@@ -13,6 +13,7 @@ interface FaceOffProps {
   store: TeamStore;
   teams: TeamsState;
   pokemonById: Map<number, Pokemon>;
+  alertTeamIds: Set<number>;
 }
 
 function statusLine(team: Team, counter: CounterResult | null): string {
@@ -69,7 +70,7 @@ function TeamsUnavailable({ teams, store }: Pick<FaceOffProps, "teams" | "store"
   );
 }
 
-export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
+export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProps) {
   // The result whose details are open; a new result starts closed.
   const [openFor, setOpenFor] = useState<CounterResult | null>(null);
   if (teams.status !== "ready") {
@@ -88,6 +89,7 @@ export function FaceOff({ store, teams, pokemonById }: FaceOffProps) {
         teams={teams.teams}
         activeId={teams.activeId}
         creating={teams.creating}
+        alertTeamIds={alertTeamIds}
         onSelect={(id) => store.select(id)}
         onNew={() => void store.newTeam()}
       />
