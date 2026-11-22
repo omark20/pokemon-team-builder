@@ -2,7 +2,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { CENSUS } from "../test/census";
-import { scrollSentinelIntoView } from "../test/observer";
 import { PokemonGrid } from "./PokemonGrid";
 
 const CHECKBOX_LABEL = "Hide special versions (Mega, regional and others)";
@@ -19,6 +18,7 @@ const typeFilter = () => screen.getByRole("combobox", { name: "Type" }) as HTMLS
 const checkbox = () => screen.getByRole("checkbox", { name: CHECKBOX_LABEL }) as HTMLInputElement;
 const typeIn = (text: string) => fireEvent.change(searchBox(), { target: { value: text } });
 const pressEnter = async () => act(async () => void fireEvent.keyDown(searchBox(), { key: "Enter" }));
+const showMore = () => screen.queryByRole("button", { name: /^Show \d+ more$/ });
 
 test("opens with all 1,351 entries counted, the checkbox unticked and 60 cards drawn", () => {
   const { cardNames } = renderGrid();
@@ -28,12 +28,34 @@ test("opens with all 1,351 entries counted, the checkbox unticked and 60 cards d
   expect(cardNames().slice(0, 3)).toEqual(["Bulbasaur", "Ivysaur", "Venusaur"]);
 });
 
-test("60 more cards are drawn each time the end of the grid scrolls into view", () => {
+test("'Show 60 more' adds the next 60 cards after the last one and says how many are on screen", () => {
   const { cardNames } = renderGrid();
-  act(scrollSentinelIntoView);
+  expect(screen.getByText("60 of 1,351 on screen")).toBeTruthy();
+  fireEvent.click(showMore()!);
   expect(cardNames()).toHaveLength(120);
-  act(scrollSentinelIntoView);
-  expect(cardNames()).toHaveLength(180);
+  expect(cardNames()[60]).toBe("Poliwhirl"); // number 61 in samples/census_all_pokemon.tsv
+  expect(screen.getByText("120 of 1,351 on screen")).toBeTruthy();
+});
+
+test("pressing the button until it goes puts every one of the 1,351 on screen", () => {
+  const { cardNames } = renderGrid();
+  for (let presses = 1; presses < 22; presses++) fireEvent.click(showMore()!);
+  expect(showMore()?.textContent).toBe("Show 31 more"); // the last batch is smaller
+  fireEvent.click(showMore()!);
+  expect(cardNames()).toHaveLength(1351);
+  expect(showMore()).toBeNull();
+});
+
+test("after a press focus stays on the button, and the new cards come before it in Tab order", () => {
+  const { container } = renderGrid();
+  const button = showMore() as HTMLButtonElement;
+  button.focus();
+  fireEvent.click(button);
+  expect(document.activeElement).toBe(button);
+  const tabOrder = [...container.querySelectorAll("button")];
+  const adds = tabOrder.filter((element) => element.textContent === "Add to team");
+  expect(adds).toHaveLength(120);
+  expect(tabOrder.indexOf(adds[119]!)).toBeLessThan(tabOrder.indexOf(button));
 });
 
 test("ticking the checkbox leaves the 1,025 default entries", () => {
@@ -61,7 +83,7 @@ test("the type filter offers all types and the 18 standard ones", () => {
 
 test("changing a filter starts again from the first 60 cards", () => {
   const { cardNames } = renderGrid();
-  act(scrollSentinelIntoView);
+  fireEvent.click(showMore()!);
   expect(cardNames()).toHaveLength(120);
   fireEvent.click(checkbox());
   expect(cardNames()).toHaveLength(60);

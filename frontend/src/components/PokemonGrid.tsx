@@ -1,7 +1,7 @@
 // The grid section: the controls, then the matching Pokémon as cards. The
-// whole list is in memory; cards are drawn 60 at a time as the reader scrolls,
-// so the page never builds 1,351 cards at once.
-import { useEffect, useMemo, useRef, useState } from "react";
+// whole list is in memory; cards are drawn 60 at a time, and a button under
+// them draws the next 60, so the page never builds 1,351 cards at once.
+import { useMemo, useState } from "react";
 import { filterPokemon, listedPokemon, NO_FILTERS, type GridFilters } from "../search";
 import type { Pokemon } from "../types";
 import { GridControls } from "./GridControls";
@@ -15,35 +15,33 @@ interface GridProps {
   onAdd: (pokemon: Pokemon) => Promise<boolean>;
 }
 
-// Draws the first cards of `pokemon`, and more each time the marker under the
-// last card comes near the bottom of the window.
+const count = (value: number) => value.toLocaleString("en-US");
+
+// Draws the first cards of `pokemon`, and the next batch each time the button
+// under them is pressed. The button stays where focus is, so pressing it again
+// needs no moving about; the new cards come before it, in reading order. When
+// every card is drawn the button goes.
 function CardList({ pokemon, onAdd }: GridProps) {
   const [drawn, setDrawn] = useState(PAGE_SIZE);
-  const marker = useRef<HTMLDivElement>(null);
-  const hasMore = drawn < pokemon.length;
-
-  // A fresh observer after every batch: a new observer reports at once whether
-  // the marker is in view, so a tall window keeps filling until it is not.
-  useEffect(() => {
-    if (!hasMore || !marker.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setDrawn((count) => count + PAGE_SIZE);
-      },
-      { rootMargin: "600px" },
-    );
-    observer.observe(marker.current);
-    return () => observer.disconnect();
-  }, [hasMore, drawn]);
-
+  const shown = Math.min(drawn, pokemon.length);
+  const next = Math.min(PAGE_SIZE, pokemon.length - shown);
   return (
     <>
       <div className="grid">
-        {pokemon.slice(0, drawn).map((entry) => (
+        {pokemon.slice(0, shown).map((entry) => (
           <PokemonCard key={entry.id} pokemon={entry} onAdd={onAdd} />
         ))}
       </div>
-      {hasMore && <div ref={marker} />}
+      {next > 0 && (
+        <div className="show-more">
+          <p aria-live="polite">
+            {count(shown)} of {count(pokemon.length)} on screen
+          </p>
+          <button type="button" onClick={() => setDrawn(shown + PAGE_SIZE)}>
+            Show {next} more
+          </button>
+        </div>
+      )}
     </>
   );
 }
