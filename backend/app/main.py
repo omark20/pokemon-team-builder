@@ -7,6 +7,7 @@ generic 500 carrying only a request ID the visitor can quote.
 
 import logging
 import secrets
+import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -67,6 +68,7 @@ def create_app(settings: Settings) -> FastAPI:
     )
     app.state.settings = settings
     app.state.limiter = limits.RateLimiter()
+    app.state.counter_places = threading.BoundedSemaphore(counter.COUNTER_PLACES)
     app.middleware("http")(guard_request)
     app.add_middleware(GZipMiddleware)
     app.get("/healthz")(healthz)

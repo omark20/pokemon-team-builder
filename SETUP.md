@@ -49,7 +49,7 @@ The first serves the API on `http://127.0.0.1:8000`; the second serves the page 
 make smoke
 ```
 
-starts the app on port 8765 against the local database, runs a live scan of PokéAPI, and
+starts the app on a free local port against the local database, runs a live scan of PokéAPI, and
 then drives the API as visitors and as the scheduler would: a team, its counter team, an
 injected change, the alert for one visitor and none for another, and the reset. It prints
 `ok` or `FAIL` per step and cleans up after itself. It needs the network and takes under

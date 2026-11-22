@@ -24,13 +24,11 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from pathlib import Path
 
 import httpx
+from local_app import HOST, free_port, start_app, wait_until_up
 
-ADDRESS = "http://127.0.0.1:8766"
 DATABASE = "postgresql://pokemon:{password}@127.0.0.1:5435/pokemon?sslmode=require"
-BACKEND = Path(__file__).resolve().parents[1]
 COMPOSE = ["docker", "compose", "--profile", "burst"]
 DOWN_READS = 10
 DOWN_READ_SECONDS = 2.5  # the pool's 2-second wait, and a little for the answer
@@ -57,7 +55,8 @@ BURSTS = [
 class HealthProbe:
     """Asks /healthz on a timer in its own thread; counts the answers that were not 200."""
 
-    def __init__(self) -> None:
+    def __init__(self, address: str) -> None:
+        self.address = address
         self.asked = 0
         self.failed = 0
         self._stop = threading.Event()
@@ -72,7 +71,7 @@ class HealthProbe:
         self._thread.join()
 
     def _run(self) -> None:
-        with httpx.Client(base_url=ADDRESS, timeout=HEALTH_TIMEOUT_SECONDS) as http:
+        with httpx.Client(base_url=self.address, timeout=HEALTH_TIMEOUT_SECONDS) as http:
             while not self._stop.wait(HEALTH_EVERY_SECONDS):
                 self.asked += 1
                 try:
@@ -82,15 +81,15 @@ class HealthProbe:
                 self.failed += not ok
 
 
-def run_burst(burst: Burst) -> tuple[Counter[int | str], float]:
+def run_burst(burst: Burst, address: str) -> tuple[Counter[int | str], float]:
     """Send the burst; the count of each status code (or error), and the seconds taken."""
     codes: Counter[int | str] = Counter()
     limits = httpx.Limits(max_connections=burst.at_once)
-    with httpx.Client(base_url=ADDRESS, timeout=30, limits=limits) as http:
+    with httpx.Client(base_url=address, timeout=30, limits=limits) as http:
 
         def one(number: int) -> None:
-            address = f"203.0.113.{number % burst.addresses + 1}"
-            headers = {} if burst.addresses == 1 else {"cf-connecting-ip": address}
+            visitor = f"203.0.113.{number % burst.addresses + 1}"
+            headers = {} if burst.addresses == 1 else {"cf-connecting-ip": visitor}
             try:
                 codes[http.get("/api/scan/status", headers=headers).status_code] += 1
             except httpx.HTTPError as exc:
@@ -102,9 +101,9 @@ def run_burst(burst: Burst) -> tuple[Counter[int | str], float]:
     return codes, time.perf_counter() - start
 
 
-def check(burst: Burst) -> bool:
-    with HealthProbe() as health:
-        codes, seconds = run_burst(burst)
+def check(burst: Burst, address: str) -> bool:
+    with HealthProbe(address) as health:
+        codes, seconds = run_burst(burst, address)
     passed = dict(codes) == burst.expected and health.failed == 0
     print(
         f"burst: {'ok  ' if passed else 'FAIL'} {burst.name}: {dict(codes)} in {seconds:.1f} s"
@@ -137,8 +136,8 @@ def seconds_until_answered(http: httpx.Client) -> float | None:
     return None
 
 
-def database_gone_and_back() -> bool:
-    with HealthProbe() as health, httpx.Client(base_url=ADDRESS, timeout=10) as http:
+def database_gone_and_back(address: str) -> bool:
+    with HealthProbe(address) as health, httpx.Client(base_url=address, timeout=10) as http:
         subprocess.run([*COMPOSE, "stop", "db-burst"], check=True, capture_output=True)
         down = [timed_read(http, number) for number in range(DOWN_READS)]
         subprocess.run([*COMPOSE, "start", "db-burst"], check=True, capture_output=True)
@@ -157,32 +156,17 @@ def database_gone_and_back() -> bool:
     return passed
 
 
-def start_app() -> subprocess.Popen[bytes]:
-    database_url = DATABASE.format(password=os.environ["POSTGRES_PASSWORD"])
-    command = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1"]
-    command += ["--port", ADDRESS.rsplit(":", 1)[1], "--workers", "1", "--log-level", "warning"]
-    environment = os.environ | {"DATABASE_URL": database_url}
-    return subprocess.Popen(command, cwd=BACKEND, env=environment)
-
-
-def wait_until_up(app: subprocess.Popen[bytes]) -> bool:
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline and app.poll() is None:
-        try:
-            if httpx.get(ADDRESS + "/healthz").status_code == 200:
-                return True
-        except httpx.TransportError:
-            pass
-        time.sleep(0.5)
-    print("burst: FAIL the app did not start (is port 8766 already taken?)", flush=True)
-    return False
-
-
 def main() -> int:
-    app = start_app()
+    port = free_port()
+    address = f"http://{HOST}:{port}"
+    database_url = DATABASE.format(password=os.environ["POSTGRES_PASSWORD"])
+    app = start_app(port, os.environ | {"DATABASE_URL": database_url}, quiet=True)
     try:
-        passed = wait_until_up(app) and all([check(burst) for burst in BURSTS])
-        passed = passed and database_gone_and_back()
+        problem = wait_until_up(app, address)
+        if problem:
+            print(f"burst: FAIL {problem}", flush=True)
+        passed = not problem and all([check(burst, address) for burst in BURSTS])
+        passed = passed and database_gone_and_back(address)
     finally:
         app.terminate()
         app.wait(timeout=10)

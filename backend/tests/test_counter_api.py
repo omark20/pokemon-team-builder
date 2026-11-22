@@ -9,6 +9,8 @@ import pytest
 from fake_pokeapi import FakePokeApi, run_fake_scan
 from fastapi.testclient import TestClient
 
+from app.routes import counter
+
 TEAMS = "/api/teams"
 
 
@@ -51,3 +53,20 @@ def test_an_unloaded_type_chart_is_503(visitor: TestClient, conn: psycopg.Connec
     team_id = team_with(visitor, [6])
     conn.execute("DELETE FROM type_effectiveness")
     assert visitor.get(f"{TEAMS}/{team_id}/counter").status_code == 503
+
+
+def test_with_both_counter_places_taken_a_third_is_503_and_other_reads_answer(
+    visitor: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team_id = team_with(visitor, [6])
+    monkeypatch.setattr(counter, "COUNTER_WAIT_SECONDS", 0.01)  # no need to wait two seconds
+    places = visitor.app.state.counter_places
+    assert places.acquire(blocking=False) and places.acquire(blocking=False)
+    try:
+        refused = visitor.get(f"{TEAMS}/{team_id}/counter")
+        assert (refused.status_code, refused.headers["retry-after"]) == (503, "1")
+        assert visitor.get("/api/scan/status").status_code == 200
+    finally:
+        places.release()
+        places.release()
+    assert visitor.get(f"{TEAMS}/{team_id}/counter").status_code == 200

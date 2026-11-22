@@ -5,6 +5,7 @@ The route loads the stored type chart and every stored Pokémon, passes them thr
 result as it is, plus the team size.
 """
 
+import logging
 from dataclasses import asdict
 from typing import Any
 
@@ -13,11 +14,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app import auth, db, limits
 from app.domain.counter import Pokemon, build_counter_team, candidate_pool
 from app.domain.types import Chart
+from app.logs import log_event
 from app.routes.params import PathId
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 CHART_CELLS = 18 * 18
+# At most this many counter teams are worked on at once, so the searches can never hold
+# more than two of the four database connections or crowd out other visitors' reads.
+COUNTER_PLACES = 2
+COUNTER_WAIT_SECONDS = 2.0  # then 503, rather than holding a worker thread longer
 EMPTY_TEAM_MESSAGE = "This team has no Pokémon yet. Add some to build its counter team."
 POKEMON_QUERY = """
     SELECT id, name, types, ARRAY[hp, attack, defense, special_attack, special_defense, speed],
@@ -28,7 +35,22 @@ POKEMON_QUERY = """
 
 @router.get("/api/teams/{team_id}/counter", dependencies=[Depends(limits.limit_counter)])
 def counter_team(team_id: PathId, request: Request) -> dict[str, Any]:
-    """The counter team, one counter per slot; a message instead for an empty team."""
+    """The counter team, one counter per slot; a message instead for an empty team.
+
+    A place is taken before any database work and given back after the search; with
+    both places taken for two seconds, the answer is 503.
+    """
+    places = request.app.state.counter_places
+    if not places.acquire(timeout=COUNTER_WAIT_SECONDS):
+        log_event(logger, logging.WARNING, "counter_busy", request_id=request.state.request_id)
+        raise HTTPException(503, "Counter teams are busy", headers={"Retry-After": "1"})
+    try:
+        return _counter_for(team_id, request)
+    finally:
+        places.release()
+
+
+def _counter_for(team_id: int, request: Request) -> dict[str, Any]:
     with db.connection_for(request) as conn:
         user_id = auth.current_user(request, conn)
         owned = conn.execute(
