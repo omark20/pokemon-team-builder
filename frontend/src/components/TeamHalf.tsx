@@ -1,7 +1,7 @@
 // The left half of the face-off card: the selected team as six positions,
 // three per row. Filled positions are TeamSlots; the rest are outlines, and a
 // slot dropped on an outline moves to the end, since a team has no gaps.
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { moveToEnd, removeSlot, swapSlots, TEAM_SIZE } from "../teamMoves";
 import type { Pokemon, Team } from "../types";
@@ -19,11 +19,22 @@ interface HalfProps {
 // name into a text box; Delete asks first.
 function TeamHeader({ team, onRename, onDelete }: Omit<HalfProps, "pokemonById" | "onMembers">) {
   const [editing, setEditing] = useState(false);
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const closedForm = useRef(false); // Save or Cancel: focus returns to Rename
+  useEffect(() => {
+    if (editing || !closedForm.current) return;
+    closedForm.current = false;
+    renameButton.current?.focus();
+  }, [editing]);
+  function close() {
+    closedForm.current = true;
+    setEditing(false);
+  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = String(new FormData(event.currentTarget).get("name")).trim();
     if (name !== "" && name !== team.name) onRename(name);
-    setEditing(false);
+    close();
   }
   if (editing) {
     return (
@@ -37,7 +48,7 @@ function TeamHeader({ team, onRename, onDelete }: Omit<HalfProps, "pokemonById" 
           onFocus={(event) => event.target.select()} // typing replaces the old name
         />
         <button type="submit">Save</button>
-        <button type="button" onClick={() => setEditing(false)}>
+        <button type="button" onClick={close}>
           Cancel
         </button>
       </form>
@@ -48,7 +59,7 @@ function TeamHeader({ team, onRename, onDelete }: Omit<HalfProps, "pokemonById" 
     <div className="half-header">
       <h2 className="half-title">{team.name}</h2>
       <span className="half-count">{team.pokemon_ids.length} of 6</span>
-      <button type="button" className="link-button" onClick={() => setEditing(true)}>
+      <button type="button" className="link-button" ref={renameButton} onClick={() => setEditing(true)}>
         Rename
       </button>
       <button type="button" className="link-button" onClick={confirmDelete}>

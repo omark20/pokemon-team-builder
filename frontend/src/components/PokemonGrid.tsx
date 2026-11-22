@@ -1,7 +1,8 @@
 // The grid section: the controls, then the matching Pokémon as cards. The
 // whole list is in memory; cards are drawn 60 at a time, and a button under
 // them draws the next 60, so the page never builds 1,351 cards at once.
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { filterPokemon, NO_FILTERS, type GridFilters } from "../search";
 import type { Pokemon } from "../types";
 import { GridControls } from "./GridControls";
@@ -17,23 +18,32 @@ interface GridProps {
 }
 
 interface CardListProps extends GridProps {
-  next: number; // how many the button would add; no button when 0
+  remaining: number; // matching entries not drawn yet; no button when 0
   onMore: () => void;
 }
 
 // The drawn cards, then the button that draws the next batch. The button
 // stays where focus is, so pressing it again needs no moving about; the new
-// cards come before it, in reading order. When every card is drawn it goes.
-function CardList({ pokemon, onAdd, teamFull, next, onMore }: CardListProps) {
+// cards come before it, in reading order. The last press removes the button,
+// so focus moves to the first card it added.
+function CardList({ pokemon, onAdd, teamFull, remaining, onMore }: CardListProps) {
+  const grid = useRef<HTMLDivElement>(null);
+  const next = Math.min(PAGE_SIZE, remaining);
+  function showMore() {
+    if (next < remaining) return onMore();
+    const firstNew = pokemon.length;
+    flushSync(onMore);
+    grid.current?.children[firstNew]?.querySelector<HTMLElement>(".card-name")?.focus();
+  }
   return (
     <>
-      <div className="grid">
+      <div className="grid" ref={grid}>
         {pokemon.map((entry) => (
           <PokemonCard key={entry.id} pokemon={entry} onAdd={onAdd} teamFull={teamFull} />
         ))}
       </div>
       {next > 0 && (
-        <button type="button" className="show-more" onClick={onMore}>
+        <button type="button" className="show-more" onClick={showMore}>
           Show {next} more
         </button>
       )}
@@ -91,7 +101,7 @@ export function PokemonGrid({ pokemon, onAdd, teamFull }: GridProps) {
           pokemon={visible.slice(0, onScreen)}
           onAdd={onAdd}
           teamFull={teamFull}
-          next={Math.min(PAGE_SIZE, visible.length - onScreen)}
+          remaining={visible.length - onScreen}
           onMore={() => setDrawn(onScreen + PAGE_SIZE)}
         />
       )}

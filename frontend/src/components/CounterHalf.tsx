@@ -38,10 +38,13 @@ export function CounterHalf({ counter, error, pokemonById }: CounterProps) {
           })}
         </ol>
       ) : (
-        <div className={`counter-empty${error ? " counter-error" : ""}`} role={error ? "alert" : undefined}>
+        <div className={`counter-empty${error ? " counter-error" : ""}`}>
           {error ?? "No counter team yet"}
         </div>
       )}
+      <p className="visually-hidden counter-live" aria-live="polite">
+        {counter ? `Counter team ready: ${counter.picks.map((pick) => displayName(pick.counter.name)).join(", ")}.` : error}
+      </p>
       {counter?.stopped_early && <p className="counter-notice">{NOTICES.stoppedEarly}</p>}
       {counter?.relaxed && <p className="counter-notice">{NOTICES.relaxed}</p>}
     </section>

@@ -36,7 +36,9 @@ export function PokemonCard({ pokemon, onAdd, teamFull }: CardProps) {
   return (
     <article className="card" style={typeStyle(pokemon.types[0]!)}>
       <Sprite url={pokemon.sprite_url} name={name} size={64} />
-      <h3 className="card-name">{name}</h3>
+      <h3 className="card-name" tabIndex={-1}>
+        {name}
+      </h3>
       <div className="pills">
         {pokemon.types.map((type) => (
           <span key={type} className="pill" style={typeStyle(type)}>

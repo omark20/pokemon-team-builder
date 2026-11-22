@@ -1,7 +1,7 @@
 // The face-off card: team tabs on top, then the selected team on the left
 // facing its counter team on the right, then "Show details" once a counter
 // team exists, and a footer row with a status line and the buttons.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { TeamStore, TeamsState } from "../teamStore";
 import type { CounterResult, Pokemon, Team } from "../types";
 import { CounterDetails } from "./CounterDetails";
@@ -92,7 +92,14 @@ function TeamsUnavailable({ teams, store }: Pick<FaceOffProps, "teams" | "store"
   );
 }
 
+// After a delete the deleted team's controls are gone: focus the tab now
+// selected, or "New team" when no team is left.
+function focusSelectedTab(card: HTMLElement | null) {
+  card?.querySelector<HTMLElement>('.tab[aria-pressed="true"], .tab-new')?.focus();
+}
+
 export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProps) {
+  const card = useRef<HTMLElement>(null);
   // The result whose details are open; a new result starts closed.
   const [openFor, setOpenFor] = useState<CounterResult | null>(null);
   if (teams.status !== "ready") {
@@ -106,7 +113,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
   const { counter } = teams;
   const open = counter !== null && openFor === counter;
   return (
-    <section className="face-off" aria-label="Team and counter team">
+    <section ref={card} className="face-off" aria-label="Team and counter team">
       <TeamTabs
         teams={teams.teams}
         activeId={teams.activeId}
@@ -125,7 +132,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
               pokemonById={pokemonById}
               onMembers={(ids) => store.setMembers(team.id, ids)}
               onRename={(name) => void store.rename(team.id, name)}
-              onDelete={() => void store.remove(team.id)}
+              onDelete={() => void store.remove(team.id).then(() => focusSelectedTab(card.current))}
             />
             <span className="versus" aria-hidden="true">
               vs

@@ -124,7 +124,7 @@ test("a refused build shows the server's reason in the counter half", async () =
   const server = await start();
   server.refuseNext("GET", 503, undefined, "/api/teams/1/counter", "The legendary flags are not loaded yet");
   fireEvent.click(primary());
-  expect((await counterHalf().findByRole("alert")).textContent).toBe("The legendary flags are not loaded yet");
+  expect(await counterHalf().findByText("The legendary flags are not loaded yet", { selector: ".counter-empty" })).toBeTruthy();
 });
 
 test("'Save as new team' makes a team of the three counters", async () => {
@@ -136,4 +136,12 @@ test("'Save as new team' makes a team of the three counters", async () => {
     ["PUT /api/teams/3/members", { pokemon_ids: [567, 1019, 797] }],
   ]);
   expect(screen.getByRole("button", { name: "Team 3", pressed: true })).toBeTruthy();
+});
+
+test("a finished build is announced once, politely, with the counters' names", async () => {
+  await start();
+  const live = document.querySelector('.counter-live[aria-live="polite"]')!;
+  expect(live.textContent).toBe("");
+  await build();
+  expect(live.textContent).toBe("Counter team ready: Archeops, Hydrapple, Celesteela.");
 });

@@ -6,12 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchPokemon } from "./api";
 import { touchesTeams } from "./alertText";
 import { useAlerts } from "./alerts";
-import { AlertPanel } from "./components/AlertPanel";
+import { AlertPanel, PAGE_TITLE_ID } from "./components/AlertPanel";
 import { FaceOff } from "./components/FaceOff";
+import { NoticeBar } from "./components/NoticeBar";
 import { GridPlaceholder, PokemonGrid } from "./components/PokemonGrid";
 import { StatusFooter } from "./components/StatusFooter";
 import { TEAM_SIZE } from "./teamMoves";
-import { TeamStore, useTeams, type Notice } from "./teamStore";
+import { TeamStore, useTeams } from "./teamStore";
 import type { Pokemon, Team } from "./types";
 
 type ListState =
@@ -42,20 +43,6 @@ function usePokemonList() {
   return { state, retry };
 }
 
-// The result of the last thing the visitor did, kept in view at the bottom of
-// the window, since the grid's Add buttons may be far below the team.
-function NoticeBar({ notice, onClose }: { notice: Notice | null; onClose: () => void }) {
-  if (!notice) return null;
-  return (
-    <div className={`notice-bar notice-${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"}>
-      <span>{notice.text}</span>
-      <button type="button" className="notice-close" aria-label="Close message" onClick={onClose}>
-        ×
-      </button>
-    </div>
-  );
-}
-
 const NOT_LOADED: Pokemon[] = [];
 
 // The alerts that still touch a team, and the teams that get a tab dot.
@@ -78,7 +65,8 @@ export default function App() {
   const alerts = useTeamAlerts(teams.teams);
   return (
     <main className="page">
-      <h1>Pokémon Team Builder</h1>
+      {/* Focus comes here when what had it goes away (the last alert dismissed). */}
+      <h1 id={PAGE_TITLE_ID} tabIndex={-1}>Pokémon Team Builder</h1>
       <AlertPanel
         {...alerts}
         alerts={alerts.shown}

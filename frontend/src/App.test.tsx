@@ -1,6 +1,6 @@
 // The whole page against a stand-in backend: loading states, and the paths
 // that cross from the grid to the face-off card.
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import App from "./App";
 import { MESSAGES } from "./messages";
@@ -48,7 +48,7 @@ test("Enter on a full team adds nothing, shows the team-full message and keeps t
   const search = screen.getByRole("searchbox");
   fireEvent.change(search, { target: { value: "pikachu" } });
   fireEvent.keyDown(search, { key: "Enter" });
-  expect((await screen.findByRole("alert")).textContent).toContain(MESSAGES.teamFull);
+  expect(await screen.findByText(MESSAGES.teamFull, { selector: ".notice-bar span" })).toBeTruthy();
   expect((search as HTMLInputElement).value).toBe("pikachu");
   expect(server.writes()).toEqual([]);
 });
@@ -118,4 +118,35 @@ test("switching tab closes an open rename form, so the typed name renames nothin
   expect(screen.queryByRole("textbox", { name: "Team name" })).toBeNull();
   expect(screen.getByRole("heading", { name: "Team 2" })).toBeTruthy();
   expect(server.writes()).toEqual([]);
+});
+
+test("a notice is announced from a region already on the page, and a repeat is announced again", async () => {
+  new FakeServer([team(1, "Team 1")]);
+  render(<App />);
+  await count();
+  const polite = document.querySelector('.notice-live[aria-live="polite"]')!;
+  expect(polite.textContent).toBe("");
+  const add = screen.getAllByRole("button", { name: "Add to team" })[0]!;
+  await act(async () => fireEvent.click(add));
+  const first = polite.firstElementChild;
+  expect(first?.textContent).toBe("Bulbasaur added to Team 1.");
+  await act(async () => fireEvent.click(add));
+  expect(polite.firstElementChild).not.toBe(first); // a new node, so it is read again
+  expect(document.querySelector('.notice-live[aria-live="polite"]')).toBe(polite);
+});
+
+test("after a Delete, focus is on the tab now selected", async () => {
+  new FakeServer([team(1, "Fire"), team(2, "Water")]);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<App />);
+  await act(async () => fireEvent.click(await screen.findByRole("button", { name: "Delete" })));
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Water", pressed: true }));
+});
+
+test.each(["Save", "Cancel"])("after %s in the rename form, focus is back on Rename", async (closing) => {
+  new FakeServer([team(1, "Team 1")]);
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: closing })));
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Rename" }));
 });

@@ -2,6 +2,7 @@
 // row per change to the visitor's Pokémon from the last seven days, each with
 // Dismiss, and "Dismiss all". The old value is struck through and the new one
 // is bold. Shown only when there is something to say.
+import { useEffect, useRef, type RefObject } from "react";
 import { alertStyle } from "../colours";
 import { describeAlert } from "../alertText";
 import type { Alert, Pokemon, Team } from "../types";
@@ -37,7 +38,13 @@ function AlertRowView({ alert, teams, pokemonById, dismissing, onDismiss }: RowP
           {row.detected} · {row.affects}
         </div>
       </div>
-      <button type="button" className="alert-dismiss" disabled={dismissing} onClick={() => onDismiss(alert.id)}>
+      <button
+        type="button"
+        className="alert-dismiss"
+        aria-label={`Dismiss: ${row.subject}, ${row.what}`}
+        disabled={dismissing}
+        onClick={() => onDismiss(alert.id)}
+      >
         Dismiss
       </button>
     </li>
@@ -47,11 +54,31 @@ function AlertRowView({ alert, teams, pokemonById, dismissing, onDismiss }: RowP
 const headline = (count: number) =>
   `${count} ${count === 1 ? "change" : "changes"} to your Pokémon this week`;
 
+// The page title's id: focus goes there when the last alert is dismissed.
+export const PAGE_TITLE_ID = "page-title";
+
+// After a dismissal, focus goes to the Dismiss button that took the pressed
+// one's place (or the one before it), or to the page title when none is left.
+// Returns the function the panel calls when a dismissal is asked for.
+function useFocusAfterDismiss(panel: RefObject<HTMLElement | null>, alerts: Alert[], dismissing: boolean) {
+  const pressed = useRef<number | null>(null);
+  useEffect(() => {
+    if (pressed.current === null || dismissing) return;
+    const buttons = panel.current?.querySelectorAll<HTMLElement>(".alert-row .alert-dismiss") ?? [];
+    const target = buttons[Math.min(pressed.current, buttons.length - 1)] ?? document.getElementById(PAGE_TITLE_ID);
+    pressed.current = null;
+    target?.focus();
+  }, [panel, alerts, dismissing]);
+  return (index: number) => (pressed.current = index);
+}
+
 export function AlertPanel(props: PanelProps) {
   const { alerts, failed, message } = props;
+  const panel = useRef<HTMLElement>(null);
+  const willDismiss = useFocusAfterDismiss(panel, alerts, props.dismissing);
   if (alerts.length === 0 && !failed && !message) return null;
   return (
-    <section className="alert-panel" style={alertStyle()} aria-label="Changes to your Pokémon">
+    <section ref={panel} className="alert-panel" style={alertStyle()} aria-label="Changes to your Pokémon">
       {failed ? (
         <p className="alert-headline">
           Couldn't check for changes to your Pokémon.{" "}
@@ -63,7 +90,15 @@ export function AlertPanel(props: PanelProps) {
         <div className="alert-headline">
           <strong>{headline(alerts.length)}</strong>
           {alerts.length > 0 && (
-            <button type="button" className="alert-dismiss" disabled={props.dismissing} onClick={props.onDismissAll}>
+            <button
+              type="button"
+              className="alert-dismiss"
+              disabled={props.dismissing}
+              onClick={() => {
+                willDismiss(0);
+                props.onDismissAll();
+              }}
+            >
               Dismiss all
             </button>
           )}
@@ -71,14 +106,17 @@ export function AlertPanel(props: PanelProps) {
       )}
       {message && <p role="alert">{message}</p>}
       <ul className="alert-rows">
-        {alerts.map((alert) => (
+        {alerts.map((alert, index) => (
           <AlertRowView
             key={alert.id}
             alert={alert}
             teams={props.teams}
             pokemonById={props.pokemonById}
             dismissing={props.dismissing}
-            onDismiss={props.onDismiss}
+            onDismiss={(id) => {
+              willDismiss(index);
+              props.onDismiss(id);
+            }}
           />
         ))}
       </ul>

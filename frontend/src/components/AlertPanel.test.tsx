@@ -51,7 +51,7 @@ test("a tab has a dot exactly when its team holds an alerted Pokémon, and loses
   const server = await start([change(11, 6, 84, 94)]);
   expect(dotted()).toEqual(["Alpha"]);
   expect(screen.getByRole("img", { name: "has a change alert" }).closest("button")?.textContent).toBe("Alpha");
-  await act(async () => fireEvent.click(panel().getByRole("button", { name: "Dismiss" })));
+  await act(async () => fireEvent.click(panel().getByRole("button", { name: "Dismiss: Charizard, attack" })));
   expect(dismissPaths(server)).toEqual(["POST /api/alerts/11/dismiss"]);
   expect(dotted()).toEqual([]);
   expect(screen.queryByRole("region", { name: "Changes to your Pokémon" })).toBeNull();
@@ -98,4 +98,12 @@ test("a second click on 'Dismiss all' while it runs starts nothing more", async 
     fireEvent.click(button);
   });
   expect(dismissPaths(server)).toHaveLength(3);
+});
+
+test("after a row's Dismiss focus moves to the next row's, and after the last to the page title", async () => {
+  await start([change(11, 6, 84, 94), change(12, 25, 55, 60)]);
+  await act(async () => fireEvent.click(panel().getByRole("button", { name: "Dismiss: Charizard, attack" })));
+  expect(document.activeElement).toBe(panel().getByRole("button", { name: "Dismiss: Pikachu, attack" }));
+  await act(async () => fireEvent.click(document.activeElement!));
+  expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Pokémon Team Builder" }));
 });

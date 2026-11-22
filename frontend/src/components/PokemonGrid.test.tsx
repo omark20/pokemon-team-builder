@@ -147,3 +147,12 @@ test("with a full team every card's button says so and cannot be pressed", () =>
   expect(buttons).toHaveLength(60);
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
+
+test("the last press removes the button and puts focus on the first card it added", () => {
+  const { container } = renderGrid();
+  fireEvent.change(typeFilter(), { target: { value: "ghost" } }); // 96 match: 60, then one press for 36
+  fireEvent.click(showMore()!);
+  expect(showMore()).toBeNull();
+  const names = container.querySelectorAll(".card-name");
+  expect(document.activeElement).toBe(names[60]);
+});

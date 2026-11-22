@@ -351,8 +351,8 @@ button:hover {
 }
 
 .link-button {
-  min-height: 0;
-  padding: 0;
+  min-height: 24px; /* a 24-pixel target on touch screens */
+  padding: 0 2px;
   border: none;
   background: none;
   font-size: 13px;
@@ -792,4 +792,14 @@ button:disabled {
   display: block;
   min-width: 200px;
   margin: 16px auto 0;
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
