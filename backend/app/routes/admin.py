@@ -1,6 +1,6 @@
 """Scan endpoints: the public record of recent runs, and the scheduler's trigger."""
 
-from typing import Annotated, Any
+from typing import Any
 
 import psycopg
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -9,10 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import auth, scan
 from app.db import Connection
+from app.routes.params import PokemonId
 
 router = APIRouter()
-
-PokemonId = Annotated[int, Field(ge=1, le=2_147_483_647)]
 
 
 class ScanRequest(BaseModel):

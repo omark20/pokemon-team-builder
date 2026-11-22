@@ -26,8 +26,11 @@ class Limit:
     window_seconds: float
 
 
-# Every GET under /api shares one bucket, checked before any cookie or database work.
-LIMITS = {"read": Limit(600, 60)}
+LIMITS = {
+    "read": Limit(600, 60),  # every GET under /api, checked before any cookie or database work
+    "write": Limit(120, 60),  # team and alert writes
+    "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
+}
 
 
 @dataclass(frozen=True)
@@ -70,10 +73,14 @@ class RateLimiter:
             return Refusal(math.ceil(window.started + limit.window_seconds - now), first)
 
 
+def client_address(request: Request) -> str:
+    """The address a visitor is counted under. The one place that decides it."""
+    return request.client.host if request.client else "unknown"
+
+
 def enforce(request: Request, bucket: str) -> None:
     """Raise a 429 if the caller's address is over the bucket's limit."""
-    address = request.client.host if request.client else "unknown"
-    refusal = request.app.state.limiter.hit(bucket, address)
+    refusal = request.app.state.limiter.hit(bucket, client_address(request))
     if refusal is None:
         return
     if refusal.first:
@@ -93,3 +100,8 @@ def limit_reads(request: Request) -> None:
     """App-wide dependency: every GET under /api counts against the read bucket."""
     if request.method == "GET" and request.url.path.startswith("/api/"):
         enforce(request, "read")
+
+
+def limit_writes(request: Request) -> None:
+    """Route dependency for the visitor's own writes: teams, and dismissing alerts."""
+    enforce(request, "write")

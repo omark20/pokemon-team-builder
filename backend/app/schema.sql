@@ -62,3 +62,31 @@ CREATE TABLE IF NOT EXISTS changes (
     CHECK ((attacker IS NULL) = (defender IS NULL))
 );
 CREATE INDEX IF NOT EXISTS changes_detected_at ON changes (detected_at);
+
+-- Anonymous visitors. The cookie holds a random value; only its SHA-256 is stored, so
+-- nothing here can be turned back into a working cookie. Nothing else about a person.
+CREATE TABLE IF NOT EXISTS users (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- never sent to any client
+    token_hash bytea NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS teams (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 50),
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS teams_user_id ON teams (user_id);
+
+-- One row per slot, numbered 1 to n with no gaps. A slot, not a Pokémon, is the row's
+-- identity, so the same Pokémon may fill several slots; there is deliberately no
+-- uniqueness on (team_id, pokemon_id). The key and the position check make a seventh
+-- slot impossible.
+CREATE TABLE IF NOT EXISTS team_members (
+    team_id bigint NOT NULL REFERENCES teams (id) ON DELETE CASCADE,
+    position smallint NOT NULL CHECK (position BETWEEN 1 AND 6),
+    pokemon_id integer NOT NULL REFERENCES pokemon (id),
+    PRIMARY KEY (team_id, position)
+);
+CREATE INDEX IF NOT EXISTS team_members_pokemon_id ON team_members (pokemon_id);

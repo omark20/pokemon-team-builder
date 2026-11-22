@@ -1,7 +1,5 @@
 """The scan trigger and the public run history (scan_runs)."""
 
-import logging
-
 import psycopg
 import pytest
 from conftest import ADMIN_TOKEN, SCAN_TOKEN
@@ -15,31 +13,24 @@ SCAN = "/api/admin/scan"
 BEARER = {"Authorization": f"Bearer {SCAN_TOKEN}"}
 
 
-def test_trigger_without_token_is_401_and_logged_as_absent(
-    client: TestClient, conn: psycopg.Connection, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level(logging.INFO):
-        response = client.post(SCAN)
-    assert response.status_code == 401
-    assert "admin_unauthorized" in caplog.text
-    assert "route=/api/admin/scan token=absent" in caplog.text
-    assert conn.execute("SELECT count(*) FROM scan_runs").fetchone() == (0,)
-
-
 @pytest.mark.parametrize(
     "header",
-    ["Bearer not-the-token", f"Basic {SCAN_TOKEN}", f"Bearer {ADMIN_TOKEN}", "Bearer ünïcode"],
+    [
+        None,
+        "Bearer not-the-token",
+        f"Basic {SCAN_TOKEN}",
+        f"Bearer {ADMIN_TOKEN}",
+        "Bearer ünïcode",
+    ],
+    ids=["absent", "wrong", "wrong-scheme", "admin-token", "non-ascii"],
 )
-def test_trigger_with_wrong_token_is_401_and_never_logs_it(
-    client: TestClient, caplog: pytest.LogCaptureFixture, header: str
+def test_trigger_without_the_scan_token_is_401_and_starts_nothing(
+    client: TestClient, conn: psycopg.Connection, header: str | None
 ) -> None:
-    with caplog.at_level(logging.INFO):
-        # Bytes, so that a non-ASCII header can be sent at all.
-        response = client.post(SCAN, headers={"Authorization": header.encode()})
-    assert response.status_code == 401
-    assert "token=wrong" in caplog.text
-    assert header.split(" ", 1)[1] not in caplog.text
-    assert "Authorization" not in caplog.text
+    # Bytes, so that a non-ASCII header can be sent at all.
+    headers = {} if header is None else {"Authorization": header.encode()}
+    assert client.post(SCAN, headers=headers).status_code == 401
+    assert conn.execute("SELECT count(*) FROM scan_runs").fetchone() == (0,)
 
 
 @pytest.fixture

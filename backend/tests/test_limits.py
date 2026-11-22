@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.limits import Limit, RateLimiter
 
-READ_ENDPOINTS = ["/api/scan/status", "/api/pokemon"]
+READ_ENDPOINTS = ["/api/scan/status", "/api/teams", "/api/pokemon"]
 
 
 @pytest.fixture
@@ -20,15 +20,22 @@ def full_read_bucket(client: TestClient) -> TestClient:
 
 
 @pytest.mark.parametrize(
-    ("bucket", "method", "path", "allowed", "window"),
-    [("read", "GET", "/api/pokemon", 600, 60)],
+    ("method", "path", "body", "allowed", "window"),
+    [
+        ("GET", "/api/pokemon", None, 600, 60),
+        ("PATCH", "/api/teams/1", {"name": "x"}, 120, 60),
+        ("POST", "/api/teams", {"name": "x"}, 20, 3600),
+    ],
+    ids=["reads", "writes", "new-visitors"],
 )
 def test_the_request_after_the_limit_is_refused_with_retry_after(
-    client: TestClient, bucket: str, method: str, path: str, allowed: int, window: int
+    client: TestClient, method: str, path: str, body: object, allowed: int, window: int
 ) -> None:
     for _ in range(allowed):
-        assert client.request(method, path).status_code != 429
-    refused = client.request(method, path)
+        client.cookies.clear()  # so that each team create is a first-time visitor
+        assert client.request(method, path, json=body).status_code != 429
+    client.cookies.clear()
+    refused = client.request(method, path, json=body)
     assert refused.status_code == 429
     assert 1 <= int(refused.headers["retry-after"]) <= window
 

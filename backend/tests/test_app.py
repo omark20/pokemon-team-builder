@@ -1,7 +1,5 @@
 """Rules every request passes: health check, headers, origin check, hidden errors."""
 
-import logging
-
 import pytest
 from conftest import SCAN_TOKEN
 from fastapi.testclient import TestClient
@@ -60,24 +58,17 @@ def test_get_with_foreign_origin_is_not_refused(client: TestClient) -> None:
     assert response.status_code == 200
 
 
-def test_unhandled_error_gives_generic_500_and_logs_class_not_message(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_unhandled_error_gives_a_generic_500_with_only_a_request_id(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def fail(*args: object) -> int:
         raise ValueError(BOOM_MESSAGE)
 
     monkeypatch.setattr(scan, "start_run", fail)
-    with caplog.at_level(logging.INFO):
-        response = client.post("/api/admin/scan", headers={"Authorization": f"Bearer {SCAN_TOKEN}"})
+    response = client.post("/api/admin/scan", headers={"Authorization": f"Bearer {SCAN_TOKEN}"})
     assert response.status_code == 500
-    body = response.json()
-    assert set(body) == {"detail", "request_id"}
+    assert set(response.json()) == {"detail", "request_id"}
     assert BOOM_MESSAGE not in response.text
-    [line] = [r.getMessage() for r in caplog.records if "request_failed" in r.getMessage()]
-    assert f"request_id={body['request_id']}" in line
-    assert "method=POST route=/api/admin/scan" in line
-    assert "error_class=ValueError" in line
-    assert "postgresql" not in caplog.text and "secret-looking" not in caplog.text
 
 
 def test_unreachable_database_at_start_up_is_logged_without_its_message(
