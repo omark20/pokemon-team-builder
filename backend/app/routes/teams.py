@@ -6,11 +6,12 @@ So positions cannot have gaps or clashes, and the same Pokémon may fill several
 A team that is not the caller's is a 404, the same as one that does not exist.
 """
 
+import unicodedata
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from psycopg.rows import dict_row
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
 from app import auth, db, limits
 from app.routes.params import PathId, PokemonId
@@ -32,7 +33,24 @@ TEAM_QUERY = """
 
 # Strict: a number sent as text, or true for 1, is refused rather than converted.
 STRICT = ConfigDict(extra="forbid", strict=True)
-TeamName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+
+
+def _readable(name: str) -> str:
+    """Refuse control characters (a NUL breaks the database, a newline or tab the tab
+    bar) and a name with nothing visible in it, such as a lone zero-width space."""
+    categories = [unicodedata.category(character) for character in name]
+    if "Cc" in categories:
+        raise ValueError("a team name cannot contain control characters")
+    if not any(category[0] not in "CZ" for category in categories):
+        raise ValueError("a team name needs at least one visible character")
+    return name
+
+
+TeamName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=50),
+    AfterValidator(_readable),
+]
 
 
 class NameBody(BaseModel):

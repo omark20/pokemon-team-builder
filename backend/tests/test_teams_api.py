@@ -145,9 +145,33 @@ def test_the_21st_team_is_409(visitor: TestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "status"), [("x" * 50, 201), ("x" * 51, 422), ("   ", 422), ("", 422)]
+    ("name", "status"),
+    [
+        ("x" * 50, 201),
+        ("x" * 51, 422),
+        ("   ", 422),
+        ("", 422),
+        ("a\u0000b", 422),  # NUL
+        ("a\nb", 422),
+        ("a\tb", 422),
+        ("\u200b", 422),  # a zero-width space alone: nothing visible
+        ("Fire \U0001f525", 201),
+        ("\U0001f469\u200d\U0001f680", 201),  # an emoji joined with a zero-width joiner
+    ],
+    ids=[
+        "50",
+        "51",
+        "spaces",
+        "empty",
+        "nul",
+        "newline",
+        "tab",
+        "zero-width-space",
+        "emoji",
+        "joined-emoji",
+    ],
 )
-def test_names_are_1_to_50_characters_after_trimming(
+def test_names_are_1_to_50_visible_characters_without_control_characters(
     visitor: TestClient, name: str, status: int
 ) -> None:
     assert visitor.post(TEAMS, json={"name": name}).status_code == status
