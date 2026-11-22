@@ -7,7 +7,6 @@ import App from "../App";
 import { COUNTER } from "../test/counterFixture";
 import { FakeServer } from "../test/fakeServer";
 import { NOTICES } from "./CounterHalf";
-import { LEAVE_OUT_LABEL } from "./FaceOff";
 
 const TEAM = { id: 1, name: "Team 1", pokemon_ids: [6, 9, 3] };
 
@@ -97,8 +96,7 @@ test.each([
 
 test("the legendary box has its label, starts unticked, and ticking it clears a shown team", async () => {
   const server = await start();
-  const box = footer().getByRole("checkbox", { name: LEAVE_OUT_LABEL }) as HTMLInputElement;
-  expect(LEAVE_OUT_LABEL).toBe("Leave out legendary and mythical Pokémon");
+  const box = footer().getByRole("checkbox", { name: "Leave out legendary and mythical Pokémon" }) as HTMLInputElement;
   expect(box.checked).toBe(false);
   await build();
   const requests = server.calls.length;
@@ -113,9 +111,10 @@ test.each([
   { leftOut: false, pool: 1025, status: "Best team out of 1,025 candidates." },
 ])("the status line names the pool the response reports (left out: $leftOut)", async ({ leftOut, pool, status }) => {
   const server = new FakeServer([TEAM]);
-  server.counter = { ...COUNTER, pool_size: pool, legendary_left_out: leftOut };
+  server.counter = { ...COUNTER, pool_size: pool };
   render(<App />);
   await screen.findByText(/^Showing /);
+  if (leftOut) fireEvent.click(footer().getByRole("checkbox", { name: "Leave out legendary and mythical Pokémon" }));
   await build();
   expect(footer().getByText(status)).toBeTruthy();
 });

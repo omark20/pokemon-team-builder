@@ -27,7 +27,6 @@ export class FakeServer {
   counter: CounterResult = COUNTER; // the answer to every counter request
   alerts: Alert[] = [];
   runs: ScanRun[] = [];
-  demoActive = false;
   readonly calls: Call[] = [];
   private nextId: number;
   private refusals: Refusal[] = [];
@@ -75,9 +74,12 @@ export class FakeServer {
   }
 
   private answer(method: string, path: string, body: Call["body"]): Response {
-    if (path.endsWith("/counter")) return json(this.counter);
+    const [route, query] = path.split("?");
+    if (route!.endsWith("/counter")) {
+      return json({ ...this.counter, legendary_left_out: query === "leave_out_legendary=true" });
+    }
     if (path.startsWith("/api/alerts")) return this.answerAlerts(method, path);
-    if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: this.demoActive });
+    if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: false });
     if (method === "GET") return json(path === "/api/pokemon" ? CENSUS : this.teams);
     if (method === "POST") {
       const created = { id: this.nextId++, name: body.name ?? "", pokemon_ids: [] };

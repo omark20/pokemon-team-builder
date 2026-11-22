@@ -153,7 +153,7 @@ test("a build waits for the team's pending save, so the server works from the la
   const release = server.hold();
   store.setMembers(1, [6, 9]);
   const building = store.buildCounter();
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await allSettled();
   expect(server.calls.at(-1)?.path).toBe("/api/teams/1/members"); // no counter request yet
   release();
   await building;
@@ -184,15 +184,15 @@ test.each([
   expect(state()).toMatchObject({ counter: null, building: false, counterError: text });
 });
 
-test("the legendary tick is sent with the next build, and only then", async () => {
-  const { server, store } = await start([team(1, "Team 1", [6])]);
+test("the legendary tick is sent with the next build, and the answer shown is the one for it", async () => {
+  const { server, store, state } = await start([team(1, "Team 1", [6])]);
   store.setLeaveOutLegendary(true);
   expect(server.calls.at(-1)?.path).toBe("/api/teams"); // ticking asks nothing
   await store.buildCounter();
-  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter?leave_out_legendary=true");
+  expect(state().counter?.legendary_left_out).toBe(true);
   store.setLeaveOutLegendary(false);
   await store.buildCounter();
-  expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter");
+  expect(state().counter?.legendary_left_out).toBe(false);
 });
 
 // A counter answer must answer what is on screen. Each case starts a build of

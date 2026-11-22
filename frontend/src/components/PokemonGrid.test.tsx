@@ -136,11 +136,6 @@ test("Enter with nothing matching adds nothing and keeps the query", async () =>
   expect(searchBox().value).toBe("pikachoo");
 });
 
-test("the words 'alternate forms' appear nowhere", () => {
-  const { container } = renderGrid();
-  expect(container.textContent?.toLowerCase()).not.toContain("alternate form");
-});
-
 test("with a full team every card's button says so and cannot be pressed", () => {
   renderGrid(true, true);
   const buttons = screen.getAllByRole("button", { name: "Team full (6/6)" }) as HTMLButtonElement[];

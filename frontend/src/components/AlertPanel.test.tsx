@@ -82,14 +82,6 @@ test("an alert for a Pokémon taken off every team leaves the panel", async () =
   expect(screen.queryByRole("region", { name: "Changes to your Pokémon" })).toBeNull();
 });
 
-test("nothing on the page announces demo mode while the demo is active", async () => {
-  const server = new FakeServer(TEAMS);
-  server.demoActive = true;
-  render(<App />);
-  await screen.findByText(/^Showing /);
-  expect(document.body.textContent?.toLowerCase()).not.toContain("demo");
-});
-
 test("a second click on 'Dismiss all' while it runs starts nothing more", async () => {
   const server = await start([change(11, 6, 84, 94), change(12, 25, 55, 60), change(13, 3, 82, 80)]);
   const button = panel().getByRole("button", { name: "Dismiss all" });

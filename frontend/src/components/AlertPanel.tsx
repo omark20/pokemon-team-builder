@@ -4,6 +4,7 @@
 // is bold. Shown only when there is something to say.
 import { useEffect, useRef, type RefObject } from "react";
 import { alertStyle } from "../colours";
+import { ALERT_MESSAGES } from "../alerts";
 import { describeAlert } from "../alertText";
 import type { Alert, Pokemon, Team } from "../types";
 
@@ -81,7 +82,7 @@ export function AlertPanel(props: PanelProps) {
     <section ref={panel} className="alert-panel" style={alertStyle()} aria-label="Changes to your Pokémon">
       {failed ? (
         <p className="alert-headline">
-          Couldn't check for changes to your Pokémon.{" "}
+          {ALERT_MESSAGES.loadFailed}{" "}
           <button type="button" className="alert-dismiss" onClick={props.onRetry}>
             Try again
           </button>
