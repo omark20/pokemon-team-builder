@@ -1,6 +1,6 @@
 # Pokémon Team Builder
 
-**Live site:** https://pokemon-team-builder-c97p.onrender.com · **Setup:** [SETUP.md](SETUP.md) · **Demo:** [DEMO.md](DEMO.md)
+**Live site:** https://pokemon-team-builder-c97p.onrender.com · **Setup:** [SETUP.md](SETUP.md) · **Demo:** [DEMO.md](DEMO.md) · **Security:** [SECURITY.md](SECURITY.md)
 
 FastAPI, Postgres and React in one Docker image on Render; a GitHub Actions schedule runs the scan.
 
@@ -18,7 +18,7 @@ FastAPI, Postgres and React in one Docker image on Render; a GitHub Actions sche
 
 The search is exact over the pool in use: 1,025, or 931 with the filter. The last rule sees only a candidate's weakness pattern, so keeping each slot's n best per pattern cannot lose the best team: an unkept pick can be swapped for a kept one of the same pattern that scores no worse. Tests check it against brute force. A limit of 250,000 steps per strictness level bounds each request; no trial team, of 5,251 in either pool, reached it. Moves are left out. With every Pokémon allowed, 42.0% of picks on random teams are legendary or mythical by PokéAPI's own flags; a checkbox leaves them out at about 0.05 matchup points per counter (3.029 to 2.981), and about 6% of picks still have a stat total of 600 or more.
 
-**Change detection.** Each scan diffs every stored field and chart cell, recording old and new value, Pokémon and time. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches a Pokémon on your teams now, or one of its types. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale as teams change.
+**Change detection.** Each scan diffs every stored field and chart cell, recording old and new value, Pokémon and time. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches a Pokémon on your teams now, or one of its types. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale.
 
 **Staying up under load.** Requests share four reused connections, and at most two counter searches run at once; a connection per request had let a read burst exhaust the small database before any rate limit applied. `make burst` checks that one now ends in 429s.
 
