@@ -38,6 +38,10 @@ select = [
     "PLR1702",       # too many nested blocks
 ]
 
+# Sort `app` as this project's own code even for a module that does not exist yet.
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
 [tool.ruff.lint.mccabe]
 max-complexity = 10
 
