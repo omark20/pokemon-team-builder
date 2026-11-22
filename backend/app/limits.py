@@ -153,16 +153,18 @@ async def limit_counter(request: Request) -> None:
 
 
 def enforce_sign_in(request: Request, username: str) -> None:
-    """The three sign-in counts, in this order, for any name typed, real or not: the name
-    from this address, this address whatever the names, and the name from all addresses.
+    """The three sign-in counts, for any name typed, real or not: this address whatever
+    the names, the name from this address, and the name from all addresses.
 
     So a stranger at one address cannot lock an owner out: blocking the name everywhere
-    takes ten or more addresses between them.
+    takes ten or more addresses between them. The address is counted first because every
+    count adds a key for what it is given: an address already refused then adds no key
+    for the names it types, so it holds at most 20 in each of the two name counts.
     """
     name = username.lower()
+    enforce(request, "sign_in")
     # An address never holds a space, so the space keeps every (address, name) pair apart.
     enforce(request, "sign_in_pair", key=f"{client_address(request)} {name}")
-    enforce(request, "sign_in")
     enforce(request, "sign_in_name", key=name)
 
 

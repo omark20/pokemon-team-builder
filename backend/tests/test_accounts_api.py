@@ -400,6 +400,23 @@ def test_sign_in_attempts_are_counted_per_name_and_address_per_address_and_per_n
     assert attempt("Misty", 99, PASSWORD) == owner_elsewhere
 
 
+def test_an_address_over_its_count_adds_no_more_keys_for_the_names_it_types(
+    client: TestClient,
+) -> None:
+    answers = [
+        client.post(
+            "/api/session",
+            json={"username": f"name{n}", "password": "a wrong guess"},
+            headers=from_address(77),
+        ).status_code
+        for n in range(320)
+    ]
+    assert answers == [401] * 20 + [429] * 300
+    windows = client.app.state.limiter._windows  # type: ignore[attr-defined]
+    held = {bucket: len(windows[bucket].counts) for bucket in ("sign_in_pair", "sign_in_name")}
+    assert held == {"sign_in_pair": 20, "sign_in_name": 20}
+
+
 def test_the_sixth_creation_attempt_from_one_address_is_429_taken_names_included(
     client: TestClient,
 ) -> None:
