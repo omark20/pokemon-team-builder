@@ -102,6 +102,31 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     endpoint reports `count: 1025`. The three responses are 27 to 35 KB decoded,
     4 to 6 KB on the wire, and each took under 0.3 seconds.
 
+## Added 2026-11-21 (about 22:29 Eastern)
+
+| File | Request |
+|---|---|
+| `species_list_full.json` | `GET /pokemon-species?limit=100000`, fetched with `curl -s --compressed`, saved unmodified |
+| `census_species_curl_log.txt` | `curl -w "{id} %{http_code} %{time_total} %{size_download}"` output for one `GET /pokemon-species/{id}` per listed species, 4 in parallel (`xargs -P 4`) |
+| `species_{3,9,25,34,59,76,130,131,135,149,248}_{name}.json`, `species_1007_koraidon_legendary.json` | 12 bodies of that sweep, saved unmodified: the species of the Pokémon whose own responses are in this folder. `koraidon-limited-build` (entry 10264) belongs to species 1007, which is legendary. `species_6_charizard.json` was re-fetched and is byte-identical. |
+| `census_all_species.tsv` | **Derived, not raw.** One row per species, extracted from the 1,025 bodies of that sweep: id, name, `is_legendary`, `is_mythical`, `is_baby`, and each entry of `varieties` as its Pokémon id with `default` or `form` |
+
+19. **Every one of the 1,025 species responses has the shape of the three
+    captured earlier** (`census_all_species.tsv`): HTTP 200 for all; `id` matches
+    the URL; `is_legendary`, `is_mythical` and `is_baby` are always booleans;
+    `varieties` is never empty. 71 species are legendary, 23 mythical, none
+    both, and every flag equals the source table's (fact 16).
+20. **Every Pokémon entry belongs to exactly one species.** The `varieties`
+    lists together name 1,351 Pokémon ids, the same 1,351 as the Pokémon census,
+    each once. Each species has exactly one default variety, whose id is the
+    species id. The species name and the default flag agree with the Pokémon
+    census for all 1,351. 158 Pokémon entries belong to a legendary or mythical
+    species: the 94 default entries and 64 other forms.
+21. **One pass over the species is small and fast.** 1,025 requests at 4 in
+    parallel took 33 seconds (mean 0.12 s per request, slowest 0.18 s), 4.5 MB
+    on the wire with gzip, 25 MB decoded; the largest body is 10 KB on the wire.
+    No request was refused or throttled (`census_species_curl_log.txt`).
+
 ## Not verified — do not rely on these without a capture
 
 - What `x-pokeapi-hash` / `x-pokeapi-deploy-date` actually track. They look like a
@@ -113,8 +138,7 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
   throttled; it says nothing about higher rates or repeated passes.
 - Whether `raw.githubusercontent.com` throttles a browser that loads many
   sprites.
-- How long 1,025 species requests take in one pass, and whether every one of
-  the 1,025 species responses has the same shape as the three captured (fact
-  18). Only three were captured.
 
-(Resolved on 2026-11-20: null sprites, fact 11; conditional requests, fact 14.)
+(Resolved on 2026-11-20: null sprites, fact 11; conditional requests, fact 14.
+Resolved on 2026-11-21: the species responses' shape and the time of one pass,
+facts 19 to 21.)
