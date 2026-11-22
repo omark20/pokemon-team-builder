@@ -6,7 +6,7 @@ FastAPI, Postgres and React in one Docker image on Render; a GitHub Actions sche
 
 ## Key decisions
 
-**A stored copy of PokéAPI, not a live proxy.** A server-side scan reads PokéAPI four requests at a time and stores 11 fields per Pokémon and the 18 × 18 type chart. A proxy would put PokéAPI on every page load, with nothing to compare a change against.
+**A stored copy of PokéAPI, not a live proxy.** A server-side scan reads PokéAPI four requests at a time and stores 13 fields per Pokémon and the 18 × 18 type chart. A proxy would put PokéAPI on every page load, leaving nothing to compare against.
 
 **All 1,351 Pokémon.** The grid shows all of PokéAPI's entries; a checkbox hides Mega and regional forms. Counters come only from the 1,025 default forms, or battle-only forms would win.
 
