@@ -31,6 +31,12 @@ DEFAULT_FORMS = 1025
 WITHOUT_SPRITE = 9
 CHARIZARD = {"name": "charizard", "types": ["fire", "flying"], "stats": [78, 84, 78, 109, 85, 100]}
 PIKACHU = {"name": "pikachu", "types": ["electric"]}
+# Visitor A's team and its counter team on the full pool (the plan's worked full-pool
+# figure, also returned by an independently written search).
+TEAM_A = [6, 9, 3]
+COUNTERS_A = ["archeops", "hydrapple", "celesteela"]
+TOTALS_A = {"assigned_points": 9, "coverage": 6, "base_stats": 1677}
+POOL_SIZE = DEFAULT_FORMS
 
 
 class SmokeFailure(Exception):
@@ -44,9 +50,28 @@ class Smoke:
     http: httpx.Client
     scan_token: str
     list_baseline: list[dict[str, Any]] = field(default_factory=list)
+    cookies: dict[str, str] = field(default_factory=dict)  # visitor name: uid value
+    teams: dict[str, int] = field(default_factory=dict)  # visitor name: their team's ID
 
     def scan_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.scan_token}"}
+
+    def as_visitor(self, visitor: str, method: str, path: str, **options: Any) -> httpx.Response:
+        """A request carrying the visitor's cookie, sent by hand: a Secure cookie is not
+        sent back over plain http by standard cookie handling."""
+        cookie = {"Cookie": f"uid={self.cookies[visitor]}"}
+        return self.http.request(method, path, headers=cookie, **options)
+
+    def new_team(self, visitor: str, name: str, members: list[int]) -> None:
+        """Create the visitor's team (and the visitor) and set its members."""
+        response = self.http.post("/api/teams", json={"name": name})
+        check(response.status_code == 201, f"201 creating {name}", response.status_code)
+        self.cookies[visitor] = response.cookies["uid"]
+        self.http.cookies.clear()  # each visitor's cookie goes only where it is sent by hand
+        self.teams[visitor] = response.json()["id"]
+        path = f"/api/teams/{self.teams[visitor]}/members"
+        put = self.as_visitor(visitor, "PUT", path, json={"pokemon_ids": members})
+        check(put.status_code == 200, f"200 setting {name}'s members", put.status_code)
 
 
 def check(holds: bool, expected: str, got: object) -> None:
@@ -104,6 +129,28 @@ def full_list(smoke: Smoke) -> None:
     smoke.list_baseline = entries
 
 
+def team_a(smoke: Smoke) -> None:
+    smoke.new_team("A", "Smoke A", TEAM_A)
+    teams = smoke.as_visitor("A", "GET", "/api/teams").json()
+    members = [team["pokemon_ids"] for team in teams if team["id"] == smoke.teams["A"]]
+    check(members == [TEAM_A], f"A's team to hold {TEAM_A} in that order", members)
+
+
+def counter_a(smoke: Smoke) -> None:
+    body = smoke.as_visitor("A", "GET", f"/api/teams/{smoke.teams['A']}/counter").json()
+    names = [pick["counter"]["name"] for pick in body["picks"]]
+    check(names == COUNTERS_A, f"counters {COUNTERS_A} in slot order", names)
+    check(body["totals"] == TOTALS_A, f"totals {TOTALS_A}", body["totals"])
+    flags = (body["pool_size"], body["stopped_early"], body["relaxed"])
+    check(flags == (POOL_SIZE, False, False), "pool 1025, not stopped early or relaxed", flags)
+
+
+def clean_up(smoke: Smoke) -> None:
+    """Delete the teams this run made, whatever happened before."""
+    for visitor, team_id in smoke.teams.items():
+        smoke.as_visitor(visitor, "DELETE", f"/api/teams/{team_id}")
+
+
 def _has(entry: dict[str, Any], expected: dict[str, Any]) -> bool:
     return all(entry[key] == value for key, value in expected.items())
 
@@ -112,6 +159,8 @@ STEPS: list[tuple[str, Callable[[Smoke], None]]] = [
     ("0 no demo is active", no_demo_active),
     ("1 a full live scan ends ok", full_scan),
     ("2 the list matches the captures", full_list),
+    ("3 visitor A's team is stored in order", team_a),
+    ("4 A's counter team is the expected one", counter_a),
 ]
 
 
@@ -147,6 +196,8 @@ def run_steps(smoke: Smoke, app: subprocess.Popen[bytes]) -> bool:
     except SmokeFailure as failure:
         print(f"smoke: FAIL {name}: {failure}", flush=True)
         return False
+    finally:
+        clean_up(smoke)
     return True
 
 

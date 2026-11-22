@@ -31,6 +31,7 @@ LIMITS = {
     "read": Limit(600, 60),  # every GET under /api, checked before any cookie or database work
     "write": Limit(120, 60),  # team and alert writes
     "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
+    "counter": Limit(20, 60),  # counter-team searches, each up to 1,000,000 steps
 }
 
 
@@ -119,3 +120,8 @@ def limit_reads(request: Request) -> None:
 def limit_writes(request: Request) -> None:
     """Route dependency for the visitor's own writes: teams, and dismissing alerts."""
     enforce(request, "write")
+
+
+def limit_counter(request: Request) -> None:
+    """Route dependency for the counter-team search, the costliest request."""
+    enforce(request, "counter")

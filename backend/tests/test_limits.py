@@ -26,8 +26,9 @@ def full_read_bucket(client: TestClient) -> TestClient:
         ("GET", "/api/pokemon", None, 600, 60),
         ("PATCH", "/api/teams/1", {"name": "x"}, 120, 60),
         ("POST", "/api/teams", {"name": "x"}, 20, 3600),
+        ("GET", "/api/teams/1/counter", None, 20, 60),
     ],
-    ids=["reads", "writes", "new-visitors"],
+    ids=["reads", "writes", "new-visitors", "counter"],
 )
 def test_the_request_after_the_limit_is_refused_with_retry_after(
     client: TestClient, method: str, path: str, body: object, allowed: int, window: int
