@@ -11,8 +11,8 @@ const FORMS = {
   signin: { mode: "signin", title: "Sign in", password: "current-password", other: "create", link: "New here? Create account" },
 } as const;
 
-export const NO_RESET = "There is no email, so a forgotten password can't be reset.";
-export const TEAMS_MERGED =
+const NO_RESET = "There is no email, so a forgotten password can't be reset.";
+const TEAMS_MERGED =
   "Teams in this browser will be added to your account. An account holds at most 20; any beyond that are not kept.";
 
 interface DialogProps {

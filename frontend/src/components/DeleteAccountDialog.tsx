@@ -5,7 +5,7 @@ import { useRef, useState, type FormEvent } from "react";
 import type { Account } from "../account";
 import { DialogFrame } from "./DialogFrame";
 
-export const deleteWarning = (username: string) =>
+const deleteWarning = (username: string) =>
   `This deletes the account ${username}, its teams and its sign-ins on every device. It cannot be undone.`;
 
 // Mounted only while open, so each opening starts with no message from the last.

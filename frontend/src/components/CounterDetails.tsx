@@ -14,7 +14,7 @@ import { displayName, type CounterPick, type CounterResult } from "../types";
 
 // The scoring is this app's own, not the game's, so it is explained first.
 // The points follow the counter core's table: 4× +2, 2× +1, 1× 0, ½× -1, ¼× -2, no effect -3.
-export const HOW_CHOSEN = [
+const HOW_CHOSEN = [
   "Best matchup against its own opponent first, then against your whole team, then base stats. No Pokémon twice, and no type of yours may hit more than half the counters hard.",
   "Points are ours: one per doubling of damage, given minus taken. 4× is +2, 2× is +1, 1× is 0, ½× is -1, ¼× is -2, and no effect is -3.",
 ];

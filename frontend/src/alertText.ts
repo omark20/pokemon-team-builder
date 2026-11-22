@@ -3,7 +3,7 @@
 // wording rule can be tested without drawing anything.
 import { displayName, type Alert, type ChangeValue, type Pokemon, type Team } from "./types";
 
-export interface AlertRow {
+interface AlertRow {
   subject: string; // the Pokémon's name, or "Type chart"
   what: string; // the field, or for a removal the whole sentence
   oldValue: string | null; // null when the row shows no old and new value
@@ -25,7 +25,7 @@ const FIELD_NAMES: Record<string, string> = {
   hp: "HP",
 };
 
-export function formatValue(field: string, value: ChangeValue): string {
+function formatValue(field: string, value: ChangeValue): string {
   if (field === "multiplier") return WRITTEN_MULTIPLIERS[String(value)] ?? `${String(value)}×`;
   if (field === "sprite_url") return value === null ? "none" : "a picture";
   if (field === "is_default") return value ? "no" : "yes"; // "special version" reads as the opposite
@@ -34,7 +34,7 @@ export function formatValue(field: string, value: ChangeValue): string {
   return String(value);
 }
 
-export function detectedOn(isoTime: string): string {
+function detectedOn(isoTime: string): string {
   const date = new Date(isoTime).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   return `detected ${date}`;
 }

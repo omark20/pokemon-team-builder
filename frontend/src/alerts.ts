@@ -12,7 +12,7 @@ export const ALERT_MESSAGES = {
   dismissAllStopped: "Couldn't dismiss every alert; the rest are still here. Try again.",
 };
 
-export interface AlertsState {
+interface AlertsState {
   alerts: Alert[];
   failed: boolean; // the alerts could not be loaded
   message: string | null; // why the last dismissal did not go through

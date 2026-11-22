@@ -8,7 +8,7 @@ import { typeStyle } from "../colours";
 import { displayName, type Pokemon } from "../types";
 import { Sprite } from "./Sprite";
 
-export interface SlotActions {
+interface SlotActions {
   onRemove: () => void;
   onMoveEarlier?: () => void; // absent for the first slot
   onMoveLater?: () => void; // absent for the last slot

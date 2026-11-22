@@ -6,10 +6,10 @@ import { flushSync } from "react-dom";
 import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut } from "./api";
 import type { Notice } from "./teamStore";
 
-export type DialogMode = "create" | "signin" | "delete";
-export type EntryMode = Exclude<DialogMode, "delete">;
+type DialogMode = "create" | "signin" | "delete";
+type EntryMode = Exclude<DialogMode, "delete">;
 
-export const ACCOUNT_DELETED = "Your account was deleted.";
+const ACCOUNT_DELETED = "Your account was deleted.";
 
 // After signing in: what happened to the teams this browser had.
 export function signedInText(username: string, added: number, notAdded: number): string {

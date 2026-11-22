@@ -5,10 +5,10 @@
 // same two actions; while it shows, the top-right links do not.
 import type { Account } from "../account";
 
-export const BROWSER_ONLY = "Your teams are saved in this browser only.";
+const BROWSER_ONLY = "Your teams are saved in this browser only.";
 
 // Whether the notice above the teams shows.
-export function noticeShows(account: Account, hasTeams: boolean): boolean {
+function noticeShows(account: Account, hasTeams: boolean): boolean {
   return account.username === null && hasTeams && !account.noticeClosed;
 }
 

@@ -50,13 +50,10 @@ export interface Team {
 }
 
 // One counter in GET /api/teams/{id}/counter: the opponent it answers and the
-// numbers behind the choice. Multipliers are 0, 0.25, 0.5, 1, 2 or 4.
+// numbers behind the choice.
 export interface CounterPick {
   opponent: { id: number; name: string };
   counter: { id: number; name: string };
-  attack: number; // the counter's best multiplier on its opponent
-  attack_type: string; // the counter's type that gives it
-  attack_back: number; // the opponent's best multiplier on the counter
   matchup: number; // points: how hard it hits minus how hard it is hit, -5 to 5
   coverage: number; // its matchups against every opponent, added up
   base_stats: number;
