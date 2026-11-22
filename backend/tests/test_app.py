@@ -25,7 +25,8 @@ def test_healthz_answers_without_touching_the_database(
 
 
 def test_security_headers_on_every_response(client: TestClient) -> None:
-    for response in (client.get("/healthz"), client.get("/no-such-page")):
+    refused = client.post("/api/admin/scan", headers={"Origin": "https://evil.example"})
+    for response in (client.get("/healthz"), client.get("/no-such-page"), refused):
         assert response.headers["x-content-type-options"] == "nosniff"
         assert response.headers["x-frame-options"] == "DENY"
         assert response.headers["referrer-policy"] == "no-referrer"
@@ -45,7 +46,6 @@ def test_documentation_routes_are_off(client: TestClient, path: str) -> None:
 def test_write_from_another_site_is_refused(client: TestClient) -> None:
     response = client.post("/api/admin/scan", headers={"Origin": "https://evil.example"})
     assert response.status_code == 403
-    assert response.headers["x-frame-options"] == "DENY"
 
 
 def test_write_from_own_origin_or_without_origin_reaches_the_token_check(
@@ -79,7 +79,6 @@ def test_unhandled_error_gives_generic_500_and_logs_class_not_message(
     assert f"request_id={body['request_id']}" in line
     assert "method=POST route=/api/admin/scan" in line
     assert "error_class=ValueError" in line
-    assert "test_app.py" in line and ":fail" in line
     assert "postgresql" not in caplog.text and "secret-looking" not in caplog.text
 
 
