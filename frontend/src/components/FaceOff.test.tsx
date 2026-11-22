@@ -4,6 +4,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
 import App from "../App";
+import { MATCHUP_COLOURS } from "../colours";
 import { COUNTER } from "../test/counterFixture";
 import { FakeServer } from "../test/fakeServer";
 import { NOTICES } from "./CounterHalf";
@@ -83,6 +84,11 @@ test("the details open on request: one reason per pick and a table whose rows ad
     "Strong +3", "Weak -1", "Good +1",
   ]);
   expect(screen.getByRole("heading", { name: "How this team was chosen" })).toBeTruthy();
+  // The colour follows the word: the "Strong" cell has the strong fill, the "Weak" one the weak fill.
+  const fills = [...rows[0]!.querySelectorAll<HTMLElement>("td:not(.row-sum)")].map((cell) =>
+    cell.style.getPropertyValue("--matchup-fill"),
+  );
+  expect(fills).toEqual([MATCHUP_COLOURS.strong.fill, MATCHUP_COLOURS.weak.fill, MATCHUP_COLOURS.good.fill]);
 });
 
 test.each([

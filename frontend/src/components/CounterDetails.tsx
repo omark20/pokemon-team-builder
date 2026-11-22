@@ -6,10 +6,9 @@
 // A matchup is how hard the counter hits that Pokémon minus how hard it is
 // hit back, in points (one per doubling of damage), from -5 to 5. A counter's
 // coverage is its row of the table added up.
-import { matchupWord, signed } from "../matchupWords";
+import { matchupStyle, matchupWord, signed } from "../matchupWords";
 import { displayName, type CounterResult } from "../types";
 
-const sign = (value: number) => (value > 0 ? "positive" : value < 0 ? "negative" : "zero");
 
 // The scoring is this app's own, not the game's, so it is explained first.
 // The points follow the counter core's table: 4× +2, 2× +1, 1× 0, ½× -1, ¼× -2, no effect -3.
@@ -46,7 +45,7 @@ function Reasons({ counter }: { counter: CounterResult }) {
           <strong>
             {displayName(pick.counter.name)} <span className="muted">beats</span> {displayName(pick.opponent.name)}
           </strong>{" "}
-          <span className={`matchup matchup-${sign(pick.matchup)}`}>
+          <span className="matchup" style={matchupStyle(pick.matchup)}>
             <Matchup points={pick.matchup} />
           </span>
           <p>{pick.reason}</p>
@@ -56,7 +55,8 @@ function Reasons({ counter }: { counter: CounterResult }) {
   );
 }
 
-// Each cell carries its word and number; the colour only repeats them.
+// Each cell carries its word and number; the colour, greener the stronger,
+// only repeats them.
 function MatchupTable({ counter }: { counter: CounterResult }) {
   return (
     // On a narrow screen the table scrolls sideways inside its own box, never the page.
@@ -81,7 +81,7 @@ function MatchupTable({ counter }: { counter: CounterResult }) {
                 {displayName(counter.picks[index]!.counter.name)}
               </th>
               {row.map((value, column) => (
-                <td key={column} className={`matchup-${sign(value)}`}>
+                <td key={column} className="matchup-cell" style={matchupStyle(value)}>
                   <Matchup points={value} />
                 </td>
               ))}

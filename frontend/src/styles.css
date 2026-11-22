@@ -667,18 +667,11 @@ button:disabled {
   text-align: left;
 }
 
-.matchup-positive {
-  background: #eaf3de;
-  color: #27500a;
-}
-
-.matchup-negative {
-  background: #fcebeb;
-  color: #791f1f;
-}
-
-.matchup-zero {
-  color: var(--text-soft);
+/* The matchup scale's colours come from colours.ts as custom properties. */
+.matchup,
+.matchup-cell {
+  background: var(--matchup-fill);
+  color: var(--matchup-text);
 }
 
 .row-sum {

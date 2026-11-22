@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
-import { matchupWord } from "./matchupWords";
+import { matchupLevel, matchupWord } from "./matchupWords";
 
 test.each([
-  { points: -3, word: "Bad" },
-  { points: -2, word: "Bad" },
-  { points: -1, word: "Weak" },
-  { points: 0, word: "Even" },
-  { points: 1, word: "Good" },
-  { points: 2, word: "Strong" },
-  { points: 3, word: "Strong" },
-])("a matchup of $points reads $word", ({ points, word }) => {
-  expect(matchupWord(points)).toBe(word);
+  { points: -3, level: "bad", word: "Bad" },
+  { points: -2, level: "bad", word: "Bad" },
+  { points: -1, level: "weak", word: "Weak" },
+  { points: 0, level: "even", word: "Even" },
+  { points: 1, level: "good", word: "Good" },
+  { points: 2, level: "strong", word: "Strong" },
+  { points: 3, level: "strong", word: "Strong" },
+])("a matchup of $points is $level and reads $word", ({ points, level, word }) => {
+  expect([matchupLevel(points), matchupWord(points)]).toEqual([level, word]);
 });
