@@ -2,8 +2,10 @@
 
 import pytest
 
+from app import accounts
 from app.accounts import (
     COMMON_PASSWORDS,
+    MAX_PASSWORD,
     MIN_PASSWORD,
     hash_password,
     password_matches,
@@ -75,3 +77,20 @@ def test_the_shipped_list_holds_only_long_enough_lower_case_entries() -> None:
     assert len(COMMON_PASSWORDS) == 46_483  # SecLists NCSC list, 8 or more characters, lower case
     assert all(len(entry) >= MIN_PASSWORD for entry in COMMON_PASSWORDS)
     assert all(entry == entry.lower() for entry in COMMON_PASSWORDS)
+
+
+def test_a_password_over_the_maximum_fails_after_the_dummy_work_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stored = hash_password("x" * MAX_PASSWORD)
+    verified: list[tuple[str, int]] = []
+
+    class SpyHasher:
+        def verify(self, stored_hash: str, password: str) -> bool:
+            verified.append((stored_hash, len(password)))
+            return bool(accounts.PasswordHasher.verify(real, stored_hash, password))
+
+    real = accounts.HASHER
+    monkeypatch.setattr(accounts, "HASHER", SpyHasher())
+    assert not password_matches(stored, "x" * MAX_PASSWORD + "y" * 16_000)
+    assert verified == [(accounts.DUMMY_HASH, MAX_PASSWORD)]

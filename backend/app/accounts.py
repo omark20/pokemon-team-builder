@@ -58,8 +58,16 @@ def hash_password(password: str) -> str:
 
 
 def password_matches(stored_hash: str | None, password: str) -> bool:
-    """Whether the password matches; with no stored hash, the dummy one is verified."""
+    """Whether the password matches; with no stored hash, the dummy one is verified.
+
+    A password over MAX_PASSWORD cannot be right, as none can be set: it fails, after the
+    dummy hash is verified against its first MAX_PASSWORD characters, so the answer takes
+    the time of any other and a long body is never hashed whole.
+    """
+    fits = len(password) <= MAX_PASSWORD
+    checked = stored_hash if fits and stored_hash is not None else DUMMY_HASH
     try:
-        return HASHER.verify(stored_hash or DUMMY_HASH, password) and stored_hash is not None
+        matched = HASHER.verify(checked, password[:MAX_PASSWORD])
     except (VerificationError, InvalidHashError):  # a wrong password, or a damaged hash
         return False
+    return matched and checked is not DUMMY_HASH
