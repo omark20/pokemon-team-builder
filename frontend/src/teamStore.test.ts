@@ -189,3 +189,50 @@ test("the legendary tick is sent with the next build, and only then", async () =
   await store.buildCounter();
   expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter");
 });
+
+// A counter answer must answer what is on screen. Each case starts a build of
+// team 1's counter, changes something while it is in flight, then lets it finish.
+const counterRequests = (server: FakeServer) => server.calls.filter((call) => call.path.includes("/counter"));
+
+test("an answer for a team that was left while its save was in flight is dropped", async () => {
+  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  const release = server.hold(); // holds the save of team 1's new member
+  await store.add(CHARIZARD);
+  const building = store.buildCounter();
+  store.select(2);
+  release();
+  await building;
+  expect(state()).toMatchObject({ activeId: 2, counter: null, counterError: null, building: false });
+  expect(counterRequests(server)).toEqual([]);
+});
+
+test("an answer for the legendary setting the box no longer shows is dropped", async () => {
+  const { server, store, state } = await start([team(1, "A", [6])]);
+  const release = server.hold(); // holds the counter request
+  const building = store.buildCounter();
+  await vi.waitFor(() => expect(counterRequests(server)).toHaveLength(1));
+  store.setLeaveOutLegendary(true);
+  release();
+  await building;
+  expect(state()).toMatchObject({ counter: null, leaveOutLegendary: true });
+});
+
+test("an error for a team deleted mid-build is not shown on the tab that replaces it", async () => {
+  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  server.refuseNext("GET", 500, undefined, "/api/teams/1/counter");
+  const release = server.hold(); // holds the counter request
+  const building = store.buildCounter();
+  await vi.waitFor(() => expect(counterRequests(server)).toHaveLength(1));
+  await store.remove(1);
+  release();
+  await building;
+  expect(state()).toMatchObject({ activeId: 2, counterError: null });
+});
+
+test("switching tab mid-build leaves Build usable on the new tab", async () => {
+  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  server.hold();
+  void store.buildCounter();
+  store.select(2);
+  expect(state().building).toBe(false);
+});

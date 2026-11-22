@@ -120,6 +120,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
         <>
           <div className="halves">
             <TeamHalf
+              key={team.id} // a fresh half per team: an open rename form never moves to another team
               team={team}
               pokemonById={pokemonById}
               onMembers={(ids) => store.setMembers(team.id, ids)}

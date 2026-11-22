@@ -108,3 +108,14 @@ test("after a keyboard move, focus follows the moved Pokémon to its new place",
   ]);
   expect(document.activeElement?.getAttribute("aria-label")).toBe("Move Charizard earlier");
 });
+
+test("switching tab closes an open rename form, so the typed name renames nothing", async () => {
+  const server = new FakeServer([team(1, "Team 1"), team(2, "Team 2")]);
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Team name" }), { target: { value: "Typed for 1" } });
+  fireEvent.click(screen.getByRole("button", { name: "Team 2" }));
+  expect(screen.queryByRole("textbox", { name: "Team name" })).toBeNull();
+  expect(screen.getByRole("heading", { name: "Team 2" })).toBeTruthy();
+  expect(server.writes()).toEqual([]);
+});

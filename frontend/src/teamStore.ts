@@ -20,17 +20,16 @@ export interface TeamsState {
   activeId: number | null; // the team whose tab is selected
   creating: boolean; // a team is being created; other adds and creates wait
   notice: Notice | null;
-  // The counter team of the selected team, built on request. It is cleared
-  // whenever that team's members change or another tab is selected, so what
-  // is shown always answers the team on screen.
+  // The counter team of the selected team, built on request. Selecting another
+  // tab, changing the team's members, deleting it or changing the legendary
+  // box clears it, and an answer or error for a build started before such a
+  // change is dropped, so what is shown always answers the team and the box
+  // on screen.
   counter: CounterResult | null;
   counterError: string | null; // why the last build gave no counter team
-  building: boolean; // a counter team is being worked out
+  building: boolean; // a counter team is being worked out for what is on screen
   leaveOutLegendary: boolean; // the visitor's tick; kept while the page is open
 }
-
-// Nothing shown in the counter half: what any change to the team leads to.
-const NO_COUNTER = { counter: null, counterError: null };
 
 export const MESSAGES = {
   teamFull: "This team already has six Pokémon. Remove one to add another.",
@@ -73,10 +72,13 @@ export class TeamStore {
     activeId: null,
     creating: false,
     notice: null,
-    ...NO_COUNTER,
+    counter: null,
+    counterError: null,
     building: false,
     leaveOutLegendary: false,
   };
+  // Counts the builds and the changes that make a build's answer stale.
+  private buildNumber = 0;
   private readonly listeners = new Set<() => void>();
   // Per team: the members the server last confirmed, the newest members not
   // yet sent, and whether a save is in flight.
@@ -107,7 +109,7 @@ export class TeamStore {
   }
 
   select(id: number): void {
-    this.update({ activeId: id, notice: null, ...NO_COUNTER });
+    this.update({ activeId: id, notice: null, ...this.clearCounter() });
   }
 
   dismissNotice(): void {
@@ -139,7 +141,7 @@ export class TeamStore {
     const teams = this.state.teams.filter((team) => team.id !== id);
     const neighbour = teams[index] ?? teams[index - 1];
     const activeId = this.state.activeId === id ? (neighbour?.id ?? null) : this.state.activeId;
-    this.update({ teams, activeId, notice: null, ...NO_COUNTER });
+    this.update({ teams, activeId, notice: null, ...this.clearCounter() });
   }
 
   // Adds a Pokémon to the selected team; true when it was added. A visitor
@@ -166,27 +168,28 @@ export class TeamStore {
   }
 
   // Asks the server for the selected team's counter team, once its latest
-  // members are saved. An answer for members that changed meanwhile is dropped.
+  // members are saved. If anything it was asked for changes before the answer
+  // arrives (see `counter` above), the answer or error is dropped.
   async buildCounter(): Promise<void> {
     const team = this.activeTeam();
     if (!team?.pokemon_ids.length || this.state.building) return;
-    this.update({ building: true, notice: null, ...NO_COUNTER });
+    this.update({ notice: null, ...this.clearCounter(), building: true });
+    const build = this.buildNumber;
+    const stillWanted = () => build === this.buildNumber;
     try {
       await this.saving.get(team.id);
-      const asked = this.activeTeam()?.pokemon_ids;
+      if (!stillWanted()) return;
       const counter = await fetchCounter(team.id, this.state.leaveOutLegendary);
-      if (this.activeTeam()?.pokemon_ids === asked) this.update({ counter });
+      if (stillWanted()) this.update({ counter, building: false });
     } catch (error) {
-      this.update({ counterError: counterErrorText(error) });
-    } finally {
-      this.update({ building: false });
+      if (stillWanted()) this.update({ counterError: counterErrorText(error), building: false });
     }
   }
 
   // Ticking or unticking the box changes who may be picked, so like a change
   // to the team it clears the counter half; nothing is asked of the server.
   setLeaveOutLegendary(leaveOut: boolean): void {
-    this.update({ leaveOutLegendary: leaveOut, ...NO_COUNTER });
+    this.update({ leaveOutLegendary: leaveOut, ...this.clearCounter() });
   }
 
   // "Save as new team": the counter team becomes a team of its own.
@@ -247,7 +250,7 @@ export class TeamStore {
     try {
       const team = await createTeam(nextTeamName(this.state.teams));
       this.confirmed.set(team.id, team.pokemon_ids);
-      this.update({ teams: [...this.state.teams, team], activeId: team.id, ...NO_COUNTER });
+      this.update({ teams: [...this.state.teams, team], activeId: team.id, ...this.clearCounter() });
       return team;
     } catch (error) {
       const atLimit = error instanceof ApiError && error.status === 409;
@@ -260,7 +263,13 @@ export class TeamStore {
   private changeTeam(id: number, change: Partial<Team>): void {
     const teams = this.state.teams.map((team) => (team.id === id ? { ...team, ...change } : team));
     const stale = change.pokemon_ids !== undefined && id === this.state.activeId;
-    this.update({ teams, notice: null, ...(stale ? NO_COUNTER : {}) });
+    this.update({ teams, notice: null, ...(stale ? this.clearCounter() : {}) });
+  }
+
+  // An empty counter half, and any build still in flight made stale.
+  private clearCounter(): Partial<TeamsState> {
+    this.buildNumber += 1;
+    return { counter: null, counterError: null, building: false };
   }
 
   private fail(error: unknown, fallback: string): void {
