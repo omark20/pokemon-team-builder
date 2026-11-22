@@ -4,13 +4,15 @@ Expected values are read off the captured responses: Charizard (id 6) has attack
 types fire and flying; fire does double damage to grass.
 """
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import psycopg
 import pytest
-from fake_pokeapi import POKEMON_LIST, FakePokeApi, pokemon_path, run_fake_scan
+from fake_pokeapi import POKEMON_LIST, FakePokeApi, pokemon_path, run_fake_scan, species_path
+from psycopg import sql
 
 from app.domain.diff import RECORD_FIELDS
 from app.pokeapi import UpstreamError
@@ -78,20 +80,37 @@ def _fire_only(source: FakePokeApi) -> None:
     source.answers[CHARIZARD]["types"].pop()
 
 
+def _pikachu_legendary(source: FakePokeApi) -> None:
+    # Pikachu's species names no other stored Pokémon, so only Pikachu changes.
+    source.answers[species_path(25)]["is_legendary"] = True
+
+
 @pytest.mark.parametrize(
-    ("change", "field", "old", "new"),
-    [(_attack_94, "attack", 84, 94), (_fire_only, "types", ["fire", "flying"], ["fire"])],
+    ("change", "pokemon_id", "field", "old", "new"),
+    [
+        (_attack_94, 6, "attack", 84, 94),
+        (_fire_only, 6, "types", ["fire", "flying"], ["fire"]),
+        (_pikachu_legendary, 25, "is_legendary", False, True),
+    ],
 )
 def test_a_changed_field_records_one_change_and_updates_the_row(
-    conn: psycopg.Connection, source: FakePokeApi, change: Breaker, field: str, old: Any, new: Any
+    conn: psycopg.Connection,
+    source: FakePokeApi,
+    change: Breaker,
+    pokemon_id: int,
+    field: str,
+    old: Any,
+    new: Any,
 ) -> None:
     run_fake_scan(conn, source)
     change(source)
     run_id, _ = run_fake_scan(conn, source, now=lambda: FIXED_TIME)
-    assert change_rows(conn) == [(6, None, None, field, old, new)]
+    assert change_rows(conn) == [(pokemon_id, None, None, field, old, new)]
     detected = conn.execute("SELECT detected_at, scan_run_id FROM changes").fetchone()
     assert detected == (FIXED_TIME, run_id)
-    stored = conn.execute(f"SELECT {field} FROM pokemon WHERE id = 6").fetchone()
+    stored = conn.execute(
+        sql.SQL("SELECT {} FROM pokemon WHERE id = %s").format(sql.Identifier(field)), (pokemon_id,)
+    ).fetchone()
     assert stored == (new,)
 
 
@@ -226,22 +245,24 @@ def test_pokemon_ids_narrows_the_run_and_judges_nothing_removed(
     assert scope.fetchone() == ("subset", 1)
 
 
+@pytest.mark.parametrize("column", ["speed", "is_legendary"])
 def test_a_newly_added_empty_column_is_filled_without_a_change(
-    conn: psycopg.Connection, source: FakePokeApi
+    conn: psycopg.Connection, source: FakePokeApi, column: str
 ) -> None:
     run_fake_scan(conn, source)
-    before = pokemon_rows(conn)
+    values = sql.SQL("SELECT id, {} FROM pokemon ORDER BY id").format(sql.Identifier(column))
+    before = conn.execute(values).fetchall()
     # What a column added with ALTER TABLE ... ADD COLUMN looks like: NULL in every row.
-    conn.execute("ALTER TABLE pokemon ALTER COLUMN speed DROP NOT NULL")
-    conn.execute("UPDATE pokemon SET speed = NULL")
+    conn.execute(
+        sql.SQL("ALTER TABLE pokemon ALTER COLUMN {} DROP NOT NULL").format(sql.Identifier(column))
+    )
+    conn.execute(sql.SQL("UPDATE pokemon SET {} = NULL").format(sql.Identifier(column)))
     run_fake_scan(conn, source)
-    speeds = conn.execute("SELECT speed FROM pokemon WHERE id = 6").fetchone()
-    assert speeds == (100,)
+    assert conn.execute(values).fetchall() == before
     assert change_rows(conn) == []
     filled = pokemon_rows(conn)
     run_fake_scan(conn, source)
     assert pokemon_rows(conn) == filled
-    assert [row[:10] for row in filled] == [row[:10] for row in before]
 
 
 @pytest.mark.parametrize(("before", "after"), [("url", None), (None, "url")])
@@ -283,3 +304,46 @@ def test_a_run_left_running_over_30_minutes_is_failed_by_the_next_start(
     else:
         with pytest.raises(psycopg.errors.UniqueViolation):
             start_run(conn, "full", FIXED_TIME)
+
+
+def test_a_special_version_takes_its_species_flags(
+    conn: psycopg.Connection, source: FakePokeApi
+) -> None:
+    run_fake_scan(conn, source)
+    flags = conn.execute(
+        "SELECT id, is_legendary, is_mythical FROM pokemon"
+        " WHERE id IN (6, 10034, 10264) ORDER BY id"
+    ).fetchall()
+    # 10034 (Mega Charizard X) is a form of species 6; 10264 (a Koraidon form) of species 1007.
+    assert flags == [(6, False, False), (10034, False, False), (10264, True, False)]
+
+
+@pytest.mark.parametrize(
+    ("answer", "reason"),
+    [
+        (UpstreamError("timeout", retryable=True), "reason=species_timeout"),
+        (UpstreamError("http_500", retryable=True), "reason=species_http_500"),
+        ({"not": "a species"}, "reason=species_parse_error rule=malformed"),
+    ],
+    ids=["timeout", "server-error", "garbage-body"],
+)
+def test_a_species_that_cannot_be_read_leaves_the_flags_and_saves_the_rest(
+    conn: psycopg.Connection,
+    source: FakePokeApi,
+    caplog: pytest.LogCaptureFixture,
+    answer: object,
+    reason: str,
+) -> None:
+    run_fake_scan(conn, source)
+    source.answers[pokemon_path(25)]["stats"][1]["base_stat"] = 60  # Pikachu's attack moves too
+    source.answers[species_path(25)] = answer
+    with caplog.at_level(logging.INFO):
+        run_id, status = run_fake_scan(conn, source)
+    assert status == "incomplete"
+    flags = conn.execute("SELECT is_legendary, is_mythical FROM pokemon WHERE id = 25")
+    assert flags.fetchone() == (False, False)
+    assert change_rows(conn) == [(25, None, None, "attack", 55, 60)]
+    failed = conn.execute("SELECT failed FROM scan_runs WHERE id = %s", (run_id,)).fetchone()
+    assert failed == (1,)
+    expected = f"species_unread run_id={run_id} pokemon_id=25 {reason}"
+    assert [line for line in caplog.messages if "species_unread" in line] == [expected]

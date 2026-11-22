@@ -14,11 +14,12 @@ from app.domain.diff import (
     PokemonRecord,
     diff_chart,
     diff_pokemon,
+    keep_unread,
 )
 
 SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png"
 CHARIZARD = PokemonRecord(
-    6, "charizard", True, ["fire", "flying"], 78, 84, 78, 109, 85, 100, SPRITE
+    6, "charizard", True, ["fire", "flying"], 78, 84, 78, 109, 85, 100, SPRITE, False, False
 )
 
 # A different value for every field. A field added to the record without a row here
@@ -35,6 +36,8 @@ ALTERED = {
     "special_defense": 86,
     "speed": 101,
     "sprite_url": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10034.png",
+    "is_legendary": True,
+    "is_mythical": True,
 }
 
 DOMAIN = Path(__file__).resolve().parents[1] / "app" / "domain"
@@ -58,6 +61,15 @@ def test_two_fields_changed_give_two_changes() -> None:
         FieldChange("types", ["fire", "flying"], ["fire"]),
         FieldChange("attack", 84, 94),
     )
+
+
+@pytest.mark.parametrize("stored_value", [True, False, None])
+def test_a_field_not_read_in_this_run_keeps_its_stored_value(stored_value: bool | None) -> None:
+    stored = asdict(CHARIZARD) | {"is_legendary": stored_value}
+    unread = replace(CHARIZARD, is_legendary=None)
+    diff = diff_pokemon(stored, unread)
+    assert (diff.changes, diff.filled) == ((), ())
+    assert keep_unread(stored, unread).is_legendary == stored_value
 
 
 def test_empty_new_column_is_filled_without_a_change() -> None:

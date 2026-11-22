@@ -11,14 +11,12 @@ import logging
 import sys
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
-from app import db, demo, logs, pokemon_list, scan_store
+from app import db, demo, logs, pokemon_list, scan_fetch, scan_store
 from app.config import load_settings
-from app.domain.diff import ParseError, PokemonRecord, parse_pokemon
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
 from app.logs import log_event, log_exception, outside
 from app.pokeapi import (
@@ -44,16 +42,6 @@ Fetch = Callable[[str], Any]
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-@dataclass(frozen=True)
-class Fetched:
-    """A worker's result: a record, or the reason there is none. Neither means a 404."""
-
-    pokemon_id: int
-    record: PokemonRecord | None = None
-    reason: str | None = None
-    rule: str | None = None
 
 
 def start_run(conn: Conn, scope: str, now: datetime) -> int:
@@ -187,42 +175,27 @@ def _fetch_list(fetch: Fetch) -> tuple[dict[int, str], str | None]:
 def _scan_details(conn: Conn, fetch: Fetch, run: Run, wanted: dict[int, str]) -> None:
     """Fetch and parse in four worker threads; save each result here, in list order."""
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        for fetched in pool.map(partial(_fetch_one, fetch), wanted.items()):
+        for fetched in pool.map(partial(scan_fetch.fetch_one, fetch), wanted.items()):
             _apply_fetched(conn, run, fetched)
 
 
-def _fetch_one(fetch: Fetch, item: tuple[int, str]) -> Fetched:
-    """Runs in a worker: fetch by the listed URL, parse, keep the record, drop the body."""
-    pokemon_id, url = item
-    try:
-        payload = fetch(url)
-    except UpstreamError as exc:
-        return Fetched(pokemon_id, reason=exc.reason)
-    if payload is None:
-        return Fetched(pokemon_id)
-    try:
-        record = parse_pokemon(payload)
-    except ParseError as exc:
-        return Fetched(pokemon_id, reason="parse_error", rule=exc.rule)
-    if record.id != pokemon_id:
-        return Fetched(pokemon_id, reason="parse_error", rule="id_mismatch")
-    return Fetched(pokemon_id, record)
+def _apply_fetched(conn: Conn, run: Run, fetched: scan_fetch.Fetched) -> None:
+    """Save a record, with any demo patch applied, or note a removal or a skip.
 
-
-def _apply_fetched(conn: Conn, run: Run, fetched: Fetched) -> None:
-    """Save a record, with any demo patch applied, or note a removal or a skip."""
+    Anything about a Pokémon that could not be read counts it once in `failed`.
+    """
     removed_by_demo = run.overrides.removes(fetched.pokemon_id)
     if fetched.record is not None and not removed_by_demo:
         scan_store.save_pokemon(conn, run, run.overrides.apply(fetched.record))
     elif fetched.reason is None or removed_by_demo:
         run.missing.append(fetched.pokemon_id)
-    else:
+    if fetched.reason is not None and not removed_by_demo:
         run.failed += 1
         rule = {"rule": fetched.rule} if fetched.rule else {}
         log_event(
             logger,
             logging.WARNING,
-            "pokemon_skipped",
+            "pokemon_skipped" if fetched.record is None else "species_unread",
             run_id=run.run_id,
             pokemon_id=fetched.pokemon_id,
             reason=fetched.reason,

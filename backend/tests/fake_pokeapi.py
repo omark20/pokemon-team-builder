@@ -1,7 +1,8 @@
 """A stand-in for PokéAPI answering from the captured responses in samples/.
 
-It serves the captured type list and all 21 type responses, and a Pokémon list holding
-the 14 Pokémon whose detail responses were captured, each at its real listed URL.
+It serves the captured type list and all 21 type responses, a Pokémon list holding the
+14 Pokémon whose detail responses were captured, each at its real listed URL, and the
+captured species responses those 14 name.
 Tests change `answers` to make PokéAPI say something else: a payload, None for a 404,
 or an exception to raise.
 """
@@ -30,6 +31,11 @@ def pokemon_path(pokemon_id: int) -> str:
     return f"pokemon/{pokemon_id}/"
 
 
+def species_path(species_id: int) -> str:
+    """The species path as a detail response names it, under BASE_URL."""
+    return f"pokemon-species/{species_id}/"
+
+
 class FakePokeApi:
     """Answers `get(path)` like PokeApiSource, from a dictionary keyed by path."""
 
@@ -44,6 +50,9 @@ class FakePokeApi:
         self.answers[POKEMON_LIST] = {"count": len(results), "results": results}
         for pokemon_id, payload in details.items():
             self.answers[pokemon_path(pokemon_id)] = payload
+        for path in SAMPLES.glob("species_[0-9]*_*.json"):
+            species = _load(path)
+            self.answers[species_path(species["id"])] = species
         self.requested: list[str] = []
 
     def get(self, path: str) -> Any:

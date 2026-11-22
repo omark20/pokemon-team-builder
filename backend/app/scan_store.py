@@ -17,7 +17,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from app.demo import Overrides
-from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon
+from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon, keep_unread
 from app.domain.types import Chart
 from app.logs import log_event
 
@@ -93,15 +93,19 @@ def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
 
 
 def save_pokemon(conn: Conn, run: Run, record: PokemonRecord) -> None:
-    """Insert a first sight, or diff against the stored row and write what moved."""
-    values = [getattr(record, name) for name in RECORD_FIELDS]
+    """Insert a first sight, or diff against the stored row and write what moved.
+
+    A field not read in this run keeps its stored value (`keep_unread`).
+    """
     with conn.transaction():
         stored = conn.cursor(row_factory=dict_row).execute(SELECT_ROW, (record.id,)).fetchone()
         if stored is None:
-            conn.execute(INSERT_ROW, values)
+            conn.execute(INSERT_ROW, [getattr(record, name) for name in RECORD_FIELDS])
             run.wrote_pokemon = True
         else:
-            _update_if_changed(conn, run, stored, record, values)
+            kept = keep_unread(stored, record)
+            values = [getattr(kept, name) for name in RECORD_FIELDS]
+            _update_if_changed(conn, run, stored, kept, values)
     run.scanned += 1
 
 

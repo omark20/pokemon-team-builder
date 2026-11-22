@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS pokemon (
     removed_at timestamptz,  -- set when PokéAPI stops serving the entry
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- From each Pokémon's species response. Added after the table first existed, so empty in
+-- old rows until the next scan fills them (with no change recorded).
+ALTER TABLE pokemon ADD COLUMN IF NOT EXISTS is_legendary boolean;
+ALTER TABLE pokemon ADD COLUMN IF NOT EXISTS is_mythical boolean;
 
 -- The 18 x 18 type chart: how much each attacking type multiplies damage to each defender.
 CREATE TABLE IF NOT EXISTS type_effectiveness (

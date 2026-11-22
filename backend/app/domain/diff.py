@@ -1,15 +1,15 @@
 """The stored Pokémon record: reading it from PokéAPI, and finding what changed.
 
-`parse_pokemon` keeps the ten values the app shows or computes with and refuses any
+`parse_pokemon` keeps the values the app shows or computes with and refuses any
 response that breaks a rule, so a half-read record is never stored or reported as a
-change. `diff_pokemon` compares a stored row with a fresh record field by field, over
-the record's own fields, so a field added to `PokemonRecord` is diffed without more
-code. `diff_chart` does the same for the type chart, cell by cell. Pure: no web or
-database code.
+change; `parse_species` reads the two flags that come from the Pokémon's species.
+`diff_pokemon` compares a stored row with a fresh record over the record's own fields,
+so a field added to `PokemonRecord` is diffed without more code. `diff_chart` does the
+same for the type chart, cell by cell. Pure: no web or database code.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import Any
 
 from app.domain.types import STANDARD_TYPES, Chart
@@ -39,6 +39,9 @@ class PokemonRecord:
     special_defense: int
     speed: int
     sprite_url: str | None
+    # From the species response, a second request; None until it has been read.
+    is_legendary: bool | None = None
+    is_mythical: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -87,13 +90,46 @@ def parse_pokemon(payload: Mapping[str, Any]) -> PokemonRecord:
         raise ParseError("malformed") from exc
 
 
+def parse_species(payload: Mapping[str, Any]) -> tuple[bool, bool]:
+    """Read a /pokemon-species/{id} response's (is_legendary, is_mythical), or raise ParseError."""
+    try:
+        flags = payload["is_legendary"], payload["is_mythical"]
+    except (KeyError, TypeError) as exc:
+        raise ParseError("malformed") from exc
+    _check(all(isinstance(flag, bool) for flag in flags), "species_flags")
+    return flags
+
+
+def species_url(payload: Mapping[str, Any]) -> str:
+    """The species URL a /pokemon/{id} response names (samples/README.md, fact 17)."""
+    species = payload.get("species")
+    url = species.get("url") if isinstance(species, Mapping) else None
+    if not isinstance(url, str):
+        raise ParseError("species_url")
+    return url
+
+
+def keep_unread(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonRecord:
+    """The fetched record, with every field not read in this run taken from the stored row.
+
+    A None in a field PokéAPI never sends as null (one not in OPTIONAL_UPSTREAM) means
+    its request failed this run, so the stored value stands: no change, no fill.
+    """
+    unread = [
+        n for n in RECORD_FIELDS if getattr(fetched, n) is None and n not in OPTIONAL_UPSTREAM
+    ]
+    return replace(fetched, **{name: stored[name] for name in unread})
+
+
 def diff_pokemon(stored: Mapping[str, Any], fetched: PokemonRecord) -> PokemonDiff:
     """Compare a stored row with a fresh record, over every field of the record.
 
     A stored SQL NULL in a field not in OPTIONAL_UPSTREAM is a column added since the
     last scan: it is filled with no change recorded, or every user would be alerted
-    about a change that never happened upstream.
+    about a change that never happened upstream. A field not read in this run is left
+    as stored (`keep_unread`).
     """
+    fetched = keep_unread(stored, fetched)
     changes: list[FieldChange] = []
     filled: list[str] = []
     for name in RECORD_FIELDS:

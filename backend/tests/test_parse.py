@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from app.domain.diff import ParseError, PokemonRecord, parse_pokemon
+from app.domain.diff import ParseError, PokemonRecord, parse_pokemon, parse_species
 
 SAMPLES = Path(__file__).resolve().parents[2] / "samples"
 
@@ -37,6 +37,8 @@ def test_charizard_keeps_its_ten_values() -> None:
         special_defense=85,
         speed=100,
         sprite_url="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png",
+        is_legendary=None,  # read from the species response, not this one
+        is_mythical=None,
     )
 
 
@@ -95,4 +97,41 @@ def test_responses_breaking_a_rule_are_refused(
     break_payload(payload)
     with pytest.raises(ParseError) as refused:
         parse_pokemon(payload)
+    assert refused.value.rule == rule
+
+
+@pytest.mark.parametrize(
+    ("sample", "flags"),
+    [
+        ("species_6_charizard.json", (False, False)),
+        ("species_150_mewtwo_legendary.json", (True, False)),
+        ("species_151_mew_mythical.json", (False, True)),
+        ("species_1007_koraidon_legendary.json", (True, False)),
+    ],
+)
+def test_species_flags_are_read_from_the_captured_species(
+    sample: str, flags: tuple[bool, bool]
+) -> None:
+    assert parse_species(load(sample)) == flags
+
+
+def _no_mythical_flag(payload: dict[str, Any]) -> None:
+    del payload["is_mythical"]
+
+
+def _legendary_as_text(payload: dict[str, Any]) -> None:
+    payload["is_legendary"] = "no"
+
+
+@pytest.mark.parametrize(
+    ("break_payload", "rule"),
+    [(_no_mythical_flag, "malformed"), (_legendary_as_text, "species_flags")],
+)
+def test_species_flags_that_are_missing_or_not_booleans_are_refused(
+    break_payload: Callable[[dict[str, Any]], None], rule: str
+) -> None:
+    payload = load("species_6_charizard.json")
+    break_payload(payload)
+    with pytest.raises(ParseError) as refused:
+        parse_species(payload)
     assert refused.value.rule == rule
