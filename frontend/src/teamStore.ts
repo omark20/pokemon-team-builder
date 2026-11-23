@@ -8,51 +8,11 @@ import { useSyncExternalStore } from "react";
 import { ApiError, createTeam, deleteTeam, fetchCounter, fetchTeams, renameTeam, saveMembers } from "./api";
 import { counterErrorText, errorText, MESSAGES } from "./messages";
 import { TEAM_SIZE } from "./teamMoves";
-import { displayName, type CounterResult, type Members, type Pokemon, type SlotMoves, type Team } from "./types";
-
-export interface Notice {
-  kind: "info" | "error";
-  text: string;
-}
-
-export interface TeamsState {
-  status: "loading" | "failed" | "ready";
-  teams: Team[];
-  activeId: number | null; // the team whose tab is selected
-  creating: boolean; // a team is being created; other adds and creates wait
-  notice: Notice | null;
-  // The counter team of the selected team, built on request. Selecting another
-  // tab, changing the team's members, deleting it or changing the legendary
-  // box clears it, and an answer or error for a build started before such a
-  // change is dropped, so what is shown always answers the team and the box
-  // on screen.
-  counter: CounterResult | null;
-  counterError: string | null; // why the last build gave no counter team
-  building: boolean; // a counter team is being worked out for what is on screen
-  leaveOutLegendary: boolean; // the visitor's tick; kept while the page is open
-}
-
-// A team's two saved lists, without its id and name.
-const membersOf = ({ pokemon_ids, moves }: Team): Members => ({ pokemon_ids, moves });
-
-// "Team" and the next number after the highest one in use: "Team 1" first.
-export function nextTeamName(teams: Team[]): string {
-  const numbers = teams.map((team) => Number(/^Team (\d+)$/.exec(team.name)?.[1] ?? 0));
-  return `Team ${Math.max(0, ...numbers) + 1}`;
-}
+import { MOST_TEAMS, membersOf, nextTeamName, START, type Notice, type TeamsState } from "./teamsState";
+import { displayName, type Members, type Pokemon, type SlotMoves, type Team } from "./types";
 
 export class TeamStore {
-  private state: TeamsState = {
-    status: "loading",
-    teams: [],
-    activeId: null,
-    creating: false,
-    notice: null,
-    counter: null,
-    counterError: null,
-    building: false,
-    leaveOutLegendary: false,
-  };
+  private state: TeamsState = START;
   // Counts the builds and the changes that make a build's answer stale.
   private buildNumber = 0;
   private readonly listeners = new Set<() => void>();
@@ -173,9 +133,10 @@ export class TeamStore {
   }
 
   // Asks the server for the selected team's counter team, once its latest
-  // members are saved. If anything it was asked for changes before the answer
-  // arrives (see `counter` above), the answer or error is dropped.
-  async buildCounter(): Promise<void> {
+  // members are saved; `leftOut` and `teamNumber` say which team after the best
+  // is wanted. If anything it was asked for changes before the answer arrives
+  // (see `counter` above), the answer or error is dropped.
+  async buildCounter(leftOut: number[] = [], teamNumber = 1): Promise<void> {
     const team = this.activeTeam();
     if (!team?.pokemon_ids.length || this.state.building) return;
     this.update({ notice: null, ...this.clearCounter(), building: true });
@@ -184,11 +145,19 @@ export class TeamStore {
     try {
       await this.saving.get(team.id);
       if (!stillWanted()) return;
-      const counter = await fetchCounter(team.id, this.state.leaveOutLegendary);
-      if (stillWanted()) this.update({ counter, building: false });
+      const counter = await fetchCounter(team.id, this.state.leaveOutLegendary, leftOut);
+      if (stillWanted()) this.update({ counter, building: false, leftOut, teamNumber });
     } catch (error) {
       if (stillWanted()) this.update({ counterError: counterErrorText(error), building: false });
     }
+  }
+
+  // The best team that uses none of the counters shown so far for this team.
+  async showAnotherTeam(): Promise<void> {
+    const { counter, leftOut, teamNumber } = this.state;
+    if (!counter?.picks.length || teamNumber >= MOST_TEAMS) return;
+    const shown = counter.picks.map((pick) => pick.counter.id);
+    await this.buildCounter([...leftOut, ...shown], teamNumber + 1);
   }
 
   // Ticking or unticking the box changes who may be picked, so like a change
@@ -279,7 +248,7 @@ export class TeamStore {
   // An empty counter half, and any build still in flight made stale.
   private clearCounter(): Partial<TeamsState> {
     this.buildNumber += 1;
-    return { counter: null, counterError: null, building: false };
+    return { counter: null, counterError: null, building: false, teamNumber: 1, leftOut: [] };
   }
 
   private fail(error: unknown, fallback: string): void {

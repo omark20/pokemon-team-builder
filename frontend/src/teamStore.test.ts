@@ -1,7 +1,8 @@
 // The team rules, run against a stand-in backend that records every request.
 import { expect, test, vi } from "vitest";
 import { MESSAGES } from "./messages";
-import { nextTeamName, TeamStore } from "./teamStore";
+import { TeamStore } from "./teamStore";
+import { nextTeamName } from "./teamsState";
 import { byName } from "./test/census";
 import { FakeServer } from "./test/fakeServer";
 import type { Team } from "./types";

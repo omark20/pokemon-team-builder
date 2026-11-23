@@ -3,8 +3,9 @@
 // team exists, and a footer row with a status line and the buttons.
 import { useRef, useState } from "react";
 import { fetchMoves } from "../api";
-import type { TeamStore, TeamsState } from "../teamStore";
-import type { CounterResult, Pokemon, Team } from "../types";
+import type { TeamStore } from "../teamStore";
+import { MOST_TEAMS, type TeamsState } from "../teamsState";
+import type { CounterResult, Pokemon, SlotMoves, Team } from "../types";
 import { CounterDetails } from "./CounterDetails";
 import { CounterHalf } from "./CounterHalf";
 import { TeamHalf } from "./TeamHalf";
@@ -25,6 +26,7 @@ function statusLine(team: Team, counter: CounterResult | null): string {
   if (counter) {
     const pool = counter.pool_size.toLocaleString("en-US");
     const leftOut = counter.legendary_left_out ? ", legendary and mythical left out" : "";
+    if (counter.picks.length === 0) return `Searched ${pool} candidates${leftOut}.`; // no team among them
     return `Best team out of ${pool} candidates${leftOut}.`;
   }
   return team.pokemon_ids.length === 0
@@ -47,24 +49,28 @@ function LegendaryToggle({ store, teams }: Pick<FaceOffProps, "store" | "teams">
   );
 }
 
-// The row along the bottom of the card. Building needs at least one member.
+// The row along the bottom of the card. Building needs at least one member;
+// once a team is shown the button offers another, until there is none or ten
+// have been shown.
 function Footer({ store, teams, team }: Pick<FaceOffProps, "store" | "teams"> & { team: Team }) {
+  const shown = teams.counter;
+  const noMore = shown !== null && (shown.picks.length === 0 || teams.teamNumber >= MOST_TEAMS);
   return (
     <footer className="face-off-footer">
-      <p className="face-off-status">{statusLine(team, teams.counter)}</p>
+      <p className="face-off-status">{statusLine(team, shown)}</p>
       <LegendaryToggle store={store} teams={teams} />
-      {teams.counter && (
+      {shown?.picks.length ? (
         <button type="button" disabled={teams.creating} onClick={() => void store.saveCounterAsTeam()}>
           Save as new team
         </button>
-      )}
+      ) : null}
       <button
         type="button"
         className="primary"
-        disabled={team.pokemon_ids.length === 0 || teams.building}
-        onClick={() => void store.buildCounter()}
+        disabled={team.pokemon_ids.length === 0 || teams.building || noMore}
+        onClick={() => void (shown ? store.showAnotherTeam() : store.buildCounter())}
       >
-        {teams.counter ? "Rebuild" : "Build counter team"}
+        {shown ? "Show another team" : "Build counter team"}
       </button>
     </footer>
   );
@@ -98,10 +104,23 @@ function focusSelectedTab(card: HTMLElement | null) {
   card?.querySelector<HTMLElement>('.tab[aria-pressed="true"], .tab-new')?.focus();
 }
 
+// "Show details" under a counter team, and the details it opens. The open state
+// belongs to one result, so a new result starts closed.
+function DetailsPanel({ counter, chosen }: { counter: CounterResult; chosen: SlotMoves[] }) {
+  const [openFor, setOpenFor] = useState<CounterResult | null>(null);
+  const open = openFor === counter;
+  return (
+    <>
+      <button type="button" className="details-toggle" aria-expanded={open} onClick={() => setOpenFor(open ? null : counter)}>
+        {open ? "Hide details" : "Show details"}
+      </button>
+      {open && <CounterDetails counter={counter} chosen={chosen} />}
+    </>
+  );
+}
+
 export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProps) {
   const card = useRef<HTMLElement>(null);
-  // The result whose details are open; a new result starts closed.
-  const [openFor, setOpenFor] = useState<CounterResult | null>(null);
   if (teams.status !== "ready") {
     return (
       <section className="face-off">
@@ -111,7 +130,6 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
   }
   const team = store.activeTeam();
   const { counter } = teams;
-  const open = counter !== null && openFor === counter;
   return (
     <section ref={card} className="face-off" aria-label="Team and counter team">
       <TeamTabs
@@ -139,14 +157,16 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
             <span className="versus" aria-hidden="true">
               vs
             </span>
-            <CounterHalf counter={counter} error={teams.counterError} pokemonById={pokemonById} />
+            <CounterHalf
+              counter={counter}
+              error={teams.counterError}
+              pokemonById={pokemonById}
+              teamNumber={teams.teamNumber}
+              leftOut={teams.leftOut.length}
+              onBestTeam={() => void store.buildCounter()}
+            />
           </div>
-          {counter && (
-            <button type="button" className="details-toggle" aria-expanded={open} onClick={() => setOpenFor(open ? null : counter)}>
-              {open ? "Hide details" : "Show details"}
-            </button>
-          )}
-          {open && <CounterDetails counter={counter} chosen={team.moves} />}
+          {counter?.picks.length ? <DetailsPanel counter={counter} chosen={team.moves} /> : null}
           <Footer store={store} teams={teams} team={team} />
         </>
       )}

@@ -5,7 +5,7 @@
 // page, so the two regions (polite for news, assertive for errors) are always
 // mounted; each notice gets a fresh node, so a repeated message is announced too.
 import { useRef } from "react";
-import type { Notice } from "../teamStore";
+import type { Notice } from "../teamsState";
 
 // A number that changes whenever a new notice object arrives.
 function useNoticeNumber(notice: Notice | null): number {

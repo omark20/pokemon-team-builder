@@ -127,6 +127,9 @@ export interface CounterResult {
   weakness_counts: Record<string, number>; // per opposing type, in name order: counters it hits for 2× or more
   weakness_rule: WeaknessRule;
   pool_size: number;
+  // An opponent nothing left can hit for 2× or more, once Pokémon are left out;
+  // when set there is no team.
+  no_candidate_for: string | null;
   legendary_left_out: boolean; // the candidates excluded legendary and mythical Pokémon
 }
 

@@ -146,5 +146,6 @@
   },
   "weakness_rule": "kept",
   "pool_size": 3,
+  "no_candidate_for": null,
   "legendary_left_out": false
 }

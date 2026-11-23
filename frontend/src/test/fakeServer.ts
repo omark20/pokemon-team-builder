@@ -83,7 +83,8 @@ export class FakeServer {
   private answer(method: string, path: string, body: Call["body"]): Response {
     const [route, query] = path.split("?");
     if (route!.endsWith("/counter")) {
-      return json({ ...this.counter, legendary_left_out: query === "leave_out_legendary=true" });
+      const leftOut = new URLSearchParams(query).get("leave_out_legendary") === "true";
+      return json({ ...this.counter, legendary_left_out: leftOut });
     }
     if (path.startsWith("/api/alerts")) return this.answerAlerts(method, path);
     if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: false });

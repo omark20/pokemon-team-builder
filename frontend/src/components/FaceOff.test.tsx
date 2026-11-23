@@ -22,7 +22,7 @@ async function start(teams = [TEAM, makeTeam(2, "Team 2", [25])]) {
 
 const counterHalf = () => within(screen.getByRole("region", { name: "Counter team" }));
 const footer = () => within(document.querySelector<HTMLElement>(".face-off-footer")!);
-const primary = () => footer().getByRole("button", { name: /Build counter team|Rebuild/ }) as HTMLButtonElement;
+const primary = () => footer().getByRole("button", { name: /Build counter team|Show another team/ }) as HTMLButtonElement;
 const counterNames = () => [...document.querySelectorAll(".half[aria-label='Counter team'] .slot-name")].map((el) => el.textContent);
 
 async function build() {
@@ -47,7 +47,7 @@ test("after a build, counter i faces member i, and the footer reports the pool s
   expect(chips).toEqual(["beats Charizard", "loses to Blastoise", "draws with Venusaur"]);
   expect(counterHalf().queryByRole("button", { name: "Why?" })).toBeNull(); // the reasons are in the details
   expect(footer().getByText("Best team out of 3 candidates.")).toBeTruthy();
-  expect(primary().textContent).toBe("Rebuild");
+  expect(primary().textContent).toBe("Show another team");
 });
 
 test("an empty team cannot be built, and says what to do", async () => {
@@ -177,7 +177,7 @@ test("a card's Why? shows that pick's reason, and only that one, until pressed a
   expect([second.textContent, second.getAttribute("aria-expanded")]).toEqual(["Why?", "false"]);
 });
 
-test("a rebuild hides every open reason", async () => {
+test("showing another team hides every open reason", async () => {
   await start();
   await openDetails();
   whyButtons().forEach((button) => fireEvent.click(button));
@@ -258,4 +258,71 @@ test("a member's moves are marked chosen while one of its chosen moves is used, 
     "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · chosen by youFocus Blast is no longer listed for Blastoise, so not used.",
     "Venusaur: Petal Dance, Sludge Wave, Earth Power, Outrage · usual",
   ]);
+});
+
+// ---- "Show another team"
+
+const COUNTER_IDS = "leave_out=130&leave_out=25&leave_out=149"; // Gyarados, Pikachu, Dragonite
+const otherLine = () => document.querySelector(".other-team")?.textContent ?? null;
+const counterPaths = (server: FakeServer) => server.calls.filter((call) => call.path.includes("/counter")).map((call) => call.path);
+
+async function showAnother() {
+  await act(async () => fireEvent.click(primary()));
+}
+
+test("each press leaves out every counter shown so far, and says which team is showing", async () => {
+  const server = await start();
+  await build();
+  expect(otherLine()).toBeNull();
+  await showAnother();
+  expect(otherLine()).toBe("Team 2: the best without the 3 Pokémon shown before. Back to the best team");
+  await showAnother();
+  expect(otherLine()).toBe("Team 3: the best without the 6 Pokémon shown before. Back to the best team");
+  expect(counterPaths(server)).toEqual([
+    "/api/teams/1/counter",
+    `/api/teams/1/counter?${COUNTER_IDS}`,
+    `/api/teams/1/counter?${COUNTER_IDS}&${COUNTER_IDS}`, // the stand-in answers the same three each time
+  ]);
+});
+
+test("'Back to the best team' asks again with nothing left out, and the next press gives team 2 again", async () => {
+  const server = await start();
+  await build();
+  await showAnother();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Back to the best team" })));
+  expect(otherLine()).toBeNull();
+  await showAnother();
+  expect(otherLine()).toMatch(/^Team 2: /);
+  expect(counterPaths(server).slice(-2)).toEqual(["/api/teams/1/counter", `/api/teams/1/counter?${COUNTER_IDS}`]);
+});
+
+test("a change to the team clears what was left out, and the button starts again", async () => {
+  await start();
+  await build();
+  await showAnother();
+  fireEvent.click(screen.getByRole("button", { name: "Remove Blastoise" }));
+  expect(await counterHalf().findByText("No counter team yet")).toBeTruthy();
+  expect([otherLine(), primary().textContent]).toEqual([null, "Build counter team"]);
+});
+
+test("when nothing left hits an opponent hard, it says so, offers the way back, and offers no other team", async () => {
+  const server = await start();
+  await build();
+  server.counter = { ...COUNTER, picks: [], grid: [], opponent_moves: [], weakness_counts: {}, no_candidate_for: "blastoise" };
+  await showAnother();
+  expect(otherLine()).toBe("No other team: nothing left hits Blastoise for 2× or more. Back to the best team");
+  expect(primary().disabled).toBe(true);
+  expect(footer().queryByRole("button", { name: "Save as new team" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Show details" })).toBeNull();
+  expect(footer().getByText("Searched 3 candidates.")).toBeTruthy(); // not "Best team"
+});
+
+test("after the tenth team no more are offered", async () => {
+  await start();
+  await build();
+  for (let press = 0; press < 9; press++) await showAnother();
+  expect(otherLine()).toBe(
+    "Team 10: the best without the 27 Pokémon shown before. That is the tenth team. No more are offered. Back to the best team",
+  );
+  expect(primary().disabled).toBe(true);
 });

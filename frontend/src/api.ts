@@ -68,8 +68,14 @@ export const deleteTeam = (id: number) => request<void>("DELETE", `/api/teams/${
 
 // The best counter team for a saved team, worked out by the server, optionally
 // with legendary and mythical Pokémon left out of the candidates.
-export const fetchCounter = (id: number, leaveOutLegendary: boolean) =>
-  request<CounterResult>("GET", `/api/teams/${id}/counter${leaveOutLegendary ? "?leave_out_legendary=true" : ""}`);
+// `leaveOut` names Pokémon the answer may not pick: every counter already shown.
+export function fetchCounter(id: number, leaveOutLegendary: boolean, leaveOut: number[]) {
+  const query = new URLSearchParams();
+  if (leaveOutLegendary) query.set("leave_out_legendary", "true");
+  for (const pokemonId of leaveOut) query.append("leave_out", String(pokemonId));
+  const text = query.toString();
+  return request<CounterResult>("GET", `/api/teams/${id}/counter${text ? `?${text}` : ""}`);
+}
 
 // Changes from the last seven days to the visitor's Pokémon, newest first.
 export const fetchAlerts = () => request<Alert[]>("GET", "/api/alerts");

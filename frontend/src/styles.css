@@ -563,6 +563,13 @@ button:hover {
   white-space: nowrap;
 }
 
+/* Which team is showing after the best, or why there is no other. */
+.other-team {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
 .counter-notice {
   margin: 8px 0 0;
   padding: 8px 10px;

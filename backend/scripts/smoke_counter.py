@@ -98,7 +98,18 @@ def chosen_move(smoke: Smoke) -> None:
     check(restored.status_code == 200, "200 setting A back to the usual four", restored.status_code)
 
 
-def _counter(smoke: Smoke, params: dict[str, str]) -> dict[str, Any]:
+def another_team(smoke: Smoke) -> None:
+    """Leaving out A's first counter team gives a whole team of others."""
+    shown = [duel[0] for duel in DUELS_A]
+    body = _counter(smoke, {"leave_out": [str(pokemon_id) for pokemon_id in shown]})
+    picked = [pick["counter"]["id"] for pick in body["picks"]]
+    seen = (len(picked), set(picked) & set(shown), body["pool_size"])
+    expected = (len(TEAM_A), set(), DEFAULT_FORMS - len(shown))
+    check(seen == expected, f"three other counters from a pool of 1022 {expected}", seen)
+    print(f"smoke: the second team is {[p['counter']['name'] for p in body['picks']]}", flush=True)
+
+
+def _counter(smoke: Smoke, params: dict[str, Any]) -> dict[str, Any]:
     path = f"/api/teams/{smoke.teams['A']}/counter"
     answer = smoke.as_visitor("A", "GET", path, params=params)
     check(answer.status_code == 200, "200 for A's counter team", answer.status_code)

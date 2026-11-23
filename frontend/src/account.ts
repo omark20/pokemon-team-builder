@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut } from "./api";
-import type { Notice } from "./teamStore";
+import type { Notice } from "./teamsState";
 
 type DialogMode = "create" | "signin" | "delete";
 type EntryMode = Exclude<DialogMode, "delete">;

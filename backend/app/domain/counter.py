@@ -12,7 +12,7 @@ the web.
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from app.domain.counter_result import CounterResult, describe_team
+from app.domain.counter_result import CounterResult, describe_team, no_team_for
 from app.domain.counter_score import advantage, packed_score
 from app.domain.counter_search import Candidate, choose_team
 from app.domain.duel import duel
@@ -69,26 +69,39 @@ def score_slot(
     standings: dict[int, Standing],
     chart: Chart,
     field_size: int,
+    may_waive: bool,
 ) -> Slot:
-    """Every candidate that hits this opponent for 2×, scored; the whole pool if none can."""
+    """Every candidate that hits this opponent for 2×, scored. If none can, the whole
+    pool when `may_waive`, else no candidate at all."""
     duels = {c.id: duel(c, opponent, chart, counter_hits_hard=True) for c in pool}
     able = [c for c in pool if duels[c.id].counter_hit is not None]
-    if not able:
+    waived = not able and may_waive
+    if waived:
         duels = {c.id: duel(c, opponent, chart, counter_hits_hard=False) for c in pool}
+        able = pool
     scored = []
-    for candidate in able or pool:
+    for candidate in able:
         standing = standings[candidate.id]
         score = packed_score(
             duels[candidate.id].margin, standing.advantage, standing.stat_total, field_size
         )
         scored.append(Candidate(candidate.id, score, duels[candidate.id].margin, standing.weak_to))
-    return Slot(scored, hits_hard_waived=not able)
+    return Slot(scored, hits_hard_waived=waived)
 
 
 def build_counter_team(
-    opponents: Opponents, pool: Iterable[Pokemon], chart: Chart, field_size: int
+    opponents: Opponents,
+    pool: Iterable[Pokemon],
+    chart: Chart,
+    field_size: int,
+    may_waive: bool = True,
 ) -> CounterResult:
-    """The best counter team from the pool. `field_size` is the N the baselines were taken over."""
+    """The best counter team from the pool. `field_size` is the N the baselines were taken over.
+
+    With `may_waive`, an opponent no candidate can hit for 2× or more is answered by
+    the best of the whole pool. Without it there is no team, and the answer names the
+    first such opponent: a request that leaves Pokémon out never waives the rule.
+    """
     candidates = sorted(pool, key=lambda entry: entry.id)
     standings = {
         c.id: Standing(
@@ -96,7 +109,10 @@ def build_counter_team(
         )
         for c in candidates
     }
-    slots = [score_slot(o, candidates, standings, chart, field_size) for o in opponents]
+    slots = [score_slot(o, candidates, standings, chart, field_size, may_waive) for o in opponents]
+    stuck = next((o for o, slot in zip(opponents, slots, strict=True) if not slot.candidates), None)
+    if stuck is not None:
+        return no_team_for(stuck, len(candidates))
     choice = choose_team([slot.candidates for slot in slots], [o.id for o in opponents])
     by_id = {entry.id: entry for entry in candidates}
     team = [by_id[candidate.id] for candidate in choice.team]

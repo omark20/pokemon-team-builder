@@ -70,6 +70,14 @@ class CounterResult:
     weakness_counts: dict[str, int]  # opposing type: counters it hits for 2× or more
     weakness_rule: str  # "kept", "limit_raised" or "guard_reached" (counter_search.py)
     pool_size: int
+    # The first opponent, in team order, that no candidate left can hit for 2× or
+    # more; when set, nothing else is filled in.
+    no_candidate_for: str | None = None
+
+
+def no_team_for(opponent: Pokemon, pool_size: int) -> CounterResult:
+    """The answer when nothing left in the pool can counter this opponent."""
+    return CounterResult([], [], [], {}, "kept", pool_size, no_candidate_for=opponent.name)
 
 
 def side(attacker: Pokemon, hit: Hit | None, turns: int) -> Side:

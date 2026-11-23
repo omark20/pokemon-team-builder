@@ -262,6 +262,32 @@ def test_when_nobody_hits_the_opponent_for_two_times_the_rule_is_waived_and_said
     assert "with Swift (normal, 1×)" in pick.reason
 
 
+def test_without_the_waiver_an_opponent_nothing_hits_hard_ends_the_search_and_is_named():
+    # Swift is normal: 1× on Charizard. Tyranitar's Stone Edge hits Charizard for 4×, but
+    # nothing in this pool hits Blastoise for 2×, so Blastoise is named and nothing is waived.
+    swift_only = dataclasses.replace(CENSUS["pikachu"], moves=(MOVES[129],))
+    blastoise = armed("blastoise", "pokemon_9_blastoise")
+    result = build_counter_team(
+        [CHARIZARD, blastoise], [TYRANITAR, swift_only], CHART, 1, may_waive=False
+    )
+    assert result.no_candidate_for == "blastoise"
+    assert (result.picks, result.grid, result.opponent_moves, result.weakness_counts) == (
+        [],
+        [],
+        [],
+        {},
+    )
+    assert result.pool_size == 2
+
+
+def test_with_the_waiver_the_same_pool_still_gives_a_team():
+    swift_only = dataclasses.replace(CENSUS["pikachu"], moves=(MOVES[129],))
+    blastoise = armed("blastoise", "pokemon_9_blastoise")
+    result = build_counter_team([CHARIZARD, blastoise], [TYRANITAR, swift_only], CHART, 1)
+    assert result.no_candidate_for is None
+    assert [pick.counter.name for pick in result.picks] == ["tyranitar", "pikachu"]
+
+
 def test_too_small_a_pool_gives_no_team():
     assert build_counter_team([CHARIZARD, CHARIZARD], [TYRANITAR], CHART, field_size=1).picks == []
 

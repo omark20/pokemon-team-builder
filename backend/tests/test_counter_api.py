@@ -5,6 +5,8 @@ Pokémon are the 21 captured in samples/; 18 of them are default forms (ids belo
 so the field, and the candidate pool, has 18.
 """
 
+import json
+from dataclasses import asdict
 from typing import Any
 
 import psycopg
@@ -12,6 +14,8 @@ import pytest
 from fake_pokeapi import FakePokeApi, run_fake_scan, species_path
 from fastapi.testclient import TestClient
 
+from app import duel_store
+from app.domain.counter import build_counter_team, candidate_pool
 from app.routes import counter
 
 TEAMS = "/api/teams"
@@ -29,7 +33,15 @@ def team_with(client: TestClient, pokemon_ids: list[int]) -> int:
     return team_id
 
 
-ANSWER_KEYS = {"size", "picks", "grid", "opponent_moves", "weakness_counts", "weakness_rule"}
+ANSWER_KEYS = {
+    "size",
+    "picks",
+    "grid",
+    "opponent_moves",
+    "weakness_counts",
+    "weakness_rule",
+    "no_candidate_for",
+}
 
 
 def test_a_saved_team_of_three_gets_one_counter_per_slot(visitor: TestClient) -> None:
@@ -155,3 +167,56 @@ def test_the_field_size_passed_to_the_core_is_the_number_of_stored_baselines(
     conn.execute("UPDATE duel_data SET baseline = NULL WHERE pokemon_id = 3")
     assert visitor.get(f"{TEAMS}/{team_id}/counter").status_code == 200
     assert sizes == [17]  # 18 field Pokémon, one without a baseline; 21 stored in all
+
+
+@pytest.mark.parametrize(
+    "leave_out",
+    [[str(i) for i in range(1, 62)], ["six"], ["0"], ["-1"], ["1.5"], ["6", "6"]],
+    ids=["61-ids", "not-a-number", "zero", "negative", "fraction", "repeated"],
+)
+def test_a_leave_out_list_that_breaks_a_rule_is_422(
+    visitor: TestClient, leave_out: list[str]
+) -> None:
+    team_id = team_with(visitor, [6])
+    answer = visitor.get(f"{TEAMS}/{team_id}/counter", params={"leave_out": leave_out})
+    assert answer.status_code == 422
+
+
+def test_leaving_out_the_first_team_gives_the_best_team_of_the_smaller_pool(
+    visitor: TestClient, conn: psycopg.Connection
+) -> None:
+    team_id = team_with(visitor, [6, 3])  # each has candidates that hit it for 2×
+    first = visitor.get(f"{TEAMS}/{team_id}/counter").json()
+    shown = [pick["counter"]["id"] for pick in first["picks"]]
+    params = {"leave_out": [str(i) for i in shown]}
+    second = visitor.get(f"{TEAMS}/{team_id}/counter", params=params).json()
+    fighters, chart = duel_store.load_fighters(conn), duel_store.load_chart(conn)
+    assert fighters is not None and chart is not None
+    smaller = [p for p in candidate_pool(fighters.field) if p.id not in shown]
+    opponents = [fighters.by_id[6], fighters.by_id[3]]
+    built = build_counter_team(opponents, smaller, chart, len(fighters.field), may_waive=False)
+    expected = asdict(built)
+    assert {key: second[key] for key in expected} == json.loads(json.dumps(expected))
+    picked = [pick["counter"]["id"] for pick in second["picks"]]
+    assert len(picked) == 2 and not set(picked) & set(shown)
+    assert second["pool_size"] == 18 - 2
+
+
+def test_leaving_out_no_candidate_changes_nothing(visitor: TestClient) -> None:
+    team_id = team_with(visitor, [6, 9, 3])
+    plain = visitor.get(f"{TEAMS}/{team_id}/counter").json()
+    params = {"leave_out": ["10034", "2147483647"]}  # a special form, and no Pokémon at all
+    assert visitor.get(f"{TEAMS}/{team_id}/counter", params=params).json() == plain
+
+
+def test_with_anything_left_out_a_slot_nothing_can_hit_for_2x_gives_no_team(
+    visitor: TestClient,
+) -> None:
+    """With only the 17 captured moves stored, nothing hits Blastoise for 2×: the rule is
+    waived for it alone, and never once a candidate has been left out."""
+    team_id = team_with(visitor, [9])
+    plain = visitor.get(f"{TEAMS}/{team_id}/counter").json()
+    assert (len(plain["picks"]), plain["no_candidate_for"]) == (1, None)
+    params = {"leave_out": [str(plain["picks"][0]["counter"]["id"])]}
+    out = visitor.get(f"{TEAMS}/{team_id}/counter", params=params).json()
+    assert (out["picks"], out["grid"], out["no_candidate_for"]) == ([], [], "blastoise")
