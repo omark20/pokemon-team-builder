@@ -37,7 +37,7 @@ Visitors' teams; the site staying up; the two admin tokens; the stored copy of P
 
 ## What a request may contain
 
-**Threat:** malformed or oversized input. Bodies are strict: exact types, no unknown fields, bounded lengths and IDs. A team name is 1 to 50 characters, with no control characters and at least one visible one. Bodies over 16 KB (64 KB for the demo document) are refused with 413 *while being read*, before parsing or any token check (`main.MAX_BODY_BYTES`). A 422 names each problem's kind and place, never the value sent. *Tests:* `test_malformed_requests_are_4xx_never_500`, `test_names_are_1_to_50_visible_characters_without_control_characters`, `test_an_oversized_body_is_refused_with_413_before_it_is_read`, `test_a_malformed_body_is_422_without_its_password`.
+**Threat:** malformed or oversized input. Bodies are strict: exact types, no unknown fields, bounded lengths and IDs. A team name is 1 to 50 characters, with no control characters and at least one visible one. A team's members request may also carry `move_ids`, one entry per Pokémon, each null (its usual four) or one to four different move IDs; a fifth move, a repeat or a list of the wrong length is a 422. Each chosen move is checked on the server against that Pokémon's stored move list and the rule for moves usable in a duel, and refused with 422 if it cannot be learned (`teams.NOT_LEARNABLE`) or used (`teams.NOT_COUNTED`), so a visitor cannot give a Pokémon a move it cannot learn; a counter request checks the choice again against the current stored list (`chosen_moves.py`). Bodies over 16 KB (64 KB for the demo document) are refused with 413 *while being read*, before parsing or any token check (`main.MAX_BODY_BYTES`). A 422 names each problem's kind and place, never the value sent. *Tests:* `test_malformed_requests_are_4xx_never_500`, `test_names_are_1_to_50_visible_characters_without_control_characters`, `test_an_oversized_body_is_refused_with_413_before_it_is_read`, `test_a_malformed_body_is_422_without_its_password`, `test_a_choice_that_breaks_a_rule_is_refused_and_nothing_is_stored`, `test_another_visitors_team_cannot_be_given_moves`, `test_a_chosen_move_no_longer_listed_is_left_out_and_then_the_usual_four`.
 
 ## Database safety
 
@@ -63,7 +63,7 @@ The documentation routes are off and the server does not announce itself. *Tests
 
 | What | Limit |
 |---|---|
-| Reads (every GET under `/api`) | 600 a minute per address |
+| Reads (every GET under `/api`, `GET /api/pokemon/{id}/moves` included) | 600 a minute per address |
 | Writes | 120 a minute per address |
 | Counter teams | 20 a minute per address; two searched at once. The search is exact with no step limit (for six opponents, at most 36 kept candidates and 720 ways to hand them out); a second search, run only when the best team breaks the shared-weakness rule, stops at 100,000 steps and then answers with the first search's team and a notice |
 | New visitors | 20 an hour per address; 10 a minute from all addresses together |
