@@ -1,6 +1,6 @@
 // The move picker on its own, for Charizard. test/charizardMoves.json is what the
 // backend's counter core gives from the captures in samples/: Charizard's 78 moves
-// that count, and its usual four (Overheat, Earthquake, Hurricane, Outrage).
+// that count, and its default four (Overheat, Earthquake, Hurricane, Outrage).
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import type { MoveChoices } from "../moveChoice";
@@ -24,21 +24,21 @@ const positions = () => [...document.querySelectorAll(".move-position")].map((po
 const rows = () => [...document.querySelectorAll(".move-row")].map((row) => row.textContent);
 const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}, `) });
 const save = () => screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
-const useUsual = () => screen.getByRole("button", { name: "Use the usual moves" }) as HTMLButtonElement;
+const useDefault = () => screen.getByRole("button", { name: "Use the default moves" }) as HTMLButtonElement;
 
-test("it opens on the usual four with the search box focused, and nothing to save", async () => {
+test("it opens on the default four with the search box focused, and nothing to save", async () => {
   await open();
   expect(screen.getByRole("dialog", { name: "Charizard's moves" })).toBeTruthy();
   expect(document.activeElement).toBe(screen.getByRole("searchbox"));
   expect(screen.getByRole("heading", { name: "Moves in use (4 of 4)" })).toBeTruthy();
-  expect(screen.getByText("These are Charizard's usual moves.")).toBeTruthy();
+  expect(screen.getByText("These are Charizard's default moves.")).toBeTruthy();
   expect(positions()).toEqual([
     "Overheat FireSpecial · power 130 · 90% accurate×",
     "Earthquake GroundPhysical · power 100 · 100% accurate×",
     "Hurricane FlyingSpecial · power 110 · 70% accurate×",
     "Outrage DragonPhysical · power 120 · 100% accurate×",
   ]);
-  expect([useUsual().disabled, save().disabled]).toEqual([true, true]);
+  expect([useDefault().disabled, save().disabled]).toEqual([true, true]);
 });
 
 test("the list is strongest first, then by name, and a move that cannot miss says so", async () => {
@@ -89,13 +89,13 @@ test("pressing a move in use removes it, and with none left Save waits for a mov
   for (const name of ["Overheat", "Earthquake", "Hurricane", "Outrage"]) fireEvent.click(row(name));
   expect(positions()).toEqual(["Empty", "Empty", "Empty", "Empty"]);
   expect(save().disabled).toBe(true);
-  expect(screen.getByText("Choose at least one move, or use the usual moves.")).toBeTruthy();
+  expect(screen.getByText("Choose at least one move, or use the default moves.")).toBeTruthy();
 });
 
-test("using the usual moves after a choice and saving stores 'not chosen'", async () => {
+test("using the default moves after a choice and saving stores 'not chosen'", async () => {
   const { onSave } = await open([{ id: 411, name: "focus-blast" }]);
   expect(screen.getByText("You chose these moves.")).toBeTruthy();
-  fireEvent.click(useUsual());
+  fireEvent.click(useDefault());
   expect(positions().map((text) => text?.split(" ")[0])).toEqual(["Overheat", "Earthquake", "Hurricane", "Outrage"]);
   fireEvent.click(save());
   expect(onSave).toHaveBeenCalledWith(null);
@@ -125,7 +125,7 @@ test.each([
   { listed: true, says: "None of the moves PokéAPI lists for this Pokémon has a power of its own, so none can be chosen here." },
 ])("with nothing to choose from (moves listed: $listed) it says why and has only Close", async ({ listed, says }) => {
   const onClose = vi.fn();
-  const none = () => Promise.resolve({ moves: [], usual: [], moves_listed: listed });
+  const none = () => Promise.resolve({ moves: [], default: [], moves_listed: listed });
   render(<MovePicker pokemon={CHARIZARD} chosen={null} load={none} onSave={vi.fn()} onClose={onClose} />);
   expect(await screen.findByText(says)).toBeTruthy();
   expect(within(screen.getByRole("dialog")).getAllByRole("button").map((button) => button.textContent)).toEqual(["Close"]);
@@ -140,10 +140,10 @@ test("Escape and Cancel close the dialog without saving", async () => {
   expect([onClose.mock.calls.length, onSave.mock.calls.length]).toEqual([2, 0]);
 });
 
-test("Tab reaches each move's × before 'Use the usual moves', then search and the type", async () => {
+test("Tab reaches each move's × before 'Use the default moves', then search and the type", async () => {
   await open([{ id: 89, name: "earthquake" }]);
   const order = [...screen.getByRole("dialog").querySelectorAll<HTMLElement>("button:not(:disabled), input, select")]
     .slice(0, 4)
     .map((control) => control.getAttribute("aria-label") ?? control.textContent);
-  expect(order).toEqual(["Remove Earthquake", "Use the usual moves", "Search moves", "Move type"]);
+  expect(order).toEqual(["Remove Earthquake", "Use the default moves", "Search moves", "Move type"]);
 });

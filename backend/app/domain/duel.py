@@ -1,4 +1,4 @@
-"""A one-on-one fight between two Pokémon at level 50, in whole numbers.
+"""A one on one fight between two Pokémon at level 50, in whole numbers.
 
 Each side uses the best of the four moves it carries every turn. Damage follows the
 games' formula as written in the Smogon damage calculator's public source

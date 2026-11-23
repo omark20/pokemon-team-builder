@@ -1,6 +1,6 @@
 // The dialog for choosing a team member's moves: the moves in use, a way to find
 // a move, the list, and "Save" and "Cancel" fixed at the bottom. Saving the
-// usual four, in any order, stores "not chosen" (null). The dialog never closes
+// default four, in any order, stores "not chosen" (null). The dialog never closes
 // itself: the caller closes it after a save succeeds, and keeps it open if the
 // save fails.
 import { useCallback, useEffect, useState } from "react";
@@ -22,7 +22,7 @@ import { Sprite } from "./Sprite";
 
 interface PickerProps {
   pokemon: Pokemon;
-  chosen: SlotMoves; // null: the slot uses the Pokémon's usual four
+  chosen: SlotMoves; // null: the slot uses the Pokémon's default four
   load: (pokemonId: number) => Promise<MoveChoices>;
   onSave: (chosen: SlotMoves) => void;
   onClose: () => void;
@@ -44,14 +44,14 @@ function Buttons({ onSave, onClose }: { onSave?: () => void; onClose: () => void
 }
 
 function MoveEditor({ pokemon, chosen, choices, onSave, onClose }: Omit<PickerProps, "load"> & { choices: MoveChoices }) {
-  const start = chosen?.map((move) => move.id) ?? choices.usual;
+  const start = chosen?.map((move) => move.id) ?? choices.default;
   const [positions, setPositions] = useState(() => positionsOf(start));
   const used = inUse(positions);
-  const usualInUse = sameMoves(used, choices.usual);
+  const defaultInUse = sameMoves(used, choices.default);
   const canSave = used.length > 0 && !sameMoves(used, start);
   const toggle = (id: number) => setPositions(used.includes(id) ? withoutMove(positions, id) : withMove(positions, id));
   const names = new Map([...(chosen ?? []), ...choices.moves].map((move) => [move.id, move.name]));
-  const save = () => onSave(usualInUse ? null : used.map((id): ChosenMove => ({ id, name: names.get(id)! })));
+  const save = () => onSave(defaultInUse ? null : used.map((id): ChosenMove => ({ id, name: names.get(id)! })));
   return (
     <>
       <MovesInUse
@@ -59,12 +59,12 @@ function MoveEditor({ pokemon, chosen, choices, onSave, onClose }: Omit<PickerPr
         positions={positions}
         movesById={new Map(choices.moves.map((move) => [move.id, move]))}
         chosenNames={new Map(chosen?.map((move) => [move.id, move.name]))}
-        usualInUse={usualInUse}
+        defaultInUse={defaultInUse}
         onRemove={(id) => setPositions(withoutMove(positions, id))}
-        onUseUsual={() => setPositions(positionsOf(choices.usual))}
+        onUseDefault={() => setPositions(positionsOf(choices.default))}
       />
       <MoveList moves={choices.moves} used={used} full={used.length === MOST_MOVES} onToggle={toggle} />
-      {used.length === 0 && <p className="move-full">Choose at least one move, or use the usual moves.</p>}
+      {used.length === 0 && <p className="move-full">Choose at least one move, or use the default moves.</p>}
       <Buttons onSave={canSave ? save : undefined} onClose={onClose} />
     </>
   );

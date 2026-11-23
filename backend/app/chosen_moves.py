@@ -27,7 +27,7 @@ def with_choice(
     """The Pokémon carrying the chosen moves it may still use, in the order chosen.
 
     If none of them may be used, or none were chosen, it keeps the four it carries
-    already: its usual four.
+    already: its default four.
     """
     usable = [i for i in chosen if i in learnable_ids and counted(i, moves)]
     return replace(pokemon, moves=tuple(moves[i] for i in usable)) if usable else pokemon

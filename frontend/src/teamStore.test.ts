@@ -6,7 +6,7 @@ import { nextTeamName } from "./teamsState";
 import { byName } from "./test/census";
 import { FakeServer } from "./test/fakeServer";
 import type { Team } from "./types";
-import { makeTeam, usualMembers } from "./test/makeTeam";
+import { defaultMembers, makeTeam } from "./test/makeTeam";
 
 const PIKACHU = byName("pikachu"); // id 25
 const CHARIZARD = byName("charizard"); // id 6
@@ -88,7 +88,7 @@ test.each([
 ])("a failed save ($refusal) puts the team back and says so", async ({ refusal, text }) => {
   const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9])]);
   server.refuseNext("PUT", refusal[0]!, refusal[1]);
-  store.setMembers(1, usualMembers([9, 6]));
+  store.setMembers(1, defaultMembers([9, 6]));
   expect(state().teams[0]?.pokemon_ids).toEqual([9, 6]); // shown at once
   await vi.waitFor(() => expect(state().notice).toEqual({ kind: "error", text }));
   expect(state().teams[0]?.pokemon_ids).toEqual([6, 9]);
@@ -97,9 +97,9 @@ test.each([
 test("quick changes are saved one at a time and the last one wins", async () => {
   const { server, store } = await start([makeTeam(1, "Team 1", [6, 9, 25])]);
   const release = server.hold();
-  store.setMembers(1, usualMembers([9, 6, 25]));
-  store.setMembers(1, usualMembers([9, 25, 6]));
-  store.setMembers(1, usualMembers([25, 9, 6]));
+  store.setMembers(1, defaultMembers([9, 6, 25]));
+  store.setMembers(1, defaultMembers([9, 25, 6]));
+  store.setMembers(1, defaultMembers([25, 9, 6]));
   expect(server.writes()).toHaveLength(1); // the second and third wait for the first
   release();
   await vi.waitFor(() => expect(server.teams[0]?.pokemon_ids).toEqual([25, 9, 6]));
@@ -151,7 +151,7 @@ test("a failed load is reported, and loading again recovers", async () => {
 test("a build waits for the team's pending save, so the server works from the latest members", async () => {
   const { server, store, state } = await start([makeTeam(1, "Team 1", [6])]);
   const release = server.hold();
-  store.setMembers(1, usualMembers([6, 9]));
+  store.setMembers(1, defaultMembers([6, 9]));
   const building = store.buildCounter();
   await allSettled();
   expect(server.calls.at(-1)?.path).toBe("/api/teams/1/members"); // no counter request yet
@@ -166,7 +166,7 @@ test("an answer for members that changed while it was worked out is dropped", as
   const release = server.hold();
   const building = store.buildCounter();
   await vi.waitFor(() => expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter"));
-  store.setMembers(1, usualMembers([9, 6]));
+  store.setMembers(1, defaultMembers([9, 6]));
   release();
   await building;
   expect(state().counter).toBeNull();
@@ -281,7 +281,7 @@ test("'Save as new team' that stops half way says so in its own words", async ()
 test("a save that fails for a team deleted meanwhile reports nothing", async () => {
   const { server, store, state } = await start([makeTeam(1, "A", [6]), makeTeam(2, "B")]);
   const release = server.hold(); // holds the save; the team is then deleted
-  store.setMembers(1, usualMembers([6, 9]));
+  store.setMembers(1, defaultMembers([6, 9]));
   await store.remove(1);
   release();
   await allSettled(); // the save is answered 404, and the store has handled it

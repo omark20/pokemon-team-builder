@@ -22,7 +22,7 @@ interface SlotActions {
 
 interface SlotProps extends SlotActions {
   pokemon: Pokemon;
-  ownMoves: boolean; // its moves were chosen, not the usual four
+  ownMoves: boolean; // its moves were chosen, not the default four
 }
 
 // Whether the controls are showing, and whether they were showing when the
@@ -102,7 +102,7 @@ export function TeamSlot({ pokemon, ownMoves, onRemove, onMoves, onMoveEarlier, 
         aria-label={ownMoves ? `Change ${name}'s chosen moves` : `Choose ${name}'s moves`}
         onClick={onMoves}
       >
-        {ownMoves ? "Own moves · change" : "Choose moves"}
+        {ownMoves ? "Change moves" : "Choose moves"}
       </button>
       <SlotControl label={`Remove ${name}`} className="slot-remove" act={onRemove} acts={acts}>
         ×

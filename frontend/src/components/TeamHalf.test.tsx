@@ -8,7 +8,7 @@ import type { MoveChoices } from "../moveChoice";
 import charizardMoves from "../test/charizardMoves.json";
 import type { SlotMoves, Team } from "../types";
 import { TeamHalf } from "./TeamHalf";
-import { makeTeam, usualMembers } from "../test/makeTeam";
+import { defaultMembers, makeTeam } from "../test/makeTeam";
 
 const BY_ID = new Map(CENSUS.map((entry) => [entry.id, entry]));
 
@@ -49,7 +49,7 @@ function drag(from: HTMLElement, to: HTMLElement) {
 test("dropping slot 1 on slot 4 swaps the two and moves nothing else", () => {
   const { onMembers, slots } = renderHalf([6, 9, 3, 25, 94, 149]);
   drag(slots()[0]!, slots()[3]!);
-  expect(onMembers).toHaveBeenCalledExactlyOnceWith(usualMembers([25, 9, 3, 6, 94, 149]));
+  expect(onMembers).toHaveBeenCalledExactlyOnceWith(defaultMembers([25, 9, 3, 6, 94, 149]));
 });
 
 test("a drag cancelled before its drop leaves nothing to drop later", () => {
@@ -64,7 +64,7 @@ test("a drag cancelled before its drop leaves nothing to drop later", () => {
 test("dropping a slot on an empty outline moves it to the end", () => {
   const { onMembers, slots } = renderHalf([6, 9, 25]);
   drag(slots()[0]!, slots()[4]!);
-  expect(onMembers).toHaveBeenCalledExactlyOnceWith(usualMembers([9, 25, 6]));
+  expect(onMembers).toHaveBeenCalledExactlyOnceWith(defaultMembers([9, 25, 6]));
 });
 
 test("the arrows swap a slot with its neighbour; the first has no earlier, the last no later", () => {
@@ -73,13 +73,13 @@ test("the arrows swap a slot with its neighbour; the first has no earlier, the l
   expect(screen.queryByRole("button", { name: "Move Pikachu later" })).toBeNull();
   fireEvent.click(control("Move Blastoise later")); // keyboard activation: detail 0
   fireEvent.click(control("Move Blastoise earlier"));
-  expect(onMembers.mock.calls).toEqual([[usualMembers([6, 25, 9])], [usualMembers([9, 6, 25])]]);
+  expect(onMembers.mock.calls).toEqual([[defaultMembers([6, 25, 9])], [defaultMembers([9, 6, 25])]]);
 });
 
 test("'×' on the second of two Charizard slots removes only that slot", () => {
   const { onMembers } = renderHalf([6, 6, 25]);
   fireEvent.click(control("Remove Charizard", 1));
-  expect(onMembers).toHaveBeenCalledExactlyOnceWith(usualMembers([6, 25]));
+  expect(onMembers).toHaveBeenCalledExactlyOnceWith(defaultMembers([6, 25]));
 });
 
 test("on an unrevealed slot the first tap only reveals the controls, and the next one acts", () => {
@@ -88,7 +88,7 @@ test("on an unrevealed slot the first tap only reveals the controls, and the nex
   expect(onMembers).not.toHaveBeenCalled();
   expect(slots()[1]!.classList.contains("revealed")).toBe(true);
   tap(control("Remove Blastoise"));
-  expect(onMembers).toHaveBeenCalledExactlyOnceWith(usualMembers([6, 25]));
+  expect(onMembers).toHaveBeenCalledExactlyOnceWith(defaultMembers([6, 25]));
 });
 
 test("a mouse over the slot reveals its controls, so one click acts", () => {
@@ -96,7 +96,7 @@ test("a mouse over the slot reveals its controls, so one click acts", () => {
   fireEvent.pointerEnter(slots()[1]!, { pointerType: "mouse" });
   fireEvent.pointerDown(control("Move Blastoise earlier"), { pointerType: "mouse" });
   fireEvent.click(control("Move Blastoise earlier"), { detail: 1 });
-  expect(onMembers).toHaveBeenCalledExactlyOnceWith(usualMembers([9, 6, 25]));
+  expect(onMembers).toHaveBeenCalledExactlyOnceWith(defaultMembers([9, 6, 25]));
 });
 
 test("every slot control can be reached with Tab, and focusing one reveals its slot", () => {
@@ -124,9 +124,9 @@ const FOCUS_BLAST = [{ id: 411, name: "focus-blast" }];
 test("a slot's chosen moves travel with it when it moves, go with it when it is removed, and its link says so", () => {
   const { onMembers, slots } = renderHalf([6, 9, 25], [null, FOCUS_BLAST, null]);
   expect(slots().map((slot) => slot.querySelector(".slot-moves")?.textContent ?? null)).toEqual([
-    "Choose moves", "Own moves · change", "Choose moves", null, null, null,
+    "Choose moves", "Change moves", "Choose moves", null, null, null,
   ]);
-  expect(control("Change Blastoise's chosen moves").textContent).toBe("Own moves · change");
+  expect(control("Change Blastoise's chosen moves").textContent).toBe("Change moves");
   fireEvent.click(control("Move Blastoise earlier"));
   fireEvent.click(control("Remove Blastoise"));
   expect(onMembers.mock.calls).toEqual([

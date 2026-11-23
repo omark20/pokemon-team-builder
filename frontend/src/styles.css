@@ -1070,7 +1070,7 @@ button:disabled {
 
 /* In the markup the button comes after the positions, so Tab reaches each move's
    × first; here it sits on the heading's line. */
-.use-usual {
+.use-default {
   grid-row: 1;
   grid-column: 2;
 }

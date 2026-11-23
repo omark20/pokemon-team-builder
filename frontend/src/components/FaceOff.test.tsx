@@ -136,13 +136,13 @@ test("a refused build shows the server's reason in the counter half", async () =
   expect(await counterHalf().findByText("The legendary flags are not loaded yet", { selector: ".counter-empty" })).toBeTruthy();
 });
 
-test("'Save as new team' makes a team of the three counters, each on its usual moves", async () => {
+test("'Save as new team' makes a team of the three counters, each on its default moves", async () => {
   const server = await start();
   await build();
   await act(async () => fireEvent.click(footer().getByRole("button", { name: "Save as new team" })));
   expect(server.writes()).toEqual([
     ["POST /api/teams", { name: "Team 3" }],
-    ["PUT /api/teams/3/members", { pokemon_ids: [130, 25, 149], move_ids: [null, null, null] }], // the usual four each
+    ["PUT /api/teams/3/members", { pokemon_ids: [130, 25, 149], move_ids: [null, null, null] }], // the default four each
   ]);
   expect(screen.getByRole("button", { name: "Team 3", pressed: true })).toBeTruthy();
 });
@@ -237,14 +237,14 @@ test("your team's moves list each member's four, and say so where PokéAPI lists
   await openDetails();
   fireEvent.click(moreButton());
   expect([...document.querySelectorAll(".team-moves li")].map((line) => line.textContent)).toEqual([
-    "Charizard: Overheat, Earthquake, Hurricane, Outrage · usual",
-    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · usual",
+    "Charizard: Overheat, Earthquake, Hurricane, Outrage · default",
+    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · default",
     "Venusaur-gmax: PokéAPI lists no moves for this Pokémon",
   ]);
 });
 
 test("a member's moves are marked chosen while one of its chosen moves is used, with a note for each one that was not", async () => {
-  // The answer used Charizard's usual four: its one chosen move, Focus Blast, is not among
+  // The answer used Charizard's default four: its one chosen move, Focus Blast, is not among
   // them, which is how the answer shows a move a later scan no longer lists. Blastoise
   // keeps Ice Beam, so its line is "chosen by you" with a note for Focus Blast.
   const chosen = [[{ id: 411, name: "focus-blast" }], [{ id: 58, name: "ice-beam" }, { id: 411, name: "focus-blast" }], null];
@@ -254,9 +254,9 @@ test("a member's moves are marked chosen while one of its chosen moves is used, 
   await openDetails();
   fireEvent.click(moreButton());
   expect([...document.querySelectorAll(".team-moves li")].map((line) => line.textContent)).toEqual([
-    "Charizard: Overheat, Earthquake, Hurricane, Outrage · usualFocus Blast is no longer listed for Charizard, so not used.",
+    "Charizard: Overheat, Earthquake, Hurricane, Outrage · defaultFocus Blast is no longer listed for Charizard, so not used.",
     "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · chosen by youFocus Blast is no longer listed for Blastoise, so not used.",
-    "Venusaur: Petal Dance, Sludge Wave, Earth Power, Outrage · usual",
+    "Venusaur: Petal Dance, Sludge Wave, Earth Power, Outrage · default",
   ]);
 });
 

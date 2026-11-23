@@ -5,7 +5,7 @@ carries and its baseline (duel_store.py), all in one borrowed connection. Candid
 the field, the Pokémon with a stored baseline, passed through `candidate_pool`, the one
 place that decides who may be picked; the field's size is the N the baselines were
 taken over. A slot of the visitor's team with chosen moves fights with those it may
-still use (chosen_moves.py); the counters always carry their usual four. `leave_out`
+still use (chosen_moves.py); the counters always carry their default four. `leave_out`
 takes Pokémon already shown out of the pool, for "Show another team"; nothing about
 it is remembered between requests. The core's result is returned as it is, plus the
 team size.

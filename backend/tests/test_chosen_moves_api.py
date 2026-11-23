@@ -90,7 +90,7 @@ def test_choices_belong_to_slots_and_come_back_named_in_order(visitor: TestClien
     assert put(visitor, team_id, swapped).json()["moves"] == [None, named]
     assert visitor.get(TEAMS).json()[0]["moves"] == [None, named]
     without = put(visitor, team_id, {"pokemon_ids": [CHARIZARD, CHARIZARD]})
-    assert without.json()["moves"] == [None, None]  # left out: every slot its usual four
+    assert without.json()["moves"] == [None, None]  # left out: every slot its default four
 
 
 def expected_moves(pokemon_file: str) -> list[int]:
@@ -100,7 +100,7 @@ def expected_moves(pokemon_file: str) -> list[int]:
     return sorted(move.id for move in moves if move.id in learnable and counts(move))
 
 
-def test_a_pokemons_moves_are_those_it_can_learn_that_count_and_its_usual_four(
+def test_a_pokemons_moves_are_those_it_can_learn_that_count_and_its_default_four(
     visitor: TestClient, conn: psycopg.Connection
 ) -> None:
     body = visitor.get(f"/api/pokemon/{CHARIZARD}/moves").json()
@@ -115,10 +115,10 @@ def test_a_pokemons_moves_are_those_it_can_learn_that_count_and_its_usual_four(
         "power": 90,
         "accuracy": 100,
     }
-    usual = conn.execute("SELECT move_ids FROM duel_data WHERE pokemon_id = 6").fetchone()
-    assert usual is not None and (body["usual"], body["moves_listed"]) == (usual[0], True)
+    default = conn.execute("SELECT move_ids FROM duel_data WHERE pokemon_id = 6").fetchone()
+    assert default is not None and (body["default"], body["moves_listed"]) == (default[0], True)
     gigantamax = visitor.get(f"/api/pokemon/{GIGANTAMAX}/moves").json()
-    assert gigantamax == {"moves": [], "usual": [], "moves_listed": False}
+    assert gigantamax == {"moves": [], "default": [], "moves_listed": False}
 
 
 def test_moves_of_an_unknown_pokemon_are_404_and_before_a_scan_503(
@@ -154,7 +154,7 @@ def test_an_opponent_with_chosen_moves_fights_with_them(
     assert counter(visitor, team_id)["picks"] != answer["picks"]  # the choice made a difference
 
 
-def test_a_chosen_move_no_longer_listed_is_left_out_and_then_the_usual_four(
+def test_a_chosen_move_no_longer_listed_is_left_out_and_then_the_default_four(
     visitor: TestClient, conn: psycopg.Connection
 ) -> None:
     team_id = new_team(visitor)
@@ -162,11 +162,11 @@ def test_a_chosen_move_no_longer_listed_is_left_out_and_then_the_usual_four(
     drop = "UPDATE pokemon_moves SET move_ids = array_remove(move_ids, %s) WHERE pokemon_id = 6"
     conn.execute(drop, (FOCUS_BLAST,))
     assert counter(visitor, team_id)["opponent_moves"][0]["moves"] == ["flamethrower"]
-    conn.execute(drop, (FLAMETHROWER,))  # now none of the choice is usable: the usual four
-    usual = conn.execute("SELECT move_ids FROM duel_data WHERE pokemon_id = 6").fetchone()
+    conn.execute(drop, (FLAMETHROWER,))  # now none of the choice is usable: the default four
+    default = conn.execute("SELECT move_ids FROM duel_data WHERE pokemon_id = 6").fetchone()
     names = dict(conn.execute("SELECT id, name FROM moves"))
-    assert usual is not None
-    expected = [names[i] for i in usual[0]]
+    assert default is not None
+    expected = [names[i] for i in default[0]]
     assert counter(visitor, team_id)["opponent_moves"][0]["moves"] == expected
     stored = conn.execute("SELECT move_ids FROM team_members WHERE team_id = %s", (team_id,))
     assert stored.fetchone() == ([FOCUS_BLAST, FLAMETHROWER],)  # the choice is not rewritten

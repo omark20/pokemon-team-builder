@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS team_members (
 );
 CREATE INDEX IF NOT EXISTS team_members_pokemon_id ON team_members (pokemon_id);
 -- The moves the visitor chose for this slot, one to four move IDs, or null for the
--- Pokémon's usual four, whatever a later scan makes them. Added after the table first
+-- Pokémon's default four, whatever a later scan makes them. Added after the table first
 -- existed, so null in old rows.
 ALTER TABLE team_members ADD COLUMN IF NOT EXISTS move_ids integer[]
     CHECK (cardinality(move_ids) BETWEEN 1 AND 4);

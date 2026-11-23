@@ -81,7 +81,7 @@ def legendary_filter(smoke: Smoke) -> None:
 
 def chosen_move(smoke: Smoke) -> None:
     """Charizard, in A's first slot, given only Focus Blast fights with it; then A's team is
-    set back to the usual four."""
+    set back to the default four."""
     path = f"/api/teams/{smoke.teams['A']}/members"
     body = {"pokemon_ids": TEAM_A, "move_ids": [[FOCUS_BLAST["id"]], None, None]}
     saved = smoke.as_visitor("A", "PUT", path, json=body)
@@ -95,7 +95,8 @@ def chosen_move(smoke: Smoke) -> None:
     move_back = answer["picks"][0]["opponent"]["move"]
     check(move_back in ("focus-blast", None), "Charizard's move back Focus Blast", move_back)
     restored = smoke.as_visitor("A", "PUT", path, json={"pokemon_ids": TEAM_A})
-    check(restored.status_code == 200, "200 setting A back to the usual four", restored.status_code)
+    status = restored.status_code
+    check(status == 200, "200 setting A back to the default four", status)
 
 
 def another_team(smoke: Smoke) -> None:

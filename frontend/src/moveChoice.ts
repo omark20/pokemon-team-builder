@@ -12,10 +12,10 @@ export interface MoveOption {
   accuracy: number | null; // null or 0: the move cannot miss
 }
 
-// What the dialog loads for one Pokémon: the moves it may use and its usual four.
+// What the dialog loads for one Pokémon: the moves it may use and its default four.
 export interface MoveChoices {
   moves: MoveOption[];
-  usual: number[];
+  default: number[];
   moves_listed: boolean; // false when PokéAPI lists no moves for it at all
 }
 

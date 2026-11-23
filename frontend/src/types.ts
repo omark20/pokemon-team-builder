@@ -48,7 +48,7 @@ export interface ChosenMove {
   name: string;
 }
 
-// The moves chosen for one slot, or null for the Pokémon's usual four.
+// The moves chosen for one slot, or null for the Pokémon's default four.
 export type SlotMoves = ChosenMove[] | null;
 
 // One of the visitor's teams, as the backend sends it. `pokemon_ids` is in
@@ -72,7 +72,7 @@ export function moveName(name: string): string {
     .join(" ");
 }
 
-// How a counter's one-on-one fight with an opponent ends, for the counter.
+// How a counter's one on one fight with an opponent ends, for the counter.
 export type Outcome = "wins" | "draws with" | "loses to";
 
 // GET /api/teams/{id}/counter, as far as the page reads it. A fight's damage,

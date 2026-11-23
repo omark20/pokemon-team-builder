@@ -54,14 +54,14 @@ export const renameTeam = (id: number, name: string) =>
   request<Team>("PATCH", `/api/teams/${id}`, { name });
 
 // Add, remove, reorder and choosing moves are all this one call: the complete
-// list in order, each slot's chosen moves as their IDs (null for the usual four).
+// list in order, each slot's chosen moves as their IDs (null for the default four).
 export const saveMembers = (id: number, members: Members) =>
   request<Team>("PUT", `/api/teams/${id}/members`, {
     pokemon_ids: members.pokemon_ids,
     move_ids: members.moves.map((moves) => moves?.map((move) => move.id) ?? null),
   });
 
-// The moves a Pokémon may use in a fight, and its usual four.
+// The moves a Pokémon may use in a fight, and its default four.
 export const fetchMoves = (pokemonId: number) => request<MoveChoices>("GET", `/api/pokemon/${pokemonId}/moves`);
 
 export const deleteTeam = (id: number) => request<void>("DELETE", `/api/teams/${id}`);

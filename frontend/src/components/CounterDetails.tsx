@@ -8,7 +8,7 @@ import { FightTable } from "./FightTable";
 import { PickCard } from "./PickCard";
 
 export const INTRO =
-  "Each counter was picked to win a one-on-one fight against one of your Pokémon. The numbers are the turns each needs to knock out the other; fewer wins.";
+  "Each counter was picked to win a one on one fight against one of your Pokémon. The numbers are the turns each needs to knock out the other; fewer wins.";
 
 const SIZE_WORDS = ["", "one", "two", "three", "four", "five", "six"];
 
@@ -38,9 +38,9 @@ function DroppedMoves({ moves, name }: { moves: ChosenMove[]; name: string }) {
   );
 }
 
-// One member's moves as used, marked as chosen by the visitor or as its usual
+// One member's moves as used, marked as chosen by the visitor or as its default
 // four. A chosen move missing from the moves used is one a later scan no longer
-// lists; if none of the chosen moves is left, the usual four were used.
+// lists; if none of the chosen moves is left, the default four were used.
 function MovesLine({ member, chosen }: { member: AssumedMoves; chosen: SlotMoves }) {
   const name = displayName(member.name);
   const moves = member.moves.map(moveName).join(", ");
@@ -50,7 +50,7 @@ function MovesLine({ member, chosen }: { member: AssumedMoves; chosen: SlotMoves
     <li>
       <strong>{name}</strong>:{" "}
       {member.moves_listed ? moves || "No damaging move" : "PokéAPI lists no moves for this Pokémon"}
-      {member.moves_listed && <span className="moves-source"> · {ownInUse ? "chosen by you" : "usual"}</span>}
+      {member.moves_listed && <span className="moves-source"> · {ownInUse ? "chosen by you" : "default"}</span>}
       <DroppedMoves moves={gone} name={name} />
     </li>
   );
@@ -68,13 +68,13 @@ function MoreDetails({ counter, chosen }: DetailsProps) {
     <div id="counter-more" className="counter-more">
       <section aria-labelledby="fights-title">
         <h3 id="fights-title">All {fights} fights</h3>
-        <p className="section-note">A tick means the counter wins that one-on-one fight. Outlined: the opponent it was picked for.</p>
+        <p className="section-note">A tick means the counter wins that one on one fight. Outlined: the opponent it was picked for.</p>
         <FightTable counter={counter} />
       </section>
       <section aria-labelledby="moves-title">
         <h3 id="moves-title">Your team's moves</h3>
         <p className="section-note">
-          The four each of your Pokémon is assumed to carry: the four that together hit the most Pokémon hardest.
+          The four each of your Pokémon carries: those you chose, or by default the four that together hit the most Pokémon hardest.
         </p>
         <ul className="team-moves">
           {counter.opponent_moves.map((member, index) => (

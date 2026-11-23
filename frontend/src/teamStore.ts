@@ -122,7 +122,7 @@ export class TeamStore {
     if (!this.saving.has(id)) this.saving.set(id, this.saveUnsent(id));
   }
 
-  // Sets the moves of one slot (null for the usual four) and waits for the save:
+  // Sets the moves of one slot (null for the default four) and waits for the save:
   // true once the server has stored them, false if the save failed.
   async setMoves(id: number, slot: number, moves: SlotMoves): Promise<boolean> {
     const team = this.state.teams.find((entry) => entry.id === id);
@@ -193,7 +193,7 @@ export class TeamStore {
     }
   }
 
-  // A new team holding these Pokémon, each with its usual four moves: two
+  // A new team holding these Pokémon, each with its default four moves: two
   // requests, create then set members. Used by a first Add and by "Save as new
   // team". If the second request fails the new team stays, empty, and
   // `halfDone` says what to do next.

@@ -11,9 +11,9 @@ interface InUseProps {
   positions: Positions;
   movesById: Map<number, MoveOption>;
   chosenNames: Map<number, string>; // names of chosen moves, for any no longer listed
-  usualInUse: boolean;
+  defaultInUse: boolean;
   onRemove: (id: number) => void;
-  onUseUsual: () => void;
+  onUseDefault: () => void;
 }
 
 function Position({ id, props }: { id: number | null; props: InUseProps }) {
@@ -45,7 +45,7 @@ function Position({ id, props }: { id: number | null; props: InUseProps }) {
 
 export function MovesInUse(props: InUseProps) {
   const count = inUse(props.positions).length;
-  const status = props.usualInUse ? `These are ${props.pokemonName}'s usual moves.` : "You chose these moves.";
+  const status = props.defaultInUse ? `These are ${props.pokemonName}'s default moves.` : "You chose these moves.";
   return (
     <section className="moves-in-use" aria-labelledby="moves-in-use-title">
       <h3 id="moves-in-use-title">
@@ -57,8 +57,8 @@ export function MovesInUse(props: InUseProps) {
           <Position key={index} id={id} props={props} />
         ))}
       </ul>
-      <button type="button" className="link-button use-usual" disabled={props.usualInUse} onClick={props.onUseUsual}>
-        Use the usual moves
+      <button type="button" className="link-button use-default" disabled={props.defaultInUse} onClick={props.onUseDefault}>
+        Use the default moves
       </button>
     </section>
   );

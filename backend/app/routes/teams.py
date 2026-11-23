@@ -4,7 +4,7 @@ Add, remove and reorder are all one request that sends the complete ordered list
 Pokémon IDs, stored in one transaction under a lock on the team row, numbered 1 to n.
 So positions cannot have gaps or clashes, and the same Pokémon may fill several slots.
 The same request may send, beside each Pokémon, the moves chosen for that slot, or null
-for its usual four; a choice belongs to the slot and travels with it. A team that is
+for its default four; a choice belongs to the slot and travels with it. A team that is
 not the caller's is a 404, the same as one that does not exist.
 """
 
@@ -36,7 +36,7 @@ NOT_LEARNABLE = "A chosen move is not one this Pokémon can learn"
 NOT_COUNTED = "A chosen move is not one that can be used in a duel"
 
 # `moves` is parallel to `pokemon_ids`: per slot, its chosen moves as {id, name} in the
-# order chosen, or null for the usual four. Moves are never deleted, so each has a name.
+# order chosen, or null for the default four. Moves are never deleted, so each has a name.
 TEAM_QUERY = """
     SELECT t.id, t.name,
            coalesce(array_agg(m.pokemon_id ORDER BY m.position)
@@ -91,7 +91,7 @@ ChosenMoves = Annotated[
 
 
 class MembersBody(BaseModel):
-    """The whole ordered team, and optionally each slot's chosen moves (null: usual four)."""
+    """The whole ordered team, and optionally each slot's chosen moves (null: default four)."""
 
     model_config = STRICT
     pokemon_ids: list[PokemonId] = Field(max_length=MAX_MEMBERS)

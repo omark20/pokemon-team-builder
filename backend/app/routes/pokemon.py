@@ -27,7 +27,7 @@ def list_pokemon(request: Request) -> Response:
 
 @router.get("/api/pokemon/{pokemon_id}/moves")
 def pokemon_moves(pokemon_id: PathId, request: Request) -> dict[str, Any]:
-    """The moves this Pokémon can learn that count in a duel, by ID, and its usual four.
+    """The moves this Pokémon can learn that count in a duel, by ID, and its default four.
 
     `accuracy` is null or 0 for a move that cannot miss. `moves_listed` is false where
     PokéAPI lists no moves for it at all.
@@ -41,13 +41,13 @@ def pokemon_moves(pokemon_id: PathId, request: Request) -> dict[str, Any]:
         ).fetchone()
         if row is None:
             raise HTTPException(404, "Pokémon not found")
-        listed, usual = row
+        listed, default = row
         if listed is None:  # its answer has not been read by a scan with moves
             raise HTTPException(503, MOVES_NOT_LOADED)
         moves = duel_store.load_moves_named(conn, listed)
     usable = sorted(i for i in moves if counted(i, moves))
     return {
         "moves": [{field: getattr(moves[i], field) for field in MOVE_FIELDS} for i in usable],
-        "usual": usual or [],
+        "default": default or [],
         "moves_listed": listed != [],
     }
