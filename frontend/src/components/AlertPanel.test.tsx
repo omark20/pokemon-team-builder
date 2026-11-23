@@ -15,7 +15,7 @@ const TEAMS = [
 ];
 
 const change = (id: number, pokemonId: number, oldValue: number, newValue: number): Alert => ({
-  id, pokemon_id: pokemonId, attacker: null, defender: null, field: "attack", old_value: oldValue,
+  id, pokemon_id: pokemonId, attacker: null, defender: null, move: null, field: "attack", old_value: oldValue,
   new_value: newValue, detected_at: "2026-11-20T12:00:00Z", is_demo: false, your_pokemon: [pokemonId],
 });
 
@@ -99,4 +99,19 @@ test("after a row's Dismiss focus moves to the next row's, and after the last to
   expect(document.activeElement).toBe(panel().getByRole("button", { name: "Dismiss: Pikachu, attack" }));
   await act(async () => fireEvent.click(document.activeElement!));
   expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Pokémon Team Builder" }));
+});
+
+// Flamethrower's power, carried by Pikachu (25), which is on Beta only.
+const MOVE_CHANGE: Alert = {
+  id: 21, pokemon_id: null, attacker: null, defender: null, move: "flamethrower", field: "power", old_value: 90,
+  new_value: 95, detected_at: "2026-11-20T12:00:00Z", is_demo: false, your_pokemon: [25],
+};
+
+test("a move change gets a row naming the move and who carries it, dots its team's tab and is dismissed like any other", async () => {
+  const server = await start([MOVE_CHANGE]);
+  expect(rows().map((row) => row.textContent)).toEqual(["Flamethrower · power · 90 95detected 20 Nov · used by your PikachuDismiss"]);
+  expect(dotted()).toEqual(["Beta"]);
+  await act(async () => fireEvent.click(panel().getByRole("button", { name: "Dismiss: Flamethrower, power" })));
+  expect(dismissPaths(server)).toEqual(["POST /api/alerts/21/dismiss"]);
+  expect(rows()).toHaveLength(0);
 });

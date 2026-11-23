@@ -86,11 +86,13 @@ def test_a_move_that_cannot_be_read_keeps_its_stored_row_and_the_run_is_incomple
     source.answers[move_path(FLAMETHROWER)] = answer
     with caplog.at_level(logging.INFO):
         run_id, status = run_fake_scan(conn, source)
-    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 21, 0, 0))
+    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 21, 1, 0))
     rows = move_rows(conn)
     assert len(rows) == 17
     assert rows[FLAMETHROWER][4] == 1  # left as stored, not refreshed, blanked or deleted
     assert rows[STONE_EDGE][4] == 100  # a move that was read is refreshed
+    changes = conn.execute("SELECT move_id, field, old_value, new_value FROM changes")
+    assert changes.fetchall() == [(STONE_EDGE, "power", 1, 100)]  # the unread one records none
     texts = dict(conn.execute("SELECT id, short_effect FROM moves WHERE id IN (53, 444)"))
     assert texts == {FLAMETHROWER: "old", STONE_EDGE: "Has an increased chance for a critical hit."}
     expected = f"move_unread run_id={run_id} move_id={FLAMETHROWER} {unread}"

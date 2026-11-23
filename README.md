@@ -20,7 +20,7 @@ The team is an exact assignment (931 candidates with the legendary checkbox). A 
 
 **Assumed:** no training, full damage roll, no critical hits; the best of four moves every turn, misses as average damage; no abilities, items, weather, status moves, stat changes, priority or switching. Moves described as charging, recharging, conditional or user-fainting are left out; recent textless moves slip through, as does `misty-explosion`, which faints its user.
 
-**Change detection.** Each scan diffs every stored field and chart cell, recording old and new values. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches a Pokémon on your teams, or one of its types. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale.
+**Change detection.** Each scan diffs every stored field and chart cell, recording old and new values. Failures never record one, and a Pokémon PokéAPI drops is flagged, not deleted. A change involves you if it touches your teams' Pokémon, their types or the moves they carry. Alerts cover seven days and can be dismissed. Per-user alerts written at scan time were rejected: they go stale.
 
 **The demo** alters PokéAPI's answers and runs the real scan; reset restores the data.
 
@@ -31,4 +31,4 @@ The team is an exact assignment (931 candidates with the legendary checkbox). A 
 - At most 10 new visitors a minute and 50,000 in all; beyond, newcomers cannot save.
 - Passwords need only 8 characters (OWASP asks 15); blocking a username takes ten or more addresses.
 - No abilities: some picks look stronger than they are (Slaking); narrow winners may be modest.
-- Moves refresh on every scan; a changed move raises no alert.
+- A Pokémon gaining or losing a move alerts nobody.

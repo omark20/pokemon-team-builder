@@ -1,9 +1,10 @@
 """The scan's moves step: every move PokéAPI lists, fetched and stored as fetched.
 
 Full runs only, before the Pokémon: one list request, then one request per listed move,
-four at a time, in worker threads that return a small result each. Moves are not part
-of a Pokémon's record, so nothing here is diffed or raises an alert. Failures never
-erase or blank stored data: a move that cannot be read keeps its stored row and gets
+four at a time, in worker threads that return a small result each. A stored move whose
+power, accuracy, type or class changed gets a change row, which alerts visitors whose
+team members carry it (routes/alerts.py). Failures never erase or blank stored data
+and never record a change: a move that cannot be read keeps its stored row and gets
 one log line, and a list that cannot be read skips the step and leaves every stored
 move as it is. Either way the step reports that it was not whole, and the run ends
 incomplete. No move is ever deleted.
@@ -48,7 +49,7 @@ def scan_moves(conn: Conn, fetch: Fetch, run: Run) -> bool:
     for result in results:
         if isinstance(result, Unread):
             _log_unread(run, result)
-    scan_store.save_moves(conn, moves)
+    scan_store.save_moves(conn, run, moves)
     unread = len(listed) - len(moves)
     level = logging.WARNING if unread else logging.INFO
     log_event(logger, level, "moves_scanned", run_id=run.run_id, stored=len(moves), unread=unread)

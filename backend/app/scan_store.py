@@ -16,10 +16,11 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app import duel_store
 from app.db import Conn
 from app.demo import Overrides
 from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon
-from app.domain.moves import Move
+from app.domain.moves import Move, diff_move
 from app.domain.types import Chart
 from app.logs import log_event
 
@@ -56,7 +57,7 @@ class Run:
 
 
 class ChangeRow(NamedTuple):
-    """One row for the changes table: a Pokémon field, or a chart cell."""
+    """One row for the changes table: a Pokémon field, a chart cell, or a move field."""
 
     field: str
     old: Any
@@ -65,6 +66,7 @@ class ChangeRow(NamedTuple):
     attacker: str | None = None
     defender: str | None = None
     is_demo: bool = False  # the field was set by a demo patch
+    move_id: int | None = None
 
 
 def save_chart(conn: Conn, run: Run, chart: Chart) -> None:
@@ -145,9 +147,21 @@ def _demo_cells(conn: Conn, run: Run) -> set[tuple[str, str]]:
     return set(run.overrides.chart) | {(attacker, defender) for attacker, defender in rows}
 
 
-def save_moves(conn: Conn, moves: list[Move]) -> None:
-    """Store each move as read, in one transaction: new ones added, stored ones replaced."""
+def save_moves(conn: Conn, run: Run, moves: list[Move]) -> None:
+    """Store each move as read, in one transaction: new ones added, stored ones replaced.
+
+    A field a duel reads that moved gets a change row; a move seen for the first time
+    gets none.
+    """
     with conn.transaction():
+        stored = duel_store.load_moves_named(conn, [move.id for move in moves])
+        rows = [
+            ChangeRow(c.field, c.old, c.new, move_id=move.id)
+            for move in moves
+            if move.id in stored
+            for c in diff_move(stored[move.id], move)
+        ]
+        insert_changes(conn, run, rows)
         conn.cursor().executemany(
             "INSERT INTO moves (id, name, type, damage_class, power, accuracy, priority,"
             " short_effect) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE"
@@ -213,10 +227,11 @@ def insert_changes(conn: Conn, run: Run, rows: list[ChangeRow]) -> None:
     """The one place change rows are written. Jsonb, so None is JSON null, not SQL NULL."""
     detected = run.now()
     conn.cursor().executemany(
-        "INSERT INTO changes (pokemon_id, attacker, defender, field, old_value, new_value,"
-        " detected_at, scan_run_id, is_demo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO changes (pokemon_id, attacker, defender, move_id, field, old_value,"
+        " new_value, detected_at, scan_run_id, is_demo)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         [
-            (r.pokemon_id, r.attacker, r.defender, r.field, Jsonb(r.old), Jsonb(r.new))
+            (r.pokemon_id, r.attacker, r.defender, r.move_id, r.field, Jsonb(r.old), Jsonb(r.new))
             + (detected, run.run_id, r.is_demo)
             for r in rows
         ],

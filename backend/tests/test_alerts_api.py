@@ -75,6 +75,7 @@ def test_a_change_reaches_the_visitor_with_that_pokemon_and_no_one_else(
         "pokemon_id": 6,
         "attacker": None,
         "defender": None,
+        "move": None,
         "field": "attack",
         "old_value": 84,
         "new_value": 94,

@@ -139,13 +139,15 @@ export type ChangeValue = number | string | string[] | boolean | null;
 
 // One entry of GET /api/alerts: a change from the last seven days that touches
 // the visitor's Pokémon. A Pokémon change has `pokemon_id`; a type-chart change
-// has `attacker` and `defender` instead. `your_pokemon` lists, once each, the
-// visitor's Pokémon the change touches.
+// has `attacker` and `defender` instead; a move change has `move`, the move's
+// name, and nothing else of the three. `your_pokemon` lists, once each, the
+// visitor's Pokémon the change touches: for a move, the team members that carry it.
 export interface Alert {
   id: number;
   pokemon_id: number | null;
   attacker: string | null;
   defender: string | null;
+  move: string | null;
   field: string;
   old_value: ChangeValue;
   new_value: ChangeValue;

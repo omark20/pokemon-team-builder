@@ -86,23 +86,48 @@ CREATE TABLE IF NOT EXISTS duel_data (
     baseline integer  -- its duel margins against the whole field, added up; null outside the field
 );
 
--- One row per changed field of a Pokémon, or per changed chart cell. Values are JSON,
--- so a sprite going to or from none is the JSON value null, not SQL NULL.
+-- One row per changed field of a Pokémon, of a chart cell, or of a move. Values are
+-- JSON, so a sprite or a power going to or from none is the JSON value null, not SQL NULL.
 CREATE TABLE IF NOT EXISTS changes (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     pokemon_id integer REFERENCES pokemon (id),
     attacker text,
     defender text,
-    field text NOT NULL,  -- a pokemon column, 'status', or 'multiplier'
+    move_id integer REFERENCES moves (id),
+    field text NOT NULL,  -- a pokemon column, 'status', 'multiplier', or a move field
     old_value jsonb NOT NULL,
     new_value jsonb NOT NULL,
     detected_at timestamptz NOT NULL,
     scan_run_id bigint NOT NULL REFERENCES scan_runs (id),
     is_demo boolean NOT NULL DEFAULT false,
-    CHECK ((pokemon_id IS NULL) <> (attacker IS NULL)),
-    CHECK ((attacker IS NULL) = (defender IS NULL))
+    CONSTRAINT changes_about_one_thing CHECK (
+        num_nonnulls(pokemon_id, attacker, move_id) = 1 AND (attacker IS NULL) = (defender IS NULL)
+    )
 );
 CREATE INDEX IF NOT EXISTS changes_detected_at ON changes (detected_at);
+-- Moves were added after the table first existed. Its two unnamed checks said "a
+-- Pokémon or a chart cell"; they are replaced, once, by the named rule above, which
+-- adds a move. Run at every start, this does nothing once the named rule exists.
+ALTER TABLE changes ADD COLUMN IF NOT EXISTS move_id integer REFERENCES moves (id);
+DO $$
+DECLARE
+    old_check text;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'changes'::regclass AND conname = 'changes_about_one_thing'
+    ) THEN
+        FOR old_check IN
+            SELECT conname FROM pg_constraint WHERE conrelid = 'changes'::regclass AND contype = 'c'
+        LOOP
+            EXECUTE format('ALTER TABLE changes DROP CONSTRAINT %I', old_check);
+        END LOOP;
+        ALTER TABLE changes ADD CONSTRAINT changes_about_one_thing CHECK (
+            num_nonnulls(pokemon_id, attacker, move_id) = 1 AND (attacker IS NULL) = (defender IS NULL)
+        );
+    END IF;
+END
+$$;
 
 -- Visitors. The cookie holds a random value; only its SHA-256 is stored, so
 -- nothing here can be turned back into a working cookie. Nothing else about a person.

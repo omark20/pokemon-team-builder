@@ -14,7 +14,7 @@ const TEAMS: Team[] = [
 ];
 
 const alert = (change: Partial<Alert>): Alert => ({
-  id: 1, pokemon_id: 6, attacker: null, defender: null, field: "attack", old_value: 84, new_value: 94,
+  id: 1, pokemon_id: 6, attacker: null, defender: null, move: null, field: "attack", old_value: 84, new_value: 94,
   detected_at: "2026-11-20T12:00:00Z", is_demo: false, your_pokemon: [6], ...change,
 });
 
@@ -61,6 +61,29 @@ test.each([
   },
 ])("an alert for $change reads as expected", ({ alert: change, row }) => {
   expect(describeAlert(change, TEAMS, BY_ID)).toMatchObject(row);
+});
+
+// A move alert: no Pokémon or chart cell; `your_pokemon` are the team members carrying it.
+const moveAlert = (field: string, oldValue: number | string | null, newValue: number | string | null, yours = [6]) =>
+  alert({ pokemon_id: null, move: "flamethrower", field, old_value: oldValue, new_value: newValue, your_pokemon: yours });
+
+test.each([
+  { change: "its power", alert: moveAlert("power", 90, 95), row: { what: "power", oldValue: "90", newValue: "95" } },
+  { change: "its accuracy", alert: moveAlert("accuracy", 100, 85), row: { what: "accuracy", oldValue: "100", newValue: "85" } },
+  { change: "its accuracy to none", alert: moveAlert("accuracy", 90, null), row: { what: "accuracy", oldValue: "90", newValue: "none" } },
+  { change: "its type", alert: moveAlert("type", "fire", "water"), row: { what: "type", oldValue: "fire", newValue: "water" } },
+  { change: "its kind", alert: moveAlert("damage_class", "special", "physical"), row: { what: "kind", oldValue: "special", newValue: "physical" } },
+])("a move alert for $change names the move and the field", ({ alert: change, row }) => {
+  expect(describeAlert(change, TEAMS, BY_ID)).toMatchObject({ subject: "Flamethrower", affects: "used by your Charizard", ...row });
+});
+
+test("a move alert names every one of your Pokémon that carries it", () => {
+  expect(describeAlert(moveAlert("power", 90, 95, [6, 25]), TEAMS, BY_ID).affects).toBe("used by your Charizard, Pikachu");
+});
+
+test("a move alert is kept while a Pokémon that carries it is on a team", () => {
+  expect(touchesTeams(moveAlert("power", 90, 95, [25]), TEAMS)).toBe(true);
+  expect(touchesTeams(moveAlert("power", 90, 95, [150]), TEAMS)).toBe(false);
 });
 
 test("the detection date is written as day and month", () => {

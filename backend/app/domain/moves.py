@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from app.domain.diff import ParseError, check, is_int
+from app.domain.diff import FieldChange, ParseError, check, is_int
 from app.domain.types import STANDARD_TYPES
 
 # Every move URL in the list and in the 14 captured Pokémon answers has this form.
@@ -25,6 +25,8 @@ DAMAGE_CLASSES = frozenset({"physical", "special", "status"})  # fact 23
 MAX_POWER = 255  # a bound above every power seen, not a power seen
 MAX_ACCURACY = 100
 PRIORITIES = range(-7, 6)  # every move has one, from -7 to 5 (census_all_moves.tsv)
+# The fields of a move a duel reads, so the ones whose change is recorded and alerted on.
+DIFFED = ("power", "accuracy", "type", "damage_class")
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,15 @@ def parse_move_ids(payload: Mapping[str, Any]) -> list[int]:
     ids = _ids_from_urls(urls)
     check(len(set(ids)) == len(ids), "move_repeated")
     return sorted(ids)
+
+
+def diff_move(stored: Move, fetched: Move) -> list[FieldChange]:
+    """The duel's fields that differ between the stored move and the fetched one."""
+    return [
+        FieldChange(name, getattr(stored, name), getattr(fetched, name))
+        for name in DIFFED
+        if getattr(stored, name) != getattr(fetched, name)
+    ]
 
 
 def _read_move(payload: Mapping[str, Any]) -> Move:

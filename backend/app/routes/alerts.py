@@ -2,8 +2,12 @@
 
 Computed when asked, from the teams the visitor has now, so nothing per visitor is
 written at scan time. A change involves the visitor if it is about a Pokémon on any of
-their teams, or about a type-chart cell whose attacking or defending type is a type of
-one of those Pokémon. Each alert names the visitor's Pokémon it touches, once each.
+their teams, about a type-chart cell whose attacking or defending type is a type of
+one of those Pokémon, or about a move one of those team members carries: one chosen
+for its slot, or, in a slot with no choice, one of the Pokémon's default four as
+stored now. A Pokémon that could learn a move but does not carry it is not involved.
+Each alert names the visitor's Pokémon it touches, once each, and `move` names the
+move of a move alert (null for the other kinds).
 """
 
 from datetime import UTC, datetime
@@ -19,25 +23,31 @@ router = APIRouter(prefix="/api/alerts")
 
 MAX_ALERTS = 100
 
+# `mine` is one row per team slot: its Pokémon, that Pokémon's types, and the moves the
+# slot carries (its chosen moves, else the Pokémon's stored default four).
 ALERTS_QUERY = """
     WITH mine AS (
-        SELECT DISTINCT p.id, p.types
+        SELECT p.id, p.types, coalesce(m.move_ids, d.move_ids, '{}') AS carried
         FROM teams t
         JOIN team_members m ON m.team_id = t.id
         JOIN pokemon p ON p.id = m.pokemon_id
+        LEFT JOIN duel_data d ON d.pokemon_id = p.id
         WHERE t.user_id = %(user_id)s
     )
-    SELECT c.id, c.pokemon_id, c.attacker, c.defender, c.field, c.old_value, c.new_value,
-           c.detected_at, c.is_demo, array_agg(DISTINCT mine.id ORDER BY mine.id) AS your_pokemon
+    SELECT c.id, c.pokemon_id, c.attacker, c.defender, mv.name AS move, c.field,
+           c.old_value, c.new_value, c.detected_at, c.is_demo,
+           array_agg(DISTINCT mine.id ORDER BY mine.id) AS your_pokemon
     FROM changes c
     JOIN mine ON c.pokemon_id = mine.id
               OR c.attacker = ANY (mine.types)
               OR c.defender = ANY (mine.types)
+              OR c.move_id = ANY (mine.carried)
+    LEFT JOIN moves mv ON mv.id = c.move_id
     WHERE c.detected_at > %(now)s - interval '7 days'
       AND NOT EXISTS (
           SELECT 1 FROM dismissals d WHERE d.user_id = %(user_id)s AND d.change_id = c.id
       )
-    GROUP BY c.id
+    GROUP BY c.id, mv.name
     ORDER BY c.detected_at DESC, c.id DESC
     LIMIT %(limit)s
 """
