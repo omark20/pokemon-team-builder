@@ -135,7 +135,12 @@ def test_the_right_password_gives_a_new_cookie_and_the_accounts_teams(
     make_teams(client, "a", 2)
     laptop = browser(client)
     response = sign_in(laptop, "misty")
-    assert response.json() == {"username": "Misty", "teams_added": 0, "teams_not_added": 0}
+    assert response.json() == {
+        "username": "Misty",
+        "teams_added": 0,
+        "teams_not_added": 0,
+        "teams_renamed": 0,
+    }
     assert laptop.cookies["uid"] != client.cookies["uid"]
     assert team_names(laptop) == ["a1", "a2"]
 
@@ -274,7 +279,7 @@ def test_a_browsers_teams_join_the_account_oldest_first_up_to_20(
     laptop = browser(client)
     make_teams(laptop, "b", brought)
     response = sign_in(laptop)
-    added = {"teams_added": len(kept), "teams_not_added": brought - len(kept)}
+    added = {"teams_added": len(kept), "teams_not_added": brought - len(kept), "teams_renamed": 0}
     assert response.json() == {"username": "Misty", **added}
     assert team_names(laptop) == [f"a{n}" for n in range(1, held + 1)] + kept
     assert count(conn, "SELECT count(*) FROM teams WHERE name LIKE 'b%%'") == len(kept)
@@ -288,7 +293,12 @@ def test_a_browser_signed_in_to_another_account_brings_nothing(
     laptop = browser(client)
     sign_up(laptop, "Brock")
     make_teams(laptop, "brock", 2)
-    assert sign_in(laptop).json() == {"username": "Misty", "teams_added": 0, "teams_not_added": 0}
+    assert sign_in(laptop).json() == {
+        "username": "Misty",
+        "teams_added": 0,
+        "teams_not_added": 0,
+        "teams_renamed": 0,
+    }
     assert team_names(laptop) == []
     assert count(conn, "SELECT count(*) FROM sessions") == 2  # Brock's session went
 
@@ -300,10 +310,11 @@ def test_a_dismissal_made_in_the_browser_holds_after_the_merge(
     sign_up(client)
     laptop = browser(client)
     team_with(laptop, [6])
+    [name] = team_names(laptop)
     change_id = add_change(conn)
     assert laptop.post(f"/api/alerts/{change_id}/dismiss").status_code == 204
     sign_in(laptop)
-    assert team_names(client) == ["Team"]
+    assert team_names(client) == [name]
     assert client.get("/api/alerts").json() == []
 
 

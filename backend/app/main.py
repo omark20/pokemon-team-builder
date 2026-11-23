@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg_pool import ConnectionPool, PoolTimeout
 
-from app import db, limits, logs, scan, self_scan
+from app import db, limits, logs, scan, self_scan, team_names
 from app.config import Settings, load_settings
 from app.routes import admin, alerts, counter, demo_controls, pokemon, sessions, teams
 
@@ -61,6 +61,7 @@ def create_app(settings: Settings) -> FastAPI:
         try:
             with db.connect(settings.database_url) as conn:
                 db.apply_schema(conn)
+                _make_team_names_unique(conn)
             pool.open(wait=True, timeout=db.CONNECT_TIMEOUT_SECONDS * 2)
         except (psycopg.OperationalError, PoolTimeout) as exc:
             # Re-raised without its message, which can name the host or the user.
@@ -97,6 +98,19 @@ def create_app(settings: Settings) -> FastAPI:
     if STATIC_DIR.is_dir():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
     return app
+
+
+def _make_team_names_unique(conn: db.Conn) -> None:
+    """The start-up step of team_names.py. If it fails the app does not start, as with a
+    schema that fails; the error is logged by class and place only, since its message
+    can quote stored team names."""
+    try:
+        team_names.make_names_unique(conn)
+    except psycopg.OperationalError:
+        raise  # the database went away: reported as unreachable, like the schema
+    except Exception as exc:
+        logs.log_exception(logger, "team_names_failed", exc)
+        raise RuntimeError("team names could not be made unique at start-up") from None
 
 
 def _look(pool: ConnectionPool[Any], settings: Settings) -> None:

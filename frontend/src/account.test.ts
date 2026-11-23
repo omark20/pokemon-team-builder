@@ -3,15 +3,29 @@ import { accountErrorText, signedInText } from "./account";
 import { ApiError } from "./api";
 
 test.each([
-  { added: 0, notAdded: 0, text: "Signed in as ash." },
-  { added: 1, notAdded: 0, text: "Signed in as ash. 1 team from this browser added to your account." },
+  { added: 0, notAdded: 0, renamed: 0, text: "Signed in as ash." },
+  { added: 1, notAdded: 0, renamed: 0, text: "Signed in as ash. 1 team from this browser added to your account." },
   {
     added: 3,
     notAdded: 2,
+    renamed: 0,
     text: "Signed in as ash. 3 teams from this browser added to your account. 2 teams not kept: an account holds at most 20.",
   },
-])("after signing in with $added added and $notAdded not kept", ({ added, notAdded, text }) => {
-  expect(signedInText("ash", added, notAdded)).toBe(text);
+  {
+    added: 2,
+    notAdded: 0,
+    renamed: 1,
+    text: "Signed in as ash. 2 teams from this browser added to your account. 1 was renamed because you already had a team with that name.",
+  },
+  {
+    added: 3,
+    notAdded: 0,
+    renamed: 2,
+    text: "Signed in as ash. 3 teams from this browser added to your account. 2 were renamed because you already had teams with those names.",
+  },
+])("after signing in with $added added, $renamed renamed and $notAdded not kept", ({ added, notAdded, renamed, text }) => {
+  const answer = { username: "ash", teams_added: added, teams_not_added: notAdded, teams_renamed: renamed };
+  expect(signedInText(answer)).toBe(text);
 });
 
 test.each([

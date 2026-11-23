@@ -333,6 +333,14 @@ button:hover {
   margin-bottom: 6px;
 }
 
+/* Under the rename box: the name is already one of the visitor's teams. */
+.rename-refused {
+  flex-basis: 100%;
+  margin: 0;
+  color: #791f1f;
+  font-size: 13px;
+}
+
 .half-header input {
   flex: 1 1 140px;
   min-width: 0;

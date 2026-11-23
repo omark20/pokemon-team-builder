@@ -93,7 +93,8 @@ def create_account(body: Credentials, request: Request, response: Response) -> d
 
 @router.post("/session")
 def sign_in(body: Credentials, request: Request, response: Response) -> dict[str, Any]:
-    """Sign in, and merge this browser's anonymous teams into the account up to 20.
+    """Sign in, and merge this browser's anonymous teams into the account up to 20, each
+    renamed if the account already has its name (`teams_renamed` counts them).
 
     An unknown name and a wrong password get the same answer after the same work: for an
     unknown name a dummy hash is verified.

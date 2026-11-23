@@ -169,3 +169,21 @@ test.each([
   ]);
   expect(screen.queryByRole("dialog") !== null).toBe(open);
 });
+
+test("a name already in use keeps the rename box open with what was typed, saying why; another name closes it", async () => {
+  const onRename = vi.fn().mockResolvedValueOnce("You already have a team called Team 2. Choose another name.").mockResolvedValueOnce(null);
+  const team = makeTeam(1, "Team 1", [6]);
+  render(
+    <TeamHalf team={team} pokemonById={BY_ID} onMembers={vi.fn()} onMoves={vi.fn()} loadMoves={vi.fn()} onRename={onRename} onDelete={vi.fn()} />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+  const box = () => screen.getByRole("textbox", { name: "Team name" }) as HTMLInputElement;
+  fireEvent.change(box(), { target: { value: "Team 2" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+  expect(screen.getByRole("alert").textContent).toBe("You already have a team called Team 2. Choose another name.");
+  expect(box().value).toBe("Team 2");
+  fireEvent.change(box(), { target: { value: "Rain team" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save" })));
+  expect(onRename.mock.calls).toEqual([["Team 2"], ["Rain team"]]);
+  expect(screen.queryByRole("textbox", { name: "Team name" })).toBeNull();
+});

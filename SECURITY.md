@@ -25,7 +25,7 @@ Visitors' teams; the site staying up; the two admin tokens; the stored copy of P
 
 ## Your teams are yours
 
-**Threat:** reading or changing another visitor's team. Every team request looks the team up together with the cookie's visitor (`routes/teams._owner`); another visitor's team answers 404, like one that does not exist. The browser never says who it is: bodies refuse unknown fields such as `user_id`. *Tests:* `test_another_visitors_team_is_404_for_every_verb`, `test_a_user_id_in_the_body_is_refused_and_in_the_query_ignored`.
+**Threat:** reading or changing another visitor's team. Every team request looks the team up together with the cookie's visitor (`routes/teams._owner`); another visitor's team answers 404, like one that does not exist. The browser never says who it is: bodies refuse unknown fields such as `user_id`. A visitor's team names are unique ignoring capitals, enforced by a unique index in the database (`teams_owner_name`, made at start-up by `team_names.py`); a create or rename that would clash is a 409, and every write to a visitor's teams first locks that visitor's record, so two at once cannot both pass. *Tests:* `test_another_visitors_team_is_404_for_every_verb`, `test_a_user_id_in_the_body_is_refused_and_in_the_query_ignored`, `test_two_creates_with_one_name_at_once_give_one_team_and_one_409`, `test_two_renames_to_one_name_at_once_give_one_and_one_409`.
 
 ## The admin endpoints
 

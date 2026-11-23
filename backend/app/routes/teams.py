@@ -11,6 +11,7 @@ not the caller's is a 404, the same as one that does not exist.
 import unicodedata
 from typing import Annotated, Any
 
+import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from psycopg.rows import dict_row
 from pydantic import (
@@ -25,11 +26,13 @@ from pydantic import (
 from app import auth, db, duel_store, limits
 from app.chosen_moves import counted
 from app.routes.params import MoveId, PathId, PokemonId
+from app.team_names import TAKEN
 
 router = APIRouter(prefix="/api/teams")
 writes = [Depends(limits.limit_writes)]
 
 MAX_TEAMS = 20
+TOO_MANY = f"A visitor can have at most {MAX_TEAMS} teams"
 MAX_MEMBERS = 6
 MAX_MOVES = 4
 NOT_LEARNABLE = "A chosen move is not one this Pokémon can learn"
@@ -127,10 +130,14 @@ def create_team(body: NameBody, request: Request, response: Response) -> dict[st
             "SELECT count(*) FROM teams WHERE user_id = %s", (user_id,)
         ).fetchone()
         if counted is not None and counted[0] >= MAX_TEAMS:
-            raise HTTPException(409, f"A visitor can have at most {MAX_TEAMS} teams")
-        row = conn.execute(
-            "INSERT INTO teams (user_id, name) VALUES (%s, %s) RETURNING id", (user_id, body.name)
-        ).fetchone()
+            raise HTTPException(409, TOO_MANY)
+        try:
+            row = conn.execute(
+                "INSERT INTO teams (user_id, name) VALUES (%s, %s) RETURNING id",
+                (user_id, body.name),
+            ).fetchone()
+        except psycopg.errors.UniqueViolation:  # the owner already has this name
+            raise HTTPException(409, TAKEN) from None
         assert row is not None  # INSERT ... RETURNING always returns the new row
         return _team(conn, user_id, row[0])
 
@@ -139,7 +146,10 @@ def create_team(body: NameBody, request: Request, response: Response) -> dict[st
 def rename_team(team_id: PathId, body: NameBody, request: Request) -> dict[str, Any]:
     with db.connection_for(request) as conn:
         user_id = _owner(request, conn, team_id)
-        conn.execute("UPDATE teams SET name = %s WHERE id = %s", (body.name, team_id))
+        try:
+            conn.execute("UPDATE teams SET name = %s WHERE id = %s", (body.name, team_id))
+        except psycopg.errors.UniqueViolation:  # another of the owner's teams has it
+            raise HTTPException(409, TAKEN) from None
         return _team(conn, user_id, team_id)
 
 
@@ -189,8 +199,11 @@ def _check_choices(conn: db.Conn, slots: list[tuple[int, list[int] | None]]) -> 
 
 
 def _owner(request: Request, conn: db.Conn, team_id: int) -> int:
-    """The caller's ID if the team is theirs, with the team row locked; otherwise 404."""
+    """The caller's ID if the team is theirs, with their row and the team row locked;
+    otherwise 404. The owner's row comes first, as in create and the sign-in merge, so
+    writes to one owner's teams never interleave or deadlock."""
     user_id = auth.current_user(request, conn)
+    conn.execute("SELECT id FROM users WHERE id = %s FOR UPDATE", (user_id,))
     owned = conn.execute(
         "SELECT id FROM teams WHERE id = %s AND user_id = %s FOR UPDATE", (team_id, user_id)
     ).fetchone()

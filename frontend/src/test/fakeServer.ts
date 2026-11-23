@@ -33,7 +33,7 @@ export class FakeServer {
   runs: ScanRun[] = [];
   username: string | null = null; // who the browser is signed in as
   accountTeams: Team[] = []; // the teams this browser sees once signed in
-  merged = { teams_added: 0, teams_not_added: 0 }; // the sign-in answer's counts
+  merged = { teams_added: 0, teams_not_added: 0, teams_renamed: 0 }; // the sign-in answer's counts
   readonly calls: Call[] = [];
   private nextId: number;
   private refusals: Refusal[] = [];

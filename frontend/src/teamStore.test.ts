@@ -47,7 +47,6 @@ test.each([
   { refusal: [429, 1800], text: MESSAGES.tooFastMinutes },
   { refusal: [429, 5], text: MESSAGES.tooFastSeconds },
   { refusal: [500], text: MESSAGES.createFailed },
-  { refusal: [409], text: MESSAGES.tooManyTeams },
 ])("a refused create ($refusal) makes no team and says why", async ({ refusal, text }) => {
   const { server, store, state } = await start();
   server.refuseNext("POST", refusal[0]!, refusal[1]);
@@ -111,6 +110,8 @@ test.each([
   { names: [], expected: "Team 1" },
   { names: ["Team 1", "Rain team", "Team 4"], expected: "Team 5" },
   { names: ["Team 10 backup"], expected: "Team 1" },
+  { names: ["team 5"], expected: "Team 6" }, // capitals are ignored, as the server ignores them
+  { names: ["TEAM 2", "Team 1"], expected: "Team 3" },
 ])("a new team after $names is named $expected", ({ names, expected }) => {
   expect(nextTeamName(names.map((name, index) => makeTeam(index + 1, name)))).toBe(expected);
 });
@@ -306,4 +307,32 @@ test("if saving moves fails, the slot goes back, the error shows and the call sa
   expect(await store.setMoves(1, 0, FOCUS_BLAST)).toBe(false);
   expect(state().teams[0]?.moves).toEqual([null, null]);
   expect(state().notice).toEqual({ kind: "error", text: MESSAGES.saveFailed });
+});
+
+// ---- Team names are unique for each visitor, ignoring capitals.
+
+test.each([
+  { teamsOnServer: 20, text: MESSAGES.tooManyTeams },
+  { teamsOnServer: 2, text: MESSAGES.createFailed }, // the name was taken by a team not on screen
+])("a create refused as a clash loads the teams again and says why ($teamsOnServer on the server)", async ({ teamsOnServer, text }) => {
+  const { server, store, state } = await start([makeTeam(1, "Team 1")]);
+  server.teams = Array.from({ length: teamsOnServer }, (_, index) => makeTeam(index + 1, `Team ${index + 1}`));
+  server.refuseNext("POST", 409);
+  await store.newTeam();
+  expect(state().teams).toHaveLength(teamsOnServer);
+  expect([state().notice, state().activeId]).toEqual([{ kind: "error", text }, 1]);
+});
+
+test("a rename to a name already in use is refused in words for the rename box, and nothing changes", async () => {
+  const { server, store, state } = await start([makeTeam(1, "Team 1"), makeTeam(2, "Team 2")]);
+  server.refuseNext("PATCH", 409);
+  expect(await store.rename(1, "team 2")).toBe("You already have a team called team 2. Choose another name.");
+  expect([state().teams[0]?.name, state().notice]).toEqual(["Team 1", null]);
+});
+
+test("any other refused rename goes to the notice bar, and the box has nothing to say", async () => {
+  const { server, store, state } = await start([makeTeam(1, "Team 1")]);
+  server.refuseNext("PATCH", 500);
+  expect(await store.rename(1, "Rain")).toBeNull();
+  expect(state().notice).toEqual({ kind: "error", text: MESSAGES.renameFailed });
 });

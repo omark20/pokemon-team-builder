@@ -16,6 +16,7 @@ from fastapi import HTTPException, Request, Response
 
 from app import auth, db
 from app.routes.teams import MAX_TEAMS
+from app.team_names import database_lower, free_name
 
 MAX_SESSIONS = 10  # signed-in browsers per account; the eleventh sign-in drops the oldest
 TAKEN = "That username is taken."
@@ -24,11 +25,8 @@ RECORD_CHANGED = "This browser's teams changed while signing up. Try again."
 
 # The teams that fit, oldest first, move to the account; the rest stay on the browser's
 # record and are deleted with it.
-MOVE_TEAMS = """
-    UPDATE teams SET user_id = %(account)s
-    WHERE id IN (SELECT id FROM teams WHERE user_id = %(browser)s
-                 ORDER BY created_at, id LIMIT %(room)s)
-"""
+FITTING = "SELECT id FROM teams WHERE user_id = %(browser)s ORDER BY created_at, id LIMIT %(room)s"
+MOVE_TEAMS = f"UPDATE teams SET user_id = %(account)s WHERE id IN ({FITTING})"
 COPY_DISMISSALS = """
     INSERT INTO dismissals (user_id, change_id)
     SELECT %(account)s, change_id FROM dismissals WHERE user_id = %(browser)s
@@ -56,6 +54,7 @@ class Account(NamedTuple):
 class Merge:
     teams_added: int
     teams_not_added: int
+    teams_renamed: int = 0  # of those added, renamed because the account had the name
 
 
 def find_account(conn: db.Conn, username: str) -> Account | None:
@@ -143,8 +142,9 @@ def sign_in(
 
 
 def _merge(conn: db.Conn, account_id: int, browser_id: int) -> Merge:
-    """Move the browser's teams in, oldest first, up to MAX_TEAMS; copy its dismissals;
-    delete its record, which takes any team that did not fit and its token with it."""
+    """Move the browser's teams in, oldest first, up to MAX_TEAMS, each renamed first if
+    the account already has its name; copy its dismissals; delete its record, which
+    takes any team that did not fit and its token with it."""
     locked = conn.execute(
         "SELECT id FROM users WHERE id = %s AND token_hash IS NOT NULL FOR UPDATE", (browser_id,)
     ).fetchone()
@@ -153,10 +153,31 @@ def _merge(conn: db.Conn, account_id: int, browser_id: int) -> Merge:
     held = _team_count(conn, account_id)
     brought = _team_count(conn, browser_id)
     ids = {"account": account_id, "browser": browser_id, "room": max(0, MAX_TEAMS - held)}
+    renamed = _rename_clashes(conn, ids)
     moved = conn.execute(MOVE_TEAMS, ids).rowcount
     conn.execute(COPY_DISMISSALS, ids)
     conn.execute("DELETE FROM users WHERE id = %s", (browser_id,))
-    return Merge(moved, brought - moved)
+    return Merge(moved, brought - moved, renamed)
+
+
+def _rename_clashes(conn: db.Conn, ids: dict[str, int]) -> int:
+    """Rename each team about to move in whose name the account already has, by the one
+    naming rule (team_names.py), to a name neither record holds; the number renamed."""
+    rows = conn.execute(
+        "SELECT user_id, lower(name) FROM teams WHERE user_id IN (%(account)s, %(browser)s)", ids
+    ).fetchall()
+    held = {key for user_id, key in rows if user_id == ids["account"]}
+    used = {key for _, key in rows}
+    lower = database_lower(conn)
+    renamed = 0
+    fitting = f"SELECT id, name, lower(name) FROM teams WHERE id IN ({FITTING}) ORDER BY id"
+    for team_id, name, key in conn.execute(fitting, ids).fetchall():
+        if key in held:
+            new_name = free_name(name, used, lower)
+            used.add(lower(new_name))
+            conn.execute("UPDATE teams SET name = %s WHERE id = %s", (new_name, team_id))
+            renamed += 1
+    return renamed
 
 
 def _team_count(conn: db.Conn, user_id: int) -> int:

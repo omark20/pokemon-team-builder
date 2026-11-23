@@ -151,7 +151,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
               onMembers={(members) => store.setMembers(team.id, members)}
               onMoves={(slot, moves) => store.setMoves(team.id, slot, moves)}
               loadMoves={fetchMoves}
-              onRename={(name) => void store.rename(team.id, name)}
+              onRename={(name) => store.rename(team.id, name)}
               onDelete={() => void store.remove(team.id).then(() => focusSelectedTab(card.current))}
             />
             <span className="versus" aria-hidden="true">

@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
 import { ApiError, createTeam, deleteTeam, fetchCounter, fetchTeams, renameTeam, saveMembers } from "./api";
 import { counterErrorText, errorText, MESSAGES } from "./messages";
 import { TEAM_SIZE } from "./teamMoves";
-import { MOST_TEAMS, membersOf, nextTeamName, START, type Notice, type TeamsState } from "./teamsState";
+import { MOST_TEAMS, membersOf, nextTeamName, START, TEAM_LIMIT, type Notice, type TeamsState } from "./teamsState";
 import { displayName, type Members, type Pokemon, type SlotMoves, type Team } from "./types";
 
 export class TeamStore {
@@ -65,13 +65,18 @@ export class TeamStore {
     await this.whileCreating(() => this.postTeam());
   }
 
-  async rename(id: number, name: string): Promise<void> {
+  // Renames a team. Returns what the rename box should say when the visitor
+  // already has a team of that name, so they can type another; null otherwise,
+  // any other refusal being shown in the notice bar.
+  async rename(id: number, name: string): Promise<string | null> {
     try {
       const saved = await renameTeam(id, name);
       this.changeTeam(id, { name: saved.name });
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) return MESSAGES.nameTaken(name);
       this.fail(error, MESSAGES.renameFailed);
     }
+    return null;
   }
 
   // Deletes a team and selects the tab that takes its place, if any.
@@ -232,9 +237,27 @@ export class TeamStore {
       this.update({ teams: [...this.state.teams, team], activeId: team.id, ...this.clearCounter() });
       return team;
     } catch (error) {
-      const atLimit = error instanceof ApiError && error.status === 409;
-      this.fail(error, atLimit ? MESSAGES.tooManyTeams : MESSAGES.createFailed);
+      if (error instanceof ApiError && error.status === 409) {
+        this.update({ notice: { kind: "error", text: await this.whyCreateClashed() } });
+      } else {
+        this.fail(error, MESSAGES.createFailed);
+      }
       return null;
+    }
+  }
+
+  // A create refused with 409 means the visitor is at the team limit or the name
+  // is taken, which the teams on screen did not show: they are out of date. Loads
+  // them again so the next try works, and says which it was by their number.
+  private async whyCreateClashed(): Promise<string> {
+    try {
+      const teams = await fetchTeams();
+      for (const team of teams) this.confirmed.set(team.id, membersOf(team));
+      const activeId = teams.some((team) => team.id === this.state.activeId) ? this.state.activeId : (teams[0]?.id ?? null);
+      this.update({ teams, activeId });
+      return teams.length >= TEAM_LIMIT ? MESSAGES.tooManyTeams : MESSAGES.createFailed;
+    } catch {
+      return MESSAGES.createFailed;
     }
   }
 

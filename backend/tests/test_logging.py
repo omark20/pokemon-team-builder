@@ -4,6 +4,7 @@ The flows are run through the real app with the log captured, then the captured 
 searched for each secret value used.
 """
 
+import itertools
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -199,9 +200,12 @@ def _refuse_admin(client: TestClient, _: pytest.MonkeyPatch) -> None:
     client.post("/api/admin/scan", headers={"Authorization": f"Bearer {WRONG_TOKEN}"})
 
 
+BUSY_NUMBERS = itertools.count(1)  # a visitor's team names must differ
+
+
 def _refuse_counter(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(counter, "COUNTER_WAIT_SECONDS", 0.01)
-    team = client.post(TEAMS, json={"name": "Busy"}).json()
+    team = client.post(TEAMS, json={"name": f"Busy {next(BUSY_NUMBERS)}"}).json()
     client.put(f"{TEAMS}/{team['id']}/members", json={"pokemon_ids": [6]})
     places = client.app.state.counter_places
     assert places.acquire(blocking=False) and places.acquire(blocking=False)

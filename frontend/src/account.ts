@@ -3,7 +3,7 @@
 // signs up stays anonymous.
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut } from "./api";
+import { ApiError, createAccount, deleteAccount, fetchSession, signIn, signOut, type SignedIn } from "./api";
 import type { Notice } from "./teamsState";
 
 type DialogMode = "create" | "signin" | "delete";
@@ -12,11 +12,13 @@ type EntryMode = Exclude<DialogMode, "delete">;
 const ACCOUNT_DELETED = "Your account was deleted.";
 
 // After signing in: what happened to the teams this browser had.
-export function signedInText(username: string, added: number, notAdded: number): string {
+export function signedInText({ username, teams_added, teams_not_added, teams_renamed }: SignedIn): string {
   const teams = (count: number) => `${count} ${count === 1 ? "team" : "teams"}`;
   const parts = [`Signed in as ${username}.`];
-  if (added > 0) parts.push(`${teams(added)} from this browser added to your account.`);
-  if (notAdded > 0) parts.push(`${teams(notAdded)} not kept: an account holds at most 20.`);
+  if (teams_added > 0) parts.push(`${teams(teams_added)} from this browser added to your account.`);
+  if (teams_renamed === 1) parts.push("1 was renamed because you already had a team with that name.");
+  if (teams_renamed > 1) parts.push(`${teams_renamed} were renamed because you already had teams with those names.`);
+  if (teams_not_added > 0) parts.push(`${teams(teams_not_added)} not kept: an account holds at most 20.`);
   return parts.join(" ");
 }
 
@@ -50,7 +52,7 @@ async function enter(mode: EntryMode, name: string, password: string) {
     return { username: made.username, text: `Account created. Signed in as ${made.username}.` };
   }
   const done = await signIn(name, password);
-  return { username: done.username, text: signedInText(done.username, done.teams_added, done.teams_not_added) };
+  return { username: done.username, text: signedInText(done) };
 }
 
 // Asks the server once who this browser is; undefined until it answers.

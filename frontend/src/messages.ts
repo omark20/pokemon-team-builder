@@ -9,6 +9,7 @@ export const MESSAGES = {
   createFailed: "Couldn't create the team. Try again.",
   tooManyTeams: "You already have 20 teams. Delete one to make another.",
   renameFailed: "Couldn't rename the team. Try again.",
+  nameTaken: (name: string) => `You already have a team called ${name}. Choose another name.`,
   deleteFailed: "Couldn't delete the team. Try again.",
   counterFailed: "Couldn't build the counter team. Try again.",
   halfDone: (team: string) =>

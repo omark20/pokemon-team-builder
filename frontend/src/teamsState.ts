@@ -28,6 +28,9 @@ export interface TeamsState {
   leftOut: number[];
 }
 
+// The most teams one visitor or account may hold, as the server enforces it.
+export const TEAM_LIMIT = 20;
+
 // "Show another team" offers at most this many teams in all.
 export const MOST_TEAMS = 10;
 
@@ -35,8 +38,10 @@ export const MOST_TEAMS = 10;
 export const membersOf = ({ pokemon_ids, moves }: Team): Members => ({ pokemon_ids, moves });
 
 // "Team" and the next number after the highest one in use: "Team 1" first.
+// Capitals are ignored, as the server ignores them when it keeps names apart, so
+// a stored "team 5" gives "Team 6".
 export function nextTeamName(teams: Team[]): string {
-  const numbers = teams.map((team) => Number(/^Team (\d+)$/.exec(team.name)?.[1] ?? 0));
+  const numbers = teams.map((team) => Number(/^team (\d+)$/i.exec(team.name)?.[1] ?? 0));
   return `Team ${Math.max(0, ...numbers) + 1}`;
 }
 

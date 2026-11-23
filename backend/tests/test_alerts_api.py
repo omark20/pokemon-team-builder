@@ -5,6 +5,7 @@ test_scan.py. Charizard (6) is fire and flying, Venusaur (3) grass and poison, P
 (25) electric (the captured responses in samples/).
 """
 
+import itertools
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -31,8 +32,12 @@ def other(visitor: TestClient) -> TestClient:
     return TestClient(visitor.app, base_url="https://testserver")
 
 
+TEAM_NUMBERS = itertools.count(1)  # a visitor's team names must differ
+
+
 def team_with(client: TestClient, pokemon_ids: list[int]) -> int:
-    team_id: int = client.post("/api/teams", json={"name": "Team"}).json()["id"]
+    name = f"Team {next(TEAM_NUMBERS)}"
+    team_id: int = client.post("/api/teams", json={"name": name}).json()["id"]
     client.put(f"/api/teams/{team_id}/members", json={"pokemon_ids": pokemon_ids})
     return team_id
 

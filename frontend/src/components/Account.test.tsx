@@ -106,7 +106,7 @@ test.each([
 test("after signing in, the account's teams are loaded and the counts are shown", async () => {
   const server = await start([TEAM]);
   server.accountTeams = [makeTeam(7, "Rain team", [9]), TEAM];
-  server.merged = { teams_added: 1, teams_not_added: 0 };
+  server.merged = { teams_added: 1, teams_not_added: 0, teams_renamed: 0 };
   openDialog("Sign in");
   await fillAndSubmit("ash", "pikachu-rules");
   expect(screen.queryByRole("dialog")).toBeNull();

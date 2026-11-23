@@ -138,6 +138,9 @@ CREATE TABLE IF NOT EXISTS teams (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS teams_user_id ON teams (user_id);
+-- Names are unique per owner, ignoring capitals. That index, teams_owner_name, is not
+-- made here: team_names.py makes it at start-up, after renaming any clash stored before
+-- it existed, since creating it over a clash would fail.
 
 -- One row per slot, numbered 1 to n with no gaps. A slot, not a Pokémon, is the row's
 -- identity, so the same Pokémon may fill several slots; there is deliberately no

@@ -16,14 +16,16 @@ interface HalfProps {
   onMembers: (members: Members) => void;
   onMoves: (slot: number, moves: SlotMoves) => Promise<boolean>; // true once saved
   loadMoves: (pokemonId: number) => Promise<MoveChoices>;
-  onRename: (name: string) => void;
+  onRename: (name: string) => Promise<string | null>; // what the box should say if the name is refused
   onDelete: () => void;
 }
 
 // Name, count, and Rename and Delete for the selected team. Rename turns the
-// name into a text box; Delete asks first.
+// name into a text box, which stays open with what was typed if the visitor
+// already has a team of that name; Delete asks first.
 function TeamHeader({ team, onRename, onDelete }: Pick<HalfProps, "team" | "onRename" | "onDelete">) {
   const [editing, setEditing] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
   const renameButton = useRef<HTMLButtonElement>(null);
   const closedForm = useRef(false); // Save or Cancel: focus returns to Rename
   useEffect(() => {
@@ -33,13 +35,15 @@ function TeamHeader({ team, onRename, onDelete }: Pick<HalfProps, "team" | "onRe
   }, [editing]);
   function close() {
     closedForm.current = true;
+    setRefused(null);
     setEditing(false);
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = String(new FormData(event.currentTarget).get("name")).trim();
-    if (name !== "" && name !== team.name) onRename(name);
-    close();
+    const problem = name !== "" && name !== team.name ? await onRename(name) : null;
+    if (problem) setRefused(problem);
+    else close();
   }
   if (editing) {
     return (
@@ -56,6 +60,11 @@ function TeamHeader({ team, onRename, onDelete }: Pick<HalfProps, "team" | "onRe
         <button type="button" onClick={close}>
           Cancel
         </button>
+        {refused && (
+          <p className="rename-refused" role="alert">
+            {refused}
+          </p>
+        )}
       </form>
     );
   }
