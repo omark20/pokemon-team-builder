@@ -1,4 +1,5 @@
-"""What a scan writes to the database: Pokémon rows, chart cells, changes and removals.
+"""What a scan writes to the database: Pokémon rows, chart cells, changes and removals,
+and the moves and each Pokémon's move list, which are stored as fetched and never diffed.
 
 Each Pokémon is saved in its own transaction with its row locked, so a change row exists
 if and only if a stored value that had been seen before moved. The column lists are
@@ -7,7 +8,7 @@ built from PokemonRecord's fields, so a field added to the record needs no edit 
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import astuple, dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
@@ -18,6 +19,7 @@ from psycopg.types.json import Jsonb
 from app.db import Conn
 from app.demo import Overrides
 from app.domain.diff import RECORD_FIELDS, PokemonRecord, diff_chart, diff_pokemon
+from app.domain.moves import Move
 from app.domain.types import Chart
 from app.logs import log_event
 
@@ -141,6 +143,29 @@ def _demo_cells(conn: Conn, run: Run) -> set[tuple[str, str]]:
         "SELECT DISTINCT attacker, defender FROM changes WHERE is_demo AND attacker IS NOT NULL"
     )
     return set(run.overrides.chart) | {(attacker, defender) for attacker, defender in rows}
+
+
+def save_moves(conn: Conn, moves: list[Move]) -> None:
+    """Store each move as read, in one transaction: new ones added, stored ones replaced."""
+    with conn.transaction():
+        conn.cursor().executemany(
+            "INSERT INTO moves (id, name, type, damage_class, power, accuracy, priority,"
+            " short_effect) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO UPDATE"
+            " SET name = EXCLUDED.name, type = EXCLUDED.type,"
+            " damage_class = EXCLUDED.damage_class, power = EXCLUDED.power,"
+            " accuracy = EXCLUDED.accuracy, priority = EXCLUDED.priority,"
+            " short_effect = EXCLUDED.short_effect",
+            [astuple(move) for move in moves],
+        )
+
+
+def save_move_list(conn: Conn, pokemon_id: int, move_ids: list[int]) -> None:
+    """Store the IDs of the moves a Pokémon's answer lists, replacing the stored ones."""
+    conn.execute(
+        "INSERT INTO pokemon_moves (pokemon_id, move_ids) VALUES (%s, %s)"
+        " ON CONFLICT (pokemon_id) DO UPDATE SET move_ids = EXCLUDED.move_ids",
+        (pokemon_id, move_ids),
+    )
 
 
 def stored_not_listed(conn: Conn, listed: dict[int, str]) -> list[int]:

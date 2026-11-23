@@ -16,6 +16,9 @@ BASE_URL = "https://pokeapi.co/api/v2/"
 USER_AGENT = "pokemon-team-builder (server-side scheduled sync)"
 TIMEOUT_SECONDS = 10
 RETRY_WAITS = (1, 2, 4)  # seconds before the second, third and fourth attempt
+# Requests in flight at once: the only rate known to be accepted, for Pokémon and for moves
+# (samples/census_curl_log.txt, samples/census_moves_curl_log.txt).
+WORKERS = 4
 
 
 class UpstreamError(Exception):

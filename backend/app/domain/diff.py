@@ -97,7 +97,7 @@ def parse_species(payload: Mapping[str, Any]) -> tuple[bool, bool]:
         flags = payload["is_legendary"], payload["is_mythical"]
     except (KeyError, TypeError) as exc:
         raise ParseError("malformed") from exc
-    _check(all(isinstance(flag, bool) for flag in flags), "species_flags")
+    check(all(isinstance(flag, bool) for flag in flags), "species_flags")
     return flags
 
 
@@ -155,9 +155,9 @@ def diff_chart(stored: Chart, fetched: Chart) -> list[CellChange]:
 
 def _read_record(payload: Mapping[str, Any]) -> PokemonRecord:
     pokemon_id, name, is_default = payload["id"], payload["name"], payload["is_default"]
-    _check(_is_int(pokemon_id) and pokemon_id > 0, "id")
-    _check(isinstance(name, str) and name != "", "name")
-    _check(isinstance(is_default, bool), "is_default")
+    check(is_int(pokemon_id) and pokemon_id > 0, "id")
+    check(isinstance(name, str) and name != "", "name")
+    check(isinstance(is_default, bool), "is_default")
     stats = _parse_stats(payload["stats"])
     return PokemonRecord(
         id=pokemon_id,
@@ -174,12 +174,12 @@ def _read_record(payload: Mapping[str, Any]) -> PokemonRecord:
     )
 
 
-def _check(holds: bool, rule: str) -> None:
+def check(holds: bool, rule: str) -> None:
     if not holds:
         raise ParseError(rule)
 
 
-def _is_int(value: Any) -> bool:
+def is_int(value: Any) -> bool:
     # bool is a subclass of int in Python; true and false are not numbers here.
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -189,18 +189,18 @@ def _parse_types(entries: list[Mapping[str, Any]]) -> list[str]:
     ordered = sorted(entries, key=lambda entry: entry["slot"])
     names = [entry["type"]["name"] for entry in ordered]
     slots = [entry["slot"] for entry in ordered]
-    _check(len(names) in (1, 2), "type_count")
-    _check(slots == list(range(1, len(names) + 1)), "type_slots")
-    _check(len(set(names)) == len(names), "type_repeated")
-    _check(all(name in STANDARD_TYPES for name in names), "type_unknown")
+    check(len(names) in (1, 2), "type_count")
+    check(slots == list(range(1, len(names) + 1)), "type_slots")
+    check(len(set(names)) == len(names), "type_repeated")
+    check(all(name in STANDARD_TYPES for name in names), "type_unknown")
     return names
 
 
 def _parse_stats(entries: list[Mapping[str, Any]]) -> dict[str, int]:
     """The six base stats by name, each a whole number from 0 to 255."""
     stats = {entry["stat"]["name"]: entry["base_stat"] for entry in entries}
-    _check(len(entries) == len(STAT_NAMES) and set(stats) == set(STAT_NAMES), "stat_names")
-    _check(all(_is_int(v) and 0 <= v <= MAX_BASE_STAT for v in stats.values()), "stat_value")
+    check(len(entries) == len(STAT_NAMES) and set(stats) == set(STAT_NAMES), "stat_names")
+    check(all(is_int(v) and 0 <= v <= MAX_BASE_STAT for v in stats.values()), "stat_value")
     return stats
 
 

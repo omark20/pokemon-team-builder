@@ -1,7 +1,8 @@
 """The scan of PokéAPI. The first sync and every later run are the same function.
 
-A run loads the type chart, then the list of Pokémon, then each Pokémon's details, four
-requests at a time, and hands each result to scan_store to be compared and saved.
+A run loads the type chart, then every move (full runs only, scan_moves.py), then the
+list of Pokémon, then each Pokémon's details, four requests at a time, and hands each
+result to scan_store to be compared and saved.
 Failures never erase stored data or record a false change: a Pokémon that cannot be
 read is skipped and counted, and a bad chart or list leaves what is stored as it was.
 Every log line carries the run ID, so a run can be explained from its lines alone.
@@ -14,13 +15,14 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from functools import partial
 
-from app import db, demo, logs, pokemon_list, scan_fetch, scan_store
+from app import db, demo, logs, pokemon_list, scan_fetch, scan_moves, scan_store
 from app.config import load_settings
 from app.db import Conn
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
 from app.logs import log_event, log_exception, outside
 from app.pokeapi import (
     RETRY_WAITS,
+    WORKERS,
     PokeApiSource,
     Source,
     UpstreamError,
@@ -34,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 TYPE_LIST_PATH = "type?limit=100"
 POKEMON_LIST_PATH = "pokemon?limit=100000"
-WORKERS = 4  # requests in flight: the only rate known to be accepted (census_curl_log.txt)
 MIN_LIST_SHARE = 0.9  # a list this much shorter than what is stored looks truncated
 STALE_AFTER = timedelta(minutes=30)  # a run still "running" after this was cut off
 
@@ -109,6 +110,7 @@ def scan_with_pokeapi(database_url: str, run_id: int, pokemon_ids: Sequence[int]
 def _scan_steps(conn: Conn, fetch: Fetch, run: Run, pokemon_ids: Sequence[int] | None) -> str:
     run.overrides = demo.load(conn)
     chart_ok = _scan_chart(conn, fetch, run)
+    moves_ok = scan_moves.scan_moves(conn, fetch, run) if pokemon_ids is None else True
     listed = _read_list(conn, fetch, run)
     if listed is None:
         return "failed"
@@ -117,7 +119,8 @@ def _scan_steps(conn: Conn, fetch: Fetch, run: Run, pokemon_ids: Sequence[int] |
     if pokemon_ids is None:
         run.missing += scan_store.stored_not_listed(conn, listed)
     scan_store.apply_removals(conn, run)
-    return "ok" if chart_ok and run.complete and run.failed == 0 else "incomplete"
+    whole = chart_ok and moves_ok and run.complete and run.failed == 0
+    return "ok" if whole else "incomplete"
 
 
 def _scan_chart(conn: Conn, fetch: Fetch, run: Run) -> bool:
@@ -183,7 +186,8 @@ def _scan_details(conn: Conn, fetch: Fetch, run: Run, wanted: dict[int, str]) ->
 def _apply_fetched(conn: Conn, run: Run, fetched: scan_fetch.Fetched) -> None:
     """One of three cases: gone (a 404, or removed by the demo), read, or unreadable.
 
-    A record read without its species flags is saved and also counted as unreadable.
+    A record read without its species flags or its move list is saved and also counted
+    as unreadable; a move list that was not read leaves the stored one as it is.
     """
     gone = fetched.record is None and fetched.reason is None
     if gone or run.overrides.removes(fetched.pokemon_id):
@@ -191,23 +195,22 @@ def _apply_fetched(conn: Conn, run: Run, fetched: scan_fetch.Fetched) -> None:
         return
     if fetched.record is not None:
         scan_store.save_pokemon(conn, run, run.overrides.apply(fetched.record))
-    if fetched.reason is not None:
-        _count_unread(run, fetched, fetched.reason)
+        if fetched.move_ids is not None:
+            scan_store.save_move_list(conn, fetched.pokemon_id, fetched.move_ids)
+    if fetched.reason is not None or fetched.moves_rule is not None:
+        _count_unread(run, fetched)
 
 
-def _count_unread(run: Run, fetched: scan_fetch.Fetched, reason: str) -> None:
-    """Something about this Pokémon could not be read: count it once in `failed`, log why."""
+def _count_unread(run: Run, fetched: scan_fetch.Fetched) -> None:
+    """Part of this Pokémon could not be read: count it once in `failed`, log each part."""
     run.failed += 1
-    rule = {"rule": fetched.rule} if fetched.rule else {}
-    log_event(
-        logger,
-        logging.WARNING,
-        "pokemon_skipped" if fetched.record is None else "species_unread",
-        run_id=run.run_id,
-        pokemon_id=fetched.pokemon_id,
-        reason=reason,
-        **rule,
-    )
+    ids = {"run_id": run.run_id, "pokemon_id": fetched.pokemon_id}
+    if fetched.reason is not None:
+        event = "pokemon_skipped" if fetched.record is None else "species_unread"
+        rule = {"rule": fetched.rule} if fetched.rule else {}
+        log_event(logger, logging.WARNING, event, **ids, reason=fetched.reason, **rule)
+    if fetched.moves_rule is not None:
+        log_event(logger, logging.WARNING, "moves_unread", **ids, rule=fetched.moves_rule)
 
 
 def _finish(conn: Conn, run: Run, status: str) -> None:

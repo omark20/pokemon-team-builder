@@ -53,6 +53,29 @@ CREATE TABLE IF NOT EXISTS type_effectiveness (
     PRIMARY KEY (attacker, defender)
 );
 
+-- Every move PokéAPI lists, as fetched (domain/moves.py); power and accuracy are null
+-- where PokéAPI gives none, and short_effect, the English one, where it has none. Not part of a Pokémon's record, so a change here is not
+-- diffed and raises no alert. Rows are never deleted.
+CREATE TABLE IF NOT EXISTS moves (
+    id integer PRIMARY KEY,
+    name text NOT NULL,
+    type text NOT NULL,
+    damage_class text NOT NULL CHECK (damage_class IN ('physical', 'special', 'status')),
+    power smallint CHECK (power BETWEEN 0 AND 255),
+    accuracy smallint CHECK (accuracy BETWEEN 0 AND 100),
+    priority smallint NOT NULL CHECK (priority BETWEEN -7 AND 5),
+    short_effect text
+);
+
+-- The IDs of the moves each Pokémon's own answer lists, smallest first. An empty array
+-- means PokéAPI lists none for it; no row means its answer has not been read yet.
+-- Replaced as fetched, never diffed. An ID not in `moves` is possible part-way through a
+-- first scan.
+CREATE TABLE IF NOT EXISTS pokemon_moves (
+    pokemon_id integer PRIMARY KEY REFERENCES pokemon (id),
+    move_ids integer[] NOT NULL
+);
+
 -- One row per changed field of a Pokémon, or per changed chart cell. Values are JSON,
 -- so a sprite going to or from none is the JSON value null, not SQL NULL.
 CREATE TABLE IF NOT EXISTS changes (
