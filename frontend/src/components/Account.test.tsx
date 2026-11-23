@@ -5,8 +5,9 @@ import { expect, test } from "vitest";
 import App from "../App";
 import { FakeServer } from "../test/fakeServer";
 import type { Team } from "../types";
+import { makeTeam } from "../test/makeTeam";
 
-const TEAM: Team = { id: 1, name: "Team 1", pokemon_ids: [6] };
+const TEAM: Team = makeTeam(1, "Team 1", [6]);
 const NOTICE = "Your teams are saved in this browser only.";
 
 async function start(teams: Team[] = [], username: string | null = null) {
@@ -104,7 +105,7 @@ test.each([
 
 test("after signing in, the account's teams are loaded and the counts are shown", async () => {
   const server = await start([TEAM]);
-  server.accountTeams = [{ id: 7, name: "Rain team", pokemon_ids: [9] }, TEAM];
+  server.accountTeams = [makeTeam(7, "Rain team", [9]), TEAM];
   server.merged = { teams_added: 1, teams_not_added: 0 };
   openDialog("Sign in");
   await fillAndSubmit("ash", "pikachu-rules");

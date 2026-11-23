@@ -49,11 +49,12 @@ def user_count(conn: psycopg.Connection) -> int:
 
 def test_create_rename_and_delete_leave_other_teams_alone(visitor: TestClient) -> None:
     first, second = new_team(visitor, "  First  "), new_team(visitor, "Second")
-    assert first == {"id": first["id"], "name": "First", "pokemon_ids": []}
+    assert first == {"id": first["id"], "name": "First", "pokemon_ids": [], "moves": []}
     renamed = visitor.patch(f"{TEAMS}/{second['id']}", json={"name": "Renamed"})
     assert renamed.json()["name"] == "Renamed"
     assert visitor.delete(f"{TEAMS}/{first['id']}").status_code == 204
-    assert visitor.get(TEAMS).json() == [{"id": second["id"], "name": "Renamed", "pokemon_ids": []}]
+    renamed_team = {"id": second["id"], "name": "Renamed", "pokemon_ids": [], "moves": []}
+    assert visitor.get(TEAMS).json() == [renamed_team]
 
 
 @pytest.mark.parametrize(
@@ -63,7 +64,8 @@ def test_create_rename_and_delete_leave_other_teams_alone(visitor: TestClient) -
 )
 def test_members_come_back_exactly_as_sent(visitor: TestClient, pokemon_ids: list[int]) -> None:
     team = new_team(visitor)
-    assert set_members(visitor, team["id"], pokemon_ids).json()["pokemon_ids"] == pokemon_ids
+    saved = set_members(visitor, team["id"], pokemon_ids).json()
+    assert (saved["pokemon_ids"], saved["moves"]) == (pokemon_ids, [None] * len(pokemon_ids))
     assert visitor.get(TEAMS).json()[0]["pokemon_ids"] == pokemon_ids
 
 

@@ -3,7 +3,9 @@
 Add, remove and reorder are all one request that sends the complete ordered list of
 Pokémon IDs, stored in one transaction under a lock on the team row, numbered 1 to n.
 So positions cannot have gaps or clashes, and the same Pokémon may fill several slots.
-A team that is not the caller's is a 404, the same as one that does not exist.
+The same request may send, beside each Pokémon, the moves chosen for that slot, or null
+for its usual four; a choice belongs to the slot and travels with it. A team that is
+not the caller's is a 404, the same as one that does not exist.
 """
 
 import unicodedata
@@ -11,22 +13,41 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from psycopg.rows import dict_row
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
-from app import auth, db, limits
-from app.routes.params import PathId, PokemonId
+from app import auth, db, duel_store, limits
+from app.chosen_moves import counted
+from app.routes.params import MoveId, PathId, PokemonId
 
 router = APIRouter(prefix="/api/teams")
 writes = [Depends(limits.limit_writes)]
 
 MAX_TEAMS = 20
 MAX_MEMBERS = 6
+MAX_MOVES = 4
+NOT_LEARNABLE = "A chosen move is not one this Pokémon can learn"
+NOT_COUNTED = "A chosen move is not one that can be used in a duel"
 
+# `moves` is parallel to `pokemon_ids`: per slot, its chosen moves as {id, name} in the
+# order chosen, or null for the usual four. Moves are never deleted, so each has a name.
 TEAM_QUERY = """
     SELECT t.id, t.name,
            coalesce(array_agg(m.pokemon_id ORDER BY m.position)
-                    FILTER (WHERE m.pokemon_id IS NOT NULL), '{}') AS pokemon_ids
+                    FILTER (WHERE m.pokemon_id IS NOT NULL), '{}') AS pokemon_ids,
+           coalesce(json_agg(picked.moves ORDER BY m.position)
+                    FILTER (WHERE m.pokemon_id IS NOT NULL), '[]') AS moves
     FROM teams t LEFT JOIN team_members m ON m.team_id = t.id
+    LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('id', mv.id, 'name', mv.name) ORDER BY slot.n) AS moves
+        FROM unnest(m.move_ids) WITH ORDINALITY AS slot(id, n) JOIN moves mv ON mv.id = slot.id
+    ) picked ON true
     WHERE t.user_id = %(user_id)s AND (%(team_id)s::bigint IS NULL OR t.id = %(team_id)s)
     GROUP BY t.id ORDER BY t.id
 """
@@ -58,9 +79,33 @@ class NameBody(BaseModel):
     name: TeamName
 
 
+def _no_repeat(move_ids: list[int]) -> list[int]:
+    if len(set(move_ids)) != len(move_ids):
+        raise ValueError("a slot cannot hold the same move twice")
+    return move_ids
+
+
+ChosenMoves = Annotated[
+    list[MoveId], Field(min_length=1, max_length=MAX_MOVES), AfterValidator(_no_repeat)
+]
+
+
 class MembersBody(BaseModel):
+    """The whole ordered team, and optionally each slot's chosen moves (null: usual four)."""
+
     model_config = STRICT
     pokemon_ids: list[PokemonId] = Field(max_length=MAX_MEMBERS)
+    move_ids: list[ChosenMoves | None] | None = None
+
+    @model_validator(mode="after")
+    def _one_entry_per_slot(self) -> "MembersBody":
+        if self.move_ids is not None and len(self.move_ids) != len(self.pokemon_ids):
+            raise ValueError("move_ids needs one entry per Pokémon")
+        return self
+
+    def chosen(self) -> list[list[int] | None]:
+        """Each slot's chosen moves, or None; all None when none were sent."""
+        return self.move_ids or [None] * len(self.pokemon_ids)
 
 
 @router.get("")
@@ -109,10 +154,13 @@ def set_members(team_id: PathId, body: MembersBody, request: Request) -> dict[st
         found = conn.execute("SELECT id FROM pokemon WHERE id = ANY(%s)", (list(wanted),))
         if {pokemon_id for (pokemon_id,) in found} != wanted:
             raise HTTPException(422, "Unknown Pokémon ID")
+        slots = list(zip(body.pokemon_ids, body.chosen(), strict=True))
+        _check_choices(conn, slots)
         conn.execute("DELETE FROM team_members WHERE team_id = %s", (team_id,))
         conn.cursor().executemany(
-            "INSERT INTO team_members (team_id, position, pokemon_id) VALUES (%s, %s, %s)",
-            [(team_id, position, pid) for position, pid in enumerate(body.pokemon_ids, start=1)],
+            "INSERT INTO team_members (team_id, position, pokemon_id, move_ids)"
+            " VALUES (%s, %s, %s, %s)",
+            [(team_id, position, *slot) for position, slot in enumerate(slots, start=1)],
         )
         return _team(conn, user_id, team_id)
 
@@ -123,6 +171,21 @@ def delete_team(team_id: PathId, request: Request) -> Response:
         _owner(request, conn, team_id)
         conn.execute("DELETE FROM teams WHERE id = %s", (team_id,))
         return Response(status_code=204)
+
+
+def _check_choices(conn: db.Conn, slots: list[tuple[int, list[int] | None]]) -> None:
+    """422 unless every chosen move is one its slot's Pokémon can learn and use in a duel."""
+    chosen = {move_id for _, move_ids in slots for move_id in move_ids or ()}
+    if not chosen:
+        return
+    moves = duel_store.load_moves_named(conn, chosen)
+    lists = duel_store.load_move_lists(conn, {pokemon_id for pokemon_id, _ in slots})
+    for pokemon_id, move_ids in slots:
+        for move_id in move_ids or ():
+            if move_id not in lists.get(pokemon_id, set()):
+                raise HTTPException(422, NOT_LEARNABLE)
+            if not counted(move_id, moves):
+                raise HTTPException(422, NOT_COUNTED)
 
 
 def _owner(request: Request, conn: db.Conn, team_id: int) -> int:

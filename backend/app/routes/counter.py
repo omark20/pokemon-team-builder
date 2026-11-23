@@ -4,7 +4,9 @@ The route loads the stored type chart and every stored Pokémon with the four mo
 carries and its baseline (duel_store.py), all in one borrowed connection. Candidates are
 the field, the Pokémon with a stored baseline, passed through `candidate_pool`, the one
 place that decides who may be picked; the field's size is the N the baselines were
-taken over. The core's result is returned as it is, plus the team size.
+taken over. A slot of the visitor's team with chosen moves fights with those it may
+still use (chosen_moves.py); the counters always carry their usual four. The core's
+result is returned as it is, plus the team size.
 """
 
 import logging
@@ -14,7 +16,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import auth, db, duel_store, limits
+from app.chosen_moves import with_choice
 from app.domain.counter import build_counter_team, candidate_pool
+from app.domain.moves import Move
 from app.logs import log_event
 from app.routes.params import PathId
 
@@ -61,7 +65,8 @@ def _counter_for(team_id: int, request: Request, leave_out_legendary: bool) -> d
         if user_id is None or owned is None:
             raise HTTPException(404, "Team not found")
         members = conn.execute(
-            "SELECT pokemon_id FROM team_members WHERE team_id = %s ORDER BY position", (team_id,)
+            "SELECT pokemon_id, move_ids FROM team_members WHERE team_id = %s ORDER BY position",
+            (team_id,),
         ).fetchall()
         if not members:
             return {"size": 0, "picks": [], "message": EMPTY_TEAM_MESSAGE}
@@ -71,11 +76,27 @@ def _counter_for(team_id: int, request: Request, leave_out_legendary: bool) -> d
         fighters = duel_store.load_fighters(conn)
         if fighters is None:
             raise HTTPException(503, MOVES_NOT_LOADED)
+        moves, lists = _choices(conn, members)
     # The search runs after the connection is returned, so it holds none while it works.
     pool = candidate_pool(fighters.field, leave_out_legendary)
     if leave_out_legendary and not pool:
         # Until a scan has read the flags every one is unread, and unread is left out.
         raise HTTPException(503, FLAGS_NOT_LOADED)
-    opponents = [fighters.by_id[pokemon_id] for (pokemon_id,) in members]
+    opponents = [
+        with_choice(fighters.by_id[pokemon_id], move_ids or [], lists.get(pokemon_id, set()), moves)
+        for pokemon_id, move_ids in members
+    ]
     result = build_counter_team(opponents, pool, chart, len(fighters.field))
     return {"size": len(opponents), **asdict(result), "legendary_left_out": leave_out_legendary}
+
+
+Members = list[tuple[int, list[int] | None]]
+
+
+def _choices(conn: db.Conn, members: Members) -> tuple[dict[int, Move], dict[int, set[int]]]:
+    """The stored moves the slots chose, and the move lists of the Pokémon that chose them."""
+    choosing = [(pokemon_id, move_ids) for pokemon_id, move_ids in members if move_ids]
+    if not choosing:
+        return {}, {}
+    moves = duel_store.load_moves_named(conn, {i for _, move_ids in choosing for i in move_ids})
+    return moves, duel_store.load_move_lists(conn, {pokemon_id for pokemon_id, _ in choosing})

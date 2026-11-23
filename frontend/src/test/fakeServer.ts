@@ -1,16 +1,18 @@
-// A stand-in for the backend in tests. It answers the Pokémon list, the team,
-// counter, alert and account endpoints and the scan status from memory,
+// A stand-in for the backend in tests. It answers the Pokémon list, a Pokémon's
+// moves, the team, counter, alert and account endpoints and the scan status from memory,
 // records every request, and can be told to refuse the next request or to
 // hold it back until released.
 import { vi } from "vitest";
-import type { Alert, CounterResult, ScanRun, Team } from "../types";
+import type { MoveChoices } from "../moveChoice";
+import type { Alert, CounterResult, ScanRun, SlotMoves, Team } from "../types";
 import { CENSUS } from "./census";
+import charizardMoves from "./charizardMoves.json";
 import { COUNTER } from "./counterFixture";
 
 interface Call {
   method: string;
   path: string;
-  body: { name?: string; pokemon_ids?: number[]; username?: string; password?: string };
+  body: { name?: string; pokemon_ids?: number[]; move_ids?: (number[] | null)[]; username?: string; password?: string };
 }
 
 interface Refusal {
@@ -26,6 +28,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 export class FakeServer {
   teams: Team[];
   counter: CounterResult = COUNTER; // the answer to every counter request
+  moveChoices = charizardMoves as MoveChoices; // the answer for every Pokémon's moves
   alerts: Alert[] = [];
   runs: ScanRun[] = [];
   username: string | null = null; // who the browser is signed in as
@@ -84,6 +87,7 @@ export class FakeServer {
     }
     if (path.startsWith("/api/alerts")) return this.answerAlerts(method, path);
     if (path === "/api/scan/status") return json({ runs: this.runs, demo_active: false });
+    if (/^\/api\/pokemon\/\d+\/moves$/.test(path)) return json(this.moveChoices);
     if (path === "/api/session" || path.startsWith("/api/account")) return this.answerAccount(method, path, body);
     if (method === "GET") return json(path === "/api/pokemon" ? CENSUS : this.teams);
     return this.answerTeams(method, path, body);
@@ -91,7 +95,7 @@ export class FakeServer {
 
   private answerTeams(method: string, path: string, body: Call["body"]): Response {
     if (method === "POST") {
-      const created = { id: this.nextId++, name: body.name ?? "", pokemon_ids: [] };
+      const created = { id: this.nextId++, name: body.name ?? "", pokemon_ids: [], moves: [] };
       this.teams.push(created);
       return json(created, 201);
     }
@@ -101,8 +105,16 @@ export class FakeServer {
       this.teams = this.teams.filter((entry) => entry !== team);
       return new Response(null, { status: 204 });
     }
-    Object.assign(team, body);
+    if (body.name !== undefined) team.name = body.name;
+    if (body.pokemon_ids) Object.assign(team, { pokemon_ids: body.pokemon_ids, moves: this.named(body) });
     return json(team);
+  }
+
+  // The stored moves of each slot, named as the server names them.
+  private named({ pokemon_ids = [], move_ids }: Call["body"]): SlotMoves[] {
+    const names = new Map(this.moveChoices.moves.map((move) => [move.id, move.name]));
+    const chosen = move_ids ?? pokemon_ids.map(() => null);
+    return chosen.map((ids) => ids?.map((id) => ({ id, name: names.get(id) ?? `move-${id}` })) ?? null);
   }
 
   private answerAccount(method: string, path: string, body: Call["body"]): Response {

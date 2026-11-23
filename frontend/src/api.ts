@@ -1,7 +1,8 @@
 // Every call the page makes to the backend. The browser talks to this app's
 // own API only; it never calls PokéAPI. The visitor is identified by a cookie
 // the server sets, which the browser sends by itself.
-import type { Alert, CounterResult, Pokemon, ScanRun, Team } from "./types";
+import type { MoveChoices } from "./moveChoice";
+import type { Alert, CounterResult, Members, Pokemon, ScanRun, Team } from "./types";
 
 // A request the server refused. `retryAfter` is the number of seconds in the
 // Retry-After header, which a "too many requests" answer (429) carries; 0 if
@@ -52,9 +53,16 @@ export const createTeam = (name: string) => request<Team>("POST", "/api/teams", 
 export const renameTeam = (id: number, name: string) =>
   request<Team>("PATCH", `/api/teams/${id}`, { name });
 
-// Add, remove and reorder are all this one call: the complete list in order.
-export const saveMembers = (id: number, pokemonIds: number[]) =>
-  request<Team>("PUT", `/api/teams/${id}/members`, { pokemon_ids: pokemonIds });
+// Add, remove, reorder and choosing moves are all this one call: the complete
+// list in order, each slot's chosen moves as their IDs (null for the usual four).
+export const saveMembers = (id: number, members: Members) =>
+  request<Team>("PUT", `/api/teams/${id}/members`, {
+    pokemon_ids: members.pokemon_ids,
+    move_ids: members.moves.map((moves) => moves?.map((move) => move.id) ?? null),
+  });
+
+// The moves a Pokémon may use in a fight, and its usual four.
+export const fetchMoves = (pokemonId: number) => request<MoveChoices>("GET", `/api/pokemon/${pokemonId}/moves`);
 
 export const deleteTeam = (id: number) => request<void>("DELETE", `/api/teams/${id}`);
 

@@ -12,4 +12,5 @@ from pydantic import Field
 MAX_ID = 2_147_483_647  # the largest Postgres integer
 
 PokemonId = Annotated[int, Field(ge=1, le=MAX_ID)]
+MoveId = Annotated[int, Field(ge=1, le=MAX_ID)]
 PathId = Annotated[int, Path(ge=1, le=MAX_ID)]

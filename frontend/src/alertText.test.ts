@@ -4,12 +4,13 @@ import { expect, test } from "vitest";
 import { describeAlert, touchesTeams } from "./alertText";
 import { CENSUS } from "./test/census";
 import type { Alert, Team } from "./types";
+import { makeTeam } from "./test/makeTeam";
 
 const BY_ID = new Map(CENSUS.map((entry) => [entry.id, entry]));
 const TEAMS: Team[] = [
-  { id: 1, name: "Alpha", pokemon_ids: [6, 3] },
-  { id: 2, name: "Beta", pokemon_ids: [6] },
-  { id: 3, name: "Gamma", pokemon_ids: [25] },
+  makeTeam(1, "Alpha", [6, 3]),
+  makeTeam(2, "Beta", [6]),
+  makeTeam(3, "Gamma", [25]),
 ];
 
 const alert = (change: Partial<Alert>): Alert => ({

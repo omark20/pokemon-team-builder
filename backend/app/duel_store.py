@@ -59,6 +59,21 @@ def load_moves(conn: Conn) -> dict[int, Move]:
     return {row[0]: Move(*row) for row in conn.execute(f"SELECT {MOVE_COLUMNS} FROM moves")}
 
 
+def load_moves_named(conn: Conn, move_ids: Iterable[int]) -> dict[int, Move]:
+    """The stored moves with these IDs, by ID; an ID not stored is left out."""
+    query = f"SELECT {MOVE_COLUMNS} FROM moves WHERE id = ANY(%s)"
+    return {row[0]: Move(*row) for row in conn.execute(query, (list(move_ids),))}
+
+
+def load_move_lists(conn: Conn, pokemon_ids: Iterable[int]) -> dict[int, set[int]]:
+    """The IDs of the moves each of these Pokémon can learn; one not read yet is left out."""
+    rows = conn.execute(
+        "SELECT pokemon_id, move_ids FROM pokemon_moves WHERE pokemon_id = ANY(%s)",
+        (list(pokemon_ids),),
+    )
+    return {pokemon_id: set(move_ids) for pokemon_id, move_ids in rows}
+
+
 def load_learnable(conn: Conn) -> list[tuple[Pokemon, list[int]]]:
     """Every stored Pokémon, carrying no moves yet, with the IDs of every move it can learn."""
     return [(_pokemon(row), row[8] or []) for row in conn.execute(LEARNABLE_QUERY)]

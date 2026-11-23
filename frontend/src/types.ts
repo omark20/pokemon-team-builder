@@ -41,13 +41,28 @@ export function displayName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+// A move chosen for a team slot, with its name, since a later scan may stop
+// listing it for that Pokémon.
+export interface ChosenMove {
+  id: number;
+  name: string;
+}
+
+// The moves chosen for one slot, or null for the Pokémon's usual four.
+export type SlotMoves = ChosenMove[] | null;
+
 // One of the visitor's teams, as the backend sends it. `pokemon_ids` is in
-// slot order and may hold the same Pokémon more than once.
+// slot order and may hold the same Pokémon more than once; `moves` runs beside
+// it, one entry per slot.
 export interface Team {
   id: number;
   name: string;
   pokemon_ids: number[];
+  moves: SlotMoves[];
 }
+
+// What a team's slots hold: the two lists that are saved together.
+export type Members = Pick<Team, "pokemon_ids" | "moves">;
 
 // Move names are written as words: "stone-edge" is "Stone Edge".
 export function moveName(name: string): string {

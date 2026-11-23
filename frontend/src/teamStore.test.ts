@@ -5,6 +5,7 @@ import { nextTeamName, TeamStore } from "./teamStore";
 import { byName } from "./test/census";
 import { FakeServer } from "./test/fakeServer";
 import type { Team } from "./types";
+import { makeTeam, usualMembers } from "./test/makeTeam";
 
 const PIKACHU = byName("pikachu"); // id 25
 const CHARIZARD = byName("charizard"); // id 6
@@ -16,8 +17,6 @@ async function start(teams: Team[] = []) {
   return { server, store, state: () => store.getState() };
 }
 
-const team = (id: number, name: string, pokemon_ids: number[] = []): Team => ({ id, name, pokemon_ids });
-
 // Waits until every request already answered, and every step waiting on it, has
 // run: a timer of 0 fires only after all pending promise steps are done.
 const allSettled = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -27,9 +26,9 @@ test("the first Add creates 'Team 1', then adds the Pokémon to it and selects i
   expect(await store.add(PIKACHU)).toBe(true);
   expect(server.writes()).toEqual([
     ["POST /api/teams", { name: "Team 1" }],
-    ["PUT /api/teams/1/members", { pokemon_ids: [25] }],
+    ["PUT /api/teams/1/members", { pokemon_ids: [25], move_ids: [null] }],
   ]);
-  expect(state().teams).toEqual([team(1, "Team 1", [25])]);
+  expect(state().teams).toEqual([makeTeam(1, "Team 1", [25])]);
   expect(state().activeId).toBe(1);
 });
 
@@ -40,7 +39,7 @@ test("a second Add while the first team is being created makes no second team", 
   const second = store.add(CHARIZARD);
   release();
   expect(await Promise.all([first, second])).toEqual([true, false]);
-  expect(state().teams).toEqual([team(1, "Team 1", [25])]);
+  expect(state().teams).toEqual([makeTeam(1, "Team 1", [25])]);
 });
 
 test.each([
@@ -60,22 +59,22 @@ test("if the first Add's second request fails, 'Team 1' stays empty and the next
   const { server, store, state } = await start();
   server.refuseNext("PUT", 500);
   expect(await store.add(PIKACHU)).toBe(false);
-  expect(state().teams).toEqual([team(1, "Team 1")]);
+  expect(state().teams).toEqual([makeTeam(1, "Team 1")]);
   expect(state().activeId).toBe(1);
   expect(state().notice?.text).toBe(MESSAGES.halfDone("Team 1"));
 
   expect(await store.add(PIKACHU)).toBe(true);
-  await vi.waitFor(() => expect(server.teams).toEqual([team(1, "Team 1", [25])]));
+  await vi.waitFor(() => expect(server.teams).toEqual([makeTeam(1, "Team 1", [25])]));
 });
 
 test("Add accepts a Pokémon the team already has", async () => {
-  const { server, store } = await start([team(1, "Team 1", [6])]);
+  const { server, store } = await start([makeTeam(1, "Team 1", [6])]);
   expect(await store.add(CHARIZARD)).toBe(true);
   await vi.waitFor(() => expect(server.teams[0]?.pokemon_ids).toEqual([6, 6]));
 });
 
 test("Add is refused at six members with a message and no request", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [1, 2, 3, 4, 5, 6])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [1, 2, 3, 4, 5, 6])]);
   expect(await store.add(PIKACHU)).toBe(false);
   expect(state().notice).toEqual({ kind: "error", text: MESSAGES.teamFull });
   expect(server.writes()).toEqual([]);
@@ -86,20 +85,20 @@ test.each([
   { refusal: [429, 5], text: MESSAGES.tooFastSeconds },
   { refusal: [429, 90], text: MESSAGES.tooFastMinutes },
 ])("a failed save ($refusal) puts the team back and says so", async ({ refusal, text }) => {
-  const { server, store, state } = await start([team(1, "Team 1", [6, 9])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9])]);
   server.refuseNext("PUT", refusal[0]!, refusal[1]);
-  store.setMembers(1, [9, 6]);
+  store.setMembers(1, usualMembers([9, 6]));
   expect(state().teams[0]?.pokemon_ids).toEqual([9, 6]); // shown at once
   await vi.waitFor(() => expect(state().notice).toEqual({ kind: "error", text }));
   expect(state().teams[0]?.pokemon_ids).toEqual([6, 9]);
 });
 
 test("quick changes are saved one at a time and the last one wins", async () => {
-  const { server, store } = await start([team(1, "Team 1", [6, 9, 25])]);
+  const { server, store } = await start([makeTeam(1, "Team 1", [6, 9, 25])]);
   const release = server.hold();
-  store.setMembers(1, [9, 6, 25]);
-  store.setMembers(1, [9, 25, 6]);
-  store.setMembers(1, [25, 9, 6]);
+  store.setMembers(1, usualMembers([9, 6, 25]));
+  store.setMembers(1, usualMembers([9, 25, 6]));
+  store.setMembers(1, usualMembers([25, 9, 6]));
   expect(server.writes()).toHaveLength(1); // the second and third wait for the first
   release();
   await vi.waitFor(() => expect(server.teams[0]?.pokemon_ids).toEqual([25, 9, 6]));
@@ -112,34 +111,34 @@ test.each([
   { names: ["Team 1", "Rain team", "Team 4"], expected: "Team 5" },
   { names: ["Team 10 backup"], expected: "Team 1" },
 ])("a new team after $names is named $expected", ({ names, expected }) => {
-  expect(nextTeamName(names.map((name, index) => team(index + 1, name)))).toBe(expected);
+  expect(nextTeamName(names.map((name, index) => makeTeam(index + 1, name)))).toBe(expected);
 });
 
 test("'New team' adds an empty team with the next name and selects it", async () => {
-  const { store, state } = await start([team(1, "Team 1", [6])]);
+  const { store, state } = await start([makeTeam(1, "Team 1", [6])]);
   await store.newTeam();
-  expect(state().teams).toEqual([team(1, "Team 1", [6]), team(2, "Team 2")]);
+  expect(state().teams).toEqual([makeTeam(1, "Team 1", [6]), makeTeam(2, "Team 2")]);
   expect(state().activeId).toBe(2);
 });
 
 test("renaming changes only that team's name", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [6]), team(2, "Team 2")]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6]), makeTeam(2, "Team 2")]);
   await store.rename(1, "Rain team");
   expect(server.writes()).toEqual([["PATCH /api/teams/1", { name: "Rain team" }]]);
-  expect(state().teams).toEqual([team(1, "Rain team", [6]), team(2, "Team 2")]);
+  expect(state().teams).toEqual([makeTeam(1, "Rain team", [6]), makeTeam(2, "Team 2")]);
 });
 
 test("deleting the selected team leaves the others and selects its neighbour", async () => {
-  const { server, store, state } = await start([team(1, "A"), team(2, "B", [25]), team(3, "C")]);
+  const { server, store, state } = await start([makeTeam(1, "A"), makeTeam(2, "B", [25]), makeTeam(3, "C")]);
   store.select(2);
   await store.remove(2);
   expect(server.writes()).toEqual([["DELETE /api/teams/2", {}]]);
-  expect(state().teams).toEqual([team(1, "A"), team(3, "C")]);
+  expect(state().teams).toEqual([makeTeam(1, "A"), makeTeam(3, "C")]);
   expect(state().activeId).toBe(3);
 });
 
 test("a failed load is reported, and loading again recovers", async () => {
-  const server = new FakeServer([team(1, "Team 1")]);
+  const server = new FakeServer([makeTeam(1, "Team 1")]);
   const store = new TeamStore();
   server.refuseNext("GET", 500);
   await store.load();
@@ -149,9 +148,9 @@ test("a failed load is reported, and loading again recovers", async () => {
 });
 
 test("a build waits for the team's pending save, so the server works from the latest members", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [6])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6])]);
   const release = server.hold();
-  store.setMembers(1, [6, 9]);
+  store.setMembers(1, usualMembers([6, 9]));
   const building = store.buildCounter();
   await allSettled();
   expect(server.calls.at(-1)?.path).toBe("/api/teams/1/members"); // no counter request yet
@@ -162,11 +161,11 @@ test("a build waits for the team's pending save, so the server works from the la
 });
 
 test("an answer for members that changed while it was worked out is dropped", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [6, 9])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9])]);
   const release = server.hold();
   const building = store.buildCounter();
   await vi.waitFor(() => expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter"));
-  store.setMembers(1, [9, 6]);
+  store.setMembers(1, usualMembers([9, 6]));
   release();
   await building;
   expect(state().counter).toBeNull();
@@ -178,14 +177,14 @@ test.each([
   { refusal: 500, detail: undefined, text: MESSAGES.counterFailed },
   { refusal: 429, detail: undefined, text: MESSAGES.tooFastSeconds },
 ])("a refused build ($refusal) shows no team and says why: $text", async ({ refusal, detail, text }) => {
-  const { server, store, state } = await start([team(1, "Team 1", [6])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6])]);
   server.refuseNext("GET", refusal, 30, "/api/teams/1/counter", detail);
   await store.buildCounter();
   expect(state()).toMatchObject({ counter: null, building: false, counterError: text });
 });
 
 test("the legendary tick is sent with the next build, and the answer shown is the one for it", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [6])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6])]);
   store.setLeaveOutLegendary(true);
   expect(server.calls.at(-1)?.path).toBe("/api/teams"); // ticking asks nothing
   await store.buildCounter();
@@ -200,7 +199,7 @@ test("the legendary tick is sent with the next build, and the answer shown is th
 const counterRequests = (server: FakeServer) => server.calls.filter((call) => call.path.includes("/counter"));
 
 test("an answer for a team that was left while its save was in flight is dropped", async () => {
-  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  const { server, store, state } = await start([makeTeam(1, "A", [6]), makeTeam(2, "B", [25])]);
   const release = server.hold(); // holds the save of team 1's new member
   await store.add(CHARIZARD);
   const building = store.buildCounter();
@@ -212,7 +211,7 @@ test("an answer for a team that was left while its save was in flight is dropped
 });
 
 test("an answer for the legendary setting the box no longer shows is dropped", async () => {
-  const { server, store, state } = await start([team(1, "A", [6])]);
+  const { server, store, state } = await start([makeTeam(1, "A", [6])]);
   const release = server.hold(); // holds the counter request
   const building = store.buildCounter();
   await vi.waitFor(() => expect(counterRequests(server)).toHaveLength(1));
@@ -223,7 +222,7 @@ test("an answer for the legendary setting the box no longer shows is dropped", a
 });
 
 test("an error for a team deleted mid-build is not shown on the tab that replaces it", async () => {
-  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  const { server, store, state } = await start([makeTeam(1, "A", [6]), makeTeam(2, "B", [25])]);
   server.refuseNext("GET", 500, undefined, "/api/teams/1/counter");
   const release = server.hold(); // holds the counter request
   const building = store.buildCounter();
@@ -235,7 +234,7 @@ test("an error for a team deleted mid-build is not shown on the tab that replace
 });
 
 test("switching tab mid-build leaves Build usable on the new tab", async () => {
-  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B", [25])]);
+  const { server, store, state } = await start([makeTeam(1, "A", [6]), makeTeam(2, "B", [25])]);
   server.hold();
   void store.buildCounter();
   store.select(2);
@@ -271,7 +270,7 @@ test("an Add while the first team is still being created says to wait", async ()
 });
 
 test("'Save as new team' that stops half way says so in its own words", async () => {
-  const { server, store, state } = await start([team(1, "Team 1", [6, 9, 3])]);
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9, 3])]);
   await store.buildCounter();
   server.refuseNext("PUT", 500);
   await store.saveCounterAsTeam();
@@ -279,11 +278,31 @@ test("'Save as new team' that stops half way says so in its own words", async ()
 });
 
 test("a save that fails for a team deleted meanwhile reports nothing", async () => {
-  const { server, store, state } = await start([team(1, "A", [6]), team(2, "B")]);
+  const { server, store, state } = await start([makeTeam(1, "A", [6]), makeTeam(2, "B")]);
   const release = server.hold(); // holds the save; the team is then deleted
-  store.setMembers(1, [6, 9]);
+  store.setMembers(1, usualMembers([6, 9]));
   await store.remove(1);
   release();
   await allSettled(); // the save is answered 404, and the store has handled it
   expect(state().notice).toBeNull();
+});
+
+const FOCUS_BLAST = [{ id: 411, name: "focus-blast" }];
+
+test("choosing a slot's moves saves them with the team, clears the counter team and reports success", async () => {
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9])]);
+  await store.buildCounter();
+  expect(state().counter).not.toBeNull();
+  expect(await store.setMoves(1, 1, FOCUS_BLAST)).toBe(true);
+  expect(server.writes()).toEqual([["PUT /api/teams/1/members", { pokemon_ids: [6, 9], move_ids: [null, [411]] }]]);
+  expect(state().teams[0]?.moves).toEqual([null, FOCUS_BLAST]);
+  expect(state().counter).toBeNull();
+});
+
+test("if saving moves fails, the slot goes back, the error shows and the call says so", async () => {
+  const { server, store, state } = await start([makeTeam(1, "Team 1", [6, 9])]);
+  server.refuseNext("PUT", 500);
+  expect(await store.setMoves(1, 0, FOCUS_BLAST)).toBe(false);
+  expect(state().teams[0]?.moves).toEqual([null, null]);
+  expect(state().notice).toEqual({ kind: "error", text: MESSAGES.saveFailed });
 });

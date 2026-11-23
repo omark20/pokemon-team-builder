@@ -27,6 +27,8 @@ DUELS_A_NO_LEGENDARIES = [
     (121, "starmie", "thunderbolt", 2, "outrage", 3, "wins"),
     DUELS_A[2],
 ]
+# Charizard can learn Focus Blast (samples/pokemon_6_charizard_dual_type.json), which counts.
+FOCUS_BLAST = {"id": 411, "name": "focus-blast"}
 # The stored chart's cells for a move's type on each of a Pokémon's types.
 CELLS_QUERY = (
     "SELECT e.multiplier FROM moves m JOIN type_effectiveness e ON e.attacker = m.type"
@@ -75,6 +77,25 @@ def legendary_filter(smoke: Smoke) -> None:
     _check_duels(body, DUELS_A_NO_LEGENDARIES)
     seen = (body["pool_size"], body["legendary_left_out"])
     check(seen == (POOL_WITHOUT_LEGENDARIES, True), "pool 931, legendary_left_out", seen)
+
+
+def chosen_move(smoke: Smoke) -> None:
+    """Charizard, in A's first slot, given only Focus Blast fights with it; then A's team is
+    set back to the usual four."""
+    path = f"/api/teams/{smoke.teams['A']}/members"
+    body = {"pokemon_ids": TEAM_A, "move_ids": [[FOCUS_BLAST["id"]], None, None]}
+    saved = smoke.as_visitor("A", "PUT", path, json=body)
+    check(saved.status_code == 200, "200 saving a chosen move", saved.status_code)
+    teams = smoke.as_visitor("A", "GET", "/api/teams").json()
+    check(teams[0]["moves"] == [[FOCUS_BLAST], None, None], "the choice back, named", teams[0])
+    answer = _counter(smoke, {})
+    carried = answer["opponent_moves"][0]["moves"]
+    check(carried == ["focus-blast"], "Charizard carrying Focus Blast only", carried)
+    # Its move back is Focus Blast, or none if Focus Blast does nothing to the new counter.
+    move_back = answer["picks"][0]["opponent"]["move"]
+    check(move_back in ("focus-blast", None), "Charizard's move back Focus Blast", move_back)
+    restored = smoke.as_visitor("A", "PUT", path, json={"pokemon_ids": TEAM_A})
+    check(restored.status_code == 200, "200 setting A back to the usual four", restored.status_code)
 
 
 def _counter(smoke: Smoke, params: dict[str, str]) -> dict[str, Any]:

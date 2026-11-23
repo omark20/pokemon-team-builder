@@ -1,8 +1,10 @@
 // One filled position of a team: picture and name, dragged onto another slot
-// to swap them. A "×" removes the slot and two arrows move it one place; they
-// stay in the page for the keyboard but are hidden, and ignore pointer clicks,
-// until the slot is "revealed" by a hovering mouse, keyboard focus or a tap.
-// So a first tap on a phone only shows them, and the next one acts.
+// to swap them. A "×" removes the slot, two arrows move it one place and
+// "Moves" opens the choice of its moves; they stay in the page for the keyboard
+// but are hidden, and ignore pointer clicks, until the slot is "revealed" by a
+// hovering mouse, keyboard focus or a tap. So a first tap on a phone only shows
+// them, and the next one acts. A slot whose moves were chosen says so under its
+// name.
 import { useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from "react";
 import { typeStyle } from "../colours";
 import { displayName, type Pokemon } from "../types";
@@ -10,6 +12,7 @@ import { Sprite } from "./Sprite";
 
 interface SlotActions {
   onRemove: () => void;
+  onMoves: () => void;
   onMoveEarlier?: () => void; // absent for the first slot
   onMoveLater?: () => void; // absent for the last slot
   onDragStart: () => void;
@@ -19,6 +22,7 @@ interface SlotActions {
 
 interface SlotProps extends SlotActions {
   pokemon: Pokemon;
+  ownMoves: boolean; // its moves were chosen, not the usual four
 }
 
 // Whether the controls are showing, and whether they were showing when the
@@ -61,14 +65,14 @@ function SlotControl(props: { label: string; className: string; children: ReactN
   );
 }
 
-export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDragStart, onDragEnd, onDrop }: SlotProps) {
+export function TeamSlot({ pokemon, ownMoves, onRemove, onMoves, onMoveEarlier, onMoveLater, ...drag }: SlotProps) {
   const { revealed, handlers, acts } = useReveal();
   const [dropTarget, setDropTarget] = useState(false);
   const name = displayName(pokemon.name);
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     setDropTarget(false);
-    onDrop();
+    drag.onDrop();
   }
   return (
     <li
@@ -79,19 +83,20 @@ export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDrag
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", name); // Firefox starts a drag only with data
-        onDragStart();
+        drag.onDragStart();
       }}
       onDragOver={(event) => {
         event.preventDefault();
         setDropTarget(true);
       }}
       onDragLeave={() => setDropTarget(false)}
-      onDragEnd={onDragEnd}
+      onDragEnd={drag.onDragEnd}
       onDrop={handleDrop}
       {...handlers}
     >
       <Sprite url={pokemon.sprite_url} name={name} size={48} />
       <span className="slot-name">{name}</span>
+      {ownMoves && <span className="slot-own">own moves</span>}
       <SlotControl label={`Remove ${name}`} className="slot-remove" act={onRemove} acts={acts}>
         ×
       </SlotControl>
@@ -105,6 +110,9 @@ export function TeamSlot({ pokemon, onRemove, onMoveEarlier, onMoveLater, onDrag
           ›
         </SlotControl>
       )}
+      <SlotControl label={`Choose ${name}'s moves`} className="slot-moves" act={onMoves} acts={acts}>
+        Moves
+      </SlotControl>
     </li>
   );
 }

@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
 import { ApiError, createTeam, deleteTeam, fetchCounter, fetchTeams, renameTeam, saveMembers } from "./api";
 import { counterErrorText, errorText, MESSAGES } from "./messages";
 import { TEAM_SIZE } from "./teamMoves";
-import { displayName, type CounterResult, type Pokemon, type Team } from "./types";
+import { displayName, type CounterResult, type Members, type Pokemon, type SlotMoves, type Team } from "./types";
 
 export interface Notice {
   kind: "info" | "error";
@@ -31,6 +31,9 @@ export interface TeamsState {
   building: boolean; // a counter team is being worked out for what is on screen
   leaveOutLegendary: boolean; // the visitor's tick; kept while the page is open
 }
+
+// A team's two saved lists, without its id and name.
+const membersOf = ({ pokemon_ids, moves }: Team): Members => ({ pokemon_ids, moves });
 
 // "Team" and the next number after the highest one in use: "Team 1" first.
 export function nextTeamName(teams: Team[]): string {
@@ -55,9 +58,9 @@ export class TeamStore {
   private readonly listeners = new Set<() => void>();
   // Per team: the members the server last confirmed, the newest members not
   // yet sent, and whether a save is in flight.
-  private readonly confirmed = new Map<number, number[]>();
-  private readonly unsent = new Map<number, number[]>();
-  private readonly saving = new Map<number, Promise<void>>();
+  private readonly confirmed = new Map<number, Members>();
+  private readonly unsent = new Map<number, Members>();
+  private readonly saving = new Map<number, Promise<boolean>>(); // resolves true if every save succeeded
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -76,7 +79,7 @@ export class TeamStore {
     this.update({ status: "loading", notice: null, ...this.clearCounter() });
     try {
       const teams = await fetchTeams();
-      for (const team of teams) this.confirmed.set(team.id, team.pokemon_ids);
+      for (const team of teams) this.confirmed.set(team.id, membersOf(team));
       this.update({ status: "ready", teams, activeId: teams[0]?.id ?? null });
     } catch {
       this.update({ status: "failed" });
@@ -139,7 +142,7 @@ export class TeamStore {
       this.update({ notice: { kind: "error", text: MESSAGES.teamFull } });
       return false;
     }
-    this.setMembers(team.id, [...team.pokemon_ids, pokemon.id]);
+    this.setMembers(team.id, { pokemon_ids: [...team.pokemon_ids, pokemon.id], moves: [...team.moves, null] });
     const text = `${displayName(pokemon.name)} added to ${team.name}.`;
     this.update({ notice: { kind: "info", text } });
     return true;
@@ -152,11 +155,21 @@ export class TeamStore {
     return this.state.creating ? MESSAGES.stillCreating : null;
   }
 
-  // Shows the new member list at once and saves it in the background.
-  setMembers(id: number, pokemonIds: number[]): void {
-    this.changeTeam(id, { pokemon_ids: pokemonIds });
-    this.unsent.set(id, pokemonIds);
+  // Shows the new members at once and saves them in the background.
+  setMembers(id: number, members: Members): void {
+    this.changeTeam(id, members);
+    this.unsent.set(id, members);
     if (!this.saving.has(id)) this.saving.set(id, this.saveUnsent(id));
+  }
+
+  // Sets the moves of one slot (null for the usual four) and waits for the save:
+  // true once the server has stored them, false if the save failed.
+  async setMoves(id: number, slot: number, moves: SlotMoves): Promise<boolean> {
+    const team = this.state.teams.find((entry) => entry.id === id);
+    if (!team) return false;
+    const members = { ...membersOf(team), moves: team.moves.map((held, index) => (index === slot ? moves : held)) };
+    this.setMembers(id, members);
+    return (await this.saving.get(id)) ?? false;
   }
 
   // Asks the server for the selected team's counter team, once its latest
@@ -192,33 +205,37 @@ export class TeamStore {
 
   // Sends the newest unsent list, and again if a newer one arrived meanwhile,
   // so saves for one team never overlap and the last change always wins.
-  private async saveUnsent(id: number): Promise<void> {
+  // True if every list was saved.
+  private async saveUnsent(id: number): Promise<boolean> {
     try {
-      for (let ids = this.unsent.get(id); ids; ids = this.unsent.get(id)) {
+      for (let members = this.unsent.get(id); members; members = this.unsent.get(id)) {
         this.unsent.delete(id);
-        this.confirmed.set(id, (await saveMembers(id, ids)).pokemon_ids);
+        this.confirmed.set(id, membersOf(await saveMembers(id, members)));
       }
+      return true;
     } catch (error) {
       this.unsent.delete(id);
-      if (!this.state.teams.some((team) => team.id === id)) return; // deleted meanwhile
-      this.changeTeam(id, { pokemon_ids: this.confirmed.get(id) ?? [] });
+      if (!this.state.teams.some((team) => team.id === id)) return false; // deleted meanwhile
+      this.changeTeam(id, this.confirmed.get(id) ?? { pokemon_ids: [], moves: [] });
       this.fail(error, MESSAGES.saveFailed);
+      return false;
     } finally {
       this.saving.delete(id);
     }
   }
 
-  // A new team holding these Pokémon: two requests, create then set members.
-  // Used by a first Add and by "Save as new team". If the second request
-  // fails the new team stays, empty, and `halfDone` says what to do next.
+  // A new team holding these Pokémon, each with its usual four moves: two
+  // requests, create then set members. Used by a first Add and by "Save as new
+  // team". If the second request fails the new team stays, empty, and
+  // `halfDone` says what to do next.
   private createTeamWith(pokemonIds: number[], halfDone: (team: string) => string): Promise<boolean | null> {
     return this.whileCreating(async () => {
       const team = await this.postTeam();
       if (!team) return false;
       try {
-        const saved = await saveMembers(team.id, pokemonIds);
-        this.confirmed.set(team.id, saved.pokemon_ids);
-        this.changeTeam(team.id, { pokemon_ids: saved.pokemon_ids });
+        const saved = membersOf(await saveMembers(team.id, { pokemon_ids: pokemonIds, moves: pokemonIds.map(() => null) }));
+        this.confirmed.set(team.id, saved);
+        this.changeTeam(team.id, saved);
         return true;
       } catch {
         this.update({ notice: { kind: "error", text: halfDone(team.name) } });
@@ -242,7 +259,7 @@ export class TeamStore {
   private async postTeam(): Promise<Team | null> {
     try {
       const team = await createTeam(nextTeamName(this.state.teams));
-      this.confirmed.set(team.id, team.pokemon_ids);
+      this.confirmed.set(team.id, membersOf(team));
       this.update({ teams: [...this.state.teams, team], activeId: team.id, ...this.clearCounter() });
       return team;
     } catch (error) {

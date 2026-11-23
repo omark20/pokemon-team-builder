@@ -5,9 +5,8 @@ import { expect, test, vi } from "vitest";
 import App from "./App";
 import { MESSAGES } from "./messages";
 import { FakeServer } from "./test/fakeServer";
-import type { Team } from "./types";
+import { makeTeam } from "./test/makeTeam";
 
-const team = (id: number, name: string, pokemon_ids: number[] = []): Team => ({ id, name, pokemon_ids });
 const count = () => screen.findByText(/^Showing /);
 const teamHalf = (name: string) => within(screen.getByRole("region", { name }));
 
@@ -42,7 +41,7 @@ test("a first-time visitor's Add creates 'Team 1' holding that Pokémon", async 
 });
 
 test("Enter on a full team adds nothing, shows the team-full message and keeps the query", async () => {
-  const server = new FakeServer([team(1, "Team 1", [1, 2, 3, 4, 5, 6])]);
+  const server = new FakeServer([makeTeam(1, "Team 1", [1, 2, 3, 4, 5, 6])]);
   render(<App />);
   await count();
   const search = screen.getByRole("searchbox");
@@ -55,14 +54,14 @@ test("Enter on a full team adds nothing, shows the team-full message and keeps t
 
 test("a team named with HTML shows the text itself", async () => {
   const name = "<img src=x onerror=alert(1)>";
-  new FakeServer([team(1, name)]);
+  new FakeServer([makeTeam(1, name)]);
   const { container } = render(<App />);
   expect(await screen.findByRole("heading", { name })).toBeTruthy();
   expect(container.querySelector("img[src='x']")).toBeNull();
 });
 
 test("switching tabs shows the other team", async () => {
-  new FakeServer([team(1, "Fire", [6]), team(2, "Water", [9])]);
+  new FakeServer([makeTeam(1, "Fire", [6]), makeTeam(2, "Water", [9])]);
   render(<App />);
   await count();
   expect(teamHalf("Fire").getByText("Charizard")).toBeTruthy();
@@ -72,7 +71,7 @@ test("switching tabs shows the other team", async () => {
 });
 
 test("Delete asks first, and removes the team only when confirmed", async () => {
-  const server = new FakeServer([team(1, "Fire"), team(2, "Water")]);
+  const server = new FakeServer([makeTeam(1, "Fire"), makeTeam(2, "Water")]);
   const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
   render(<App />);
   const remove = await screen.findByRole("button", { name: "Delete" });
@@ -85,7 +84,7 @@ test("Delete asks first, and removes the team only when confirmed", async () => 
 });
 
 test("Rename saves the trimmed name", async () => {
-  const server = new FakeServer([team(1, "Team 1")]);
+  const server = new FakeServer([makeTeam(1, "Team 1")]);
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
   const box = screen.getByRole("textbox", { name: "Team name" }) as HTMLInputElement;
@@ -98,7 +97,7 @@ test("Rename saves the trimmed name", async () => {
 });
 
 test("after a keyboard move, focus follows the moved Pokémon to its new place", async () => {
-  new FakeServer([team(1, "Team 1", [6, 9, 25])]);
+  new FakeServer([makeTeam(1, "Team 1", [6, 9, 25])]);
   render(<App />);
   await count();
   fireEvent.click(teamHalf("Team 1").getByRole("button", { name: "Move Charizard later" }));
@@ -110,7 +109,7 @@ test("after a keyboard move, focus follows the moved Pokémon to its new place",
 });
 
 test("switching tab closes an open rename form, so the typed name renames nothing", async () => {
-  const server = new FakeServer([team(1, "Team 1"), team(2, "Team 2")]);
+  const server = new FakeServer([makeTeam(1, "Team 1"), makeTeam(2, "Team 2")]);
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Team name" }), { target: { value: "Typed for 1" } });
@@ -121,7 +120,7 @@ test("switching tab closes an open rename form, so the typed name renames nothin
 });
 
 test("a notice is announced from a region already on the page, and a repeat is announced again", async () => {
-  new FakeServer([team(1, "Team 1")]);
+  new FakeServer([makeTeam(1, "Team 1")]);
   render(<App />);
   await count();
   const polite = document.querySelector('.notice-live[aria-live="polite"]')!;
@@ -136,7 +135,7 @@ test("a notice is announced from a region already on the page, and a repeat is a
 });
 
 test("after a Delete, focus is on the tab now selected", async () => {
-  new FakeServer([team(1, "Fire"), team(2, "Water")]);
+  new FakeServer([makeTeam(1, "Fire"), makeTeam(2, "Water")]);
   vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<App />);
   await act(async () => fireEvent.click(await screen.findByRole("button", { name: "Delete" })));
@@ -144,7 +143,7 @@ test("after a Delete, focus is on the tab now selected", async () => {
 });
 
 test.each(["Save", "Cancel"])("after %s in the rename form, focus is back on Rename", async (closing) => {
-  new FakeServer([team(1, "Team 1")]);
+  new FakeServer([makeTeam(1, "Team 1")]);
   render(<App />);
   fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: closing })));

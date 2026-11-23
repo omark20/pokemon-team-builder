@@ -2,6 +2,7 @@
 // facing its counter team on the right, then "Show details" once a counter
 // team exists, and a footer row with a status line and the buttons.
 import { useRef, useState } from "react";
+import { fetchMoves } from "../api";
 import type { TeamStore, TeamsState } from "../teamStore";
 import type { CounterResult, Pokemon, Team } from "../types";
 import { CounterDetails } from "./CounterDetails";
@@ -129,7 +130,9 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
               key={team.id} // a fresh half per team: an open rename form never moves to another team
               team={team}
               pokemonById={pokemonById}
-              onMembers={(ids) => store.setMembers(team.id, ids)}
+              onMembers={(members) => store.setMembers(team.id, members)}
+              onMoves={(slot, moves) => store.setMoves(team.id, slot, moves)}
+              loadMoves={fetchMoves}
               onRename={(name) => void store.rename(team.id, name)}
               onDelete={() => void store.remove(team.id).then(() => focusSelectedTab(card.current))}
             />
@@ -143,7 +146,7 @@ export function FaceOff({ store, teams, pokemonById, alertTeamIds }: FaceOffProp
               {open ? "Hide details" : "Show details"}
             </button>
           )}
-          {open && <CounterDetails counter={counter} />}
+          {open && <CounterDetails counter={counter} chosen={team.moves} />}
           <Footer store={store} teams={teams} team={team} />
         </>
       )}

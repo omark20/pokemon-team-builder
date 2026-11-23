@@ -7,10 +7,11 @@ import App from "../App";
 import { ALERT_MESSAGES } from "../alerts";
 import { FakeServer } from "../test/fakeServer";
 import type { Alert } from "../types";
+import { makeTeam } from "../test/makeTeam";
 
 const TEAMS = [
-  { id: 1, name: "Alpha", pokemon_ids: [6, 3] },
-  { id: 2, name: "Beta", pokemon_ids: [25] },
+  makeTeam(1, "Alpha", [6, 3]),
+  makeTeam(2, "Beta", [25]),
 ];
 
 const change = (id: number, pokemonId: number, oldValue: number, newValue: number): Alert => ({

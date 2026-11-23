@@ -16,7 +16,13 @@ from collections.abc import Callable
 
 import httpx
 from local_app import HOST, free_port, start_app, wait_until_up
-from smoke_counter import counter_a, counter_before_moves, duel_data_complete, legendary_filter
+from smoke_counter import (
+    chosen_move,
+    counter_a,
+    counter_before_moves,
+    duel_data_complete,
+    legendary_filter,
+)
 from smoke_steps import (
     Smoke,
     SmokeFailure,
@@ -45,6 +51,7 @@ STEPS: list[tuple[str, Callable[[Smoke], None]]] = [
     ("3b A's account keeps the team across signing out and in", account_a),
     ("4 A's counter team is the expected one", counter_a),
     ("4b leaving out legendaries changes the pool and the picks", legendary_filter),
+    ("4c a move chosen for Charizard is the one it fights with", chosen_move),
     ("5 storing a patch alone changes nothing", patch_stored_alone),
     ("6 a scan applies the patch", patched_scan),
     ("7 A gets the demo alert and the list shows it", alert_for_a),

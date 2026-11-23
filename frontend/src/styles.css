@@ -464,6 +464,25 @@ button:hover {
   right: 0;
 }
 
+/* "Moves" sits along the slot's bottom edge, revealed like the others. */
+.slot-moves {
+  bottom: 0;
+  left: 50%;
+  width: auto;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  font-size: 11px;
+  transform: translateX(-50%);
+}
+
+/* Under the name of a slot whose moves were chosen. */
+.slot-own {
+  font-size: 10px;
+  color: var(--text-soft);
+}
+
 .counter-empty {
   display: flex;
   align-items: center;
@@ -753,6 +772,17 @@ button:disabled {
   padding-left: 18px;
 }
 
+.moves-source {
+  color: var(--text-soft);
+}
+
+/* A chosen move a later scan no longer lists, under its member's line. */
+.moves-gone {
+  display: block;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 /* The change-alert panel ("marigold", from colours.ts): nothing white inside. */
 
 .alert-panel {
@@ -1005,4 +1035,177 @@ button:disabled {
   border-color: #a32d2d;
   background: #a32d2d;
   color: #ffffff;
+}
+
+/* The move picker, for choosing a team slot's moves. It uses the page's dialog
+   frame and widens it: 560 pixels and at most 80% of the window's height on a
+   desktop, the whole screen at 600 pixels or narrower. Only the list scrolls. */
+
+.dialog:has(> .move-picker) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(560px, 100%);
+  max-height: 80vh;
+}
+
+.move-identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.move-picker {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  font-size: 13px;
+}
+
+.moves-in-use {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+}
+
+.moves-in-use h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* In the markup the button comes after the positions, so Tab reaches each move's
+   × first; here it sits on the heading's line. */
+.use-usual {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.moves-status {
+  grid-column: 1 / -1;
+}
+
+.move-positions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.move-position {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-height: 56px;
+  padding: 6px 32px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.move-empty {
+  justify-content: center;
+  padding-right: 8px;
+  border-style: dashed;
+  color: var(--text-soft);
+}
+
+.move-numbers {
+  width: 100%;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.move-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
+.move-finder {
+  display: flex;
+  gap: 6px;
+}
+
+.move-finder input {
+  flex: 1;
+  min-width: 0;
+}
+
+.move-finder input,
+.move-finder select {
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+
+.move-list-head,
+.move-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 0.7fr 1fr;
+  gap: 6px;
+  align-items: center;
+  text-align: left;
+}
+
+.move-list-head {
+  padding: 0 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.move-list {
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+.move-row {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.move-row:disabled {
+  opacity: 0.4;
+}
+
+.move-in-use,
+.move-note,
+.move-full {
+  color: var(--text-soft);
+}
+
+.move-note {
+  font-size: 12px;
+}
+
+.move-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .dialog-backdrop:has(.move-picker) {
+    padding: 0;
+  }
+
+  .dialog:has(> .move-picker) {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
 }

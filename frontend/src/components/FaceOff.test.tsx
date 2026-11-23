@@ -9,10 +9,11 @@ import { ruleNotice } from "../ruleNotice";
 import { COUNTER } from "../test/counterFixture";
 import { FakeServer } from "../test/fakeServer";
 import { INTRO } from "./CounterDetails";
+import { makeTeam } from "../test/makeTeam";
 
-const TEAM = { id: 1, name: "Team 1", pokemon_ids: [6, 9, 3] };
+const TEAM = makeTeam(1, "Team 1", [6, 9, 3]);
 
-async function start(teams = [TEAM, { id: 2, name: "Team 2", pokemon_ids: [25] }]) {
+async function start(teams = [TEAM, makeTeam(2, "Team 2", [25])]) {
   const server = new FakeServer(teams);
   render(<App />);
   await screen.findByText(/^Showing /);
@@ -50,7 +51,7 @@ test("after a build, counter i faces member i, and the footer reports the pool s
 });
 
 test("an empty team cannot be built, and says what to do", async () => {
-  await start([{ id: 1, name: "Team 1", pokemon_ids: [] }]);
+  await start([makeTeam(1, "Team 1", [])]);
   expect(primary().disabled).toBe(true);
   expect(footer().getByText("Add Pokémon from the grid below.")).toBeTruthy();
 });
@@ -135,13 +136,13 @@ test("a refused build shows the server's reason in the counter half", async () =
   expect(await counterHalf().findByText("The legendary flags are not loaded yet", { selector: ".counter-empty" })).toBeTruthy();
 });
 
-test("'Save as new team' makes a team of the three counters", async () => {
+test("'Save as new team' makes a team of the three counters, each on its usual moves", async () => {
   const server = await start();
   await build();
   await act(async () => fireEvent.click(footer().getByRole("button", { name: "Save as new team" })));
   expect(server.writes()).toEqual([
     ["POST /api/teams", { name: "Team 3" }],
-    ["PUT /api/teams/3/members", { pokemon_ids: [130, 25, 149] }],
+    ["PUT /api/teams/3/members", { pokemon_ids: [130, 25, 149], move_ids: [null, null, null] }], // the usual four each
   ]);
   expect(screen.getByRole("button", { name: "Team 3", pressed: true })).toBeTruthy();
 });
@@ -236,8 +237,25 @@ test("your team's moves list each member's four, and say so where PokéAPI lists
   await openDetails();
   fireEvent.click(moreButton());
   expect([...document.querySelectorAll(".team-moves li")].map((line) => line.textContent)).toEqual([
-    "Charizard: Overheat, Earthquake, Hurricane, Outrage",
-    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake",
+    "Charizard: Overheat, Earthquake, Hurricane, Outrage · usual",
+    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · usual",
     "Venusaur-gmax: PokéAPI lists no moves for this Pokémon",
+  ]);
+});
+
+test("a member's moves are marked chosen while one of its chosen moves is used, with a note for each one that was not", async () => {
+  // The answer used Charizard's usual four: its one chosen move, Focus Blast, is not among
+  // them, which is how the answer shows a move a later scan no longer lists. Blastoise
+  // keeps Ice Beam, so its line is "chosen by you" with a note for Focus Blast.
+  const chosen = [[{ id: 411, name: "focus-blast" }], [{ id: 58, name: "ice-beam" }, { id: 411, name: "focus-blast" }], null];
+  new FakeServer([{ ...TEAM, moves: chosen }]);
+  render(<App />);
+  await screen.findByText(/^Showing /);
+  await openDetails();
+  fireEvent.click(moreButton());
+  expect([...document.querySelectorAll(".team-moves li")].map((line) => line.textContent)).toEqual([
+    "Charizard: Overheat, Earthquake, Hurricane, Outrage · usualFocus Blast is no longer listed for Charizard, so not used.",
+    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake · chosen by youFocus Blast is no longer listed for Blastoise, so not used.",
+    "Venusaur: Petal Dance, Sludge Wave, Earth Power, Outrage · usual",
   ]);
 });
