@@ -464,23 +464,9 @@ button:hover {
   right: 0;
 }
 
-/* "Moves" sits along the slot's bottom edge, revealed like the others. */
+/* "Choose moves" under a slot's name, always shown. */
 .slot-moves {
-  bottom: 0;
-  left: 50%;
-  width: auto;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
   font-size: 11px;
-  transform: translateX(-50%);
-}
-
-/* Under the name of a slot whose moves were chosen. */
-.slot-own {
-  font-size: 10px;
-  color: var(--text-soft);
 }
 
 .counter-empty {

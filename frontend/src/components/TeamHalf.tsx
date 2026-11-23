@@ -1,7 +1,7 @@
 // The left half of the face-off card: the selected team as six positions,
 // three per row. Filled positions are TeamSlots; the rest are outlines, and a
 // slot dropped on an outline moves to the end, since a team has no gaps. A
-// slot's "Moves" opens the move picker for that slot.
+// slot's "Choose moves" opens the move picker for that slot.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import type { MoveChoices } from "../moveChoice";
@@ -122,7 +122,7 @@ export function TeamHalf({ team, pokemonById, onMembers, onMoves, loadMoves, onR
     if (from === null || from === target) return;
     onMembers(edit((list) => (target === "end" ? moveToEnd(list, from) : swapSlots(list, from, target))));
   }
-  // Closing the picker returns focus to the slot's "Moves".
+  // Closing the picker returns focus to the slot's "Choose moves".
   function closePicker(slot: number) {
     flushSync(() => setPicking(null));
     focusIn(slot, [".slot-moves"]);

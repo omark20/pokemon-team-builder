@@ -103,11 +103,11 @@ test("every slot control can be reached with Tab, and focusing one reveals its s
   const { slots } = renderHalf([6, 9]);
   const controls = screen.getAllByRole("button").filter((button) => button.closest(".slot"));
   expect(controls.map((button) => button.getAttribute("aria-label"))).toEqual([
-    "Remove Charizard", "Move Charizard later", "Choose Charizard's moves",
-    "Remove Blastoise", "Move Blastoise earlier", "Choose Blastoise's moves",
+    "Choose Charizard's moves", "Remove Charizard", "Move Charizard later",
+    "Choose Blastoise's moves", "Remove Blastoise", "Move Blastoise earlier",
   ]);
   expect(controls.every((button) => button.tabIndex === 0)).toBe(true);
-  act(() => controls[0]!.focus());
+  act(() => controls[1]!.focus());
   expect(slots()[0]!.classList.contains("revealed")).toBe(true);
 });
 
@@ -121,11 +121,12 @@ test("six positions are drawn, the unfilled ones as outlines", () => {
 
 const FOCUS_BLAST = [{ id: 411, name: "focus-blast" }];
 
-test("a slot's chosen moves travel with it when it moves, go with it when it is removed, and show as 'own moves'", () => {
+test("a slot's chosen moves travel with it when it moves, go with it when it is removed, and its link says so", () => {
   const { onMembers, slots } = renderHalf([6, 9, 25], [null, FOCUS_BLAST, null]);
-  expect(slots().map((slot) => slot.querySelector(".slot-own")?.textContent ?? null)).toEqual([
-    null, "own moves", null, null, null, null,
+  expect(slots().map((slot) => slot.querySelector(".slot-moves")?.textContent ?? null)).toEqual([
+    "Choose moves", "Own moves · change", "Choose moves", null, null, null,
   ]);
+  expect(control("Change Blastoise's chosen moves").textContent).toBe("Own moves · change");
   fireEvent.click(control("Move Blastoise earlier"));
   fireEvent.click(control("Remove Blastoise"));
   expect(onMembers.mock.calls).toEqual([
@@ -134,7 +135,7 @@ test("a slot's chosen moves travel with it when it moves, go with it when it is 
   ]);
 });
 
-test("by keyboard, 'Moves' opens the slot's picker, and closing it returns focus there", async () => {
+test("by keyboard, 'Choose moves' opens the slot's picker, and closing it returns focus there", async () => {
   const { slots } = renderHalf([6, 9]);
   const moves = control("Choose Charizard's moves");
   act(() => moves.focus());
@@ -146,10 +147,8 @@ test("by keyboard, 'Moves' opens the slot's picker, and closing it returns focus
   expect(document.activeElement).toBe(control("Choose Charizard's moves"));
 });
 
-test("on a phone the first tap on 'Moves' reveals the controls and the next opens the picker", async () => {
+test("'Choose moves' is always shown, so on a phone the first tap opens the picker", async () => {
   renderHalf([6, 9]);
-  tap(control("Choose Charizard's moves"));
-  expect(screen.queryByRole("dialog")).toBeNull();
   tap(control("Choose Charizard's moves"));
   expect(await screen.findByRole("dialog", { name: "Charizard's moves" })).toBeTruthy();
 });

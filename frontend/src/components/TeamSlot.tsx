@@ -1,10 +1,10 @@
 // One filled position of a team: picture and name, dragged onto another slot
-// to swap them. A "×" removes the slot, two arrows move it one place and
-// "Moves" opens the choice of its moves; they stay in the page for the keyboard
-// but are hidden, and ignore pointer clicks, until the slot is "revealed" by a
-// hovering mouse, keyboard focus or a tap. So a first tap on a phone only shows
-// them, and the next one acts. A slot whose moves were chosen says so under its
-// name.
+// to swap them. A "×" removes the slot and two arrows move it one place; they
+// stay in the page for the keyboard but are hidden, and ignore pointer clicks,
+// until the slot is "revealed" by a hovering mouse, keyboard focus or a tap. So
+// a first tap on a phone only shows them, and the next one acts. Under the name,
+// always shown, a link opens the choice of the slot's moves at the first press,
+// and says whether moves were chosen.
 import { useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from "react";
 import { typeStyle } from "../colours";
 import { displayName, type Pokemon } from "../types";
@@ -96,7 +96,14 @@ export function TeamSlot({ pokemon, ownMoves, onRemove, onMoves, onMoveEarlier, 
     >
       <Sprite url={pokemon.sprite_url} name={name} size={48} />
       <span className="slot-name">{name}</span>
-      {ownMoves && <span className="slot-own">own moves</span>}
+      <button
+        type="button"
+        className="link-button slot-moves"
+        aria-label={ownMoves ? `Change ${name}'s chosen moves` : `Choose ${name}'s moves`}
+        onClick={onMoves}
+      >
+        {ownMoves ? "Own moves · change" : "Choose moves"}
+      </button>
       <SlotControl label={`Remove ${name}`} className="slot-remove" act={onRemove} acts={acts}>
         ×
       </SlotControl>
@@ -110,9 +117,6 @@ export function TeamSlot({ pokemon, ownMoves, onRemove, onMoves, onMoveEarlier, 
           ›
         </SlotControl>
       )}
-      <SlotControl label={`Choose ${name}'s moves`} className="slot-moves" act={onMoves} acts={acts}>
-        Moves
-      </SlotControl>
     </li>
   );
 }
