@@ -1,5 +1,4 @@
-# Keep secrets, local environments, build output, documents and the demo recording out
-# of the build context.
+# Keep secrets, local environments, build output and documents out of the build context.
 .env
 .env.*
 .git
@@ -11,4 +10,3 @@
 **/.ruff_cache
 frontend/dist
 *.md
-demo/
