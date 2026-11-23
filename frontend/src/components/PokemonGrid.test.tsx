@@ -45,7 +45,7 @@ test("pressing the button until it goes puts every one of the 1,351 on screen", 
   fireEvent.click(button);
   expect(cardNames()).toHaveLength(1351);
   expect(showMore()).toBeNull();
-});
+}, 20_000); // it draws all 1,351 cards: about 2.5 s here, so a slower CI runner needs more than the default 5 s
 
 test("after a press focus stays on the button, and the new cards come before it in Tab order", () => {
   const { container } = renderGrid();
