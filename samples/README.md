@@ -127,6 +127,49 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     on the wire with gzip, 25 MB decoded; the largest body is 10 KB on the wire.
     No request was refused or throttled (`census_species_curl_log.txt`).
 
+## Added 2026-11-22 (about 18:50 Eastern): moves
+
+| File | Request |
+|---|---|
+| `move_list_full.json` | `GET /move?limit=100000`, fetched with `curl -s --compressed`, saved unmodified |
+| `census_moves_curl_log.txt` | `curl -w "{id} %{http_code} %{time_total} %{size_download}"` output for one `GET /move/{id}` per listed move, 4 in parallel (`xargs -P 4`) |
+| `census_all_moves.tsv` | **Derived, not raw.** One row per move, extracted from the 938 bodies of that sweep: id, name, type, damage class, power, accuracy, pp, priority, target, generation, the fields of `meta` (category, hit counts, turn counts, drain, healing), and how many Pokémon its `learned_by_pokemon` list names |
+| `move_{id}_{name}.json` (14 files) | 14 bodies of that sweep, saved unmodified, one for each kind the rules mention: ordinary special and physical moves (53, 89, 444, 411), fixed damage (69), one-hit knock-out (90), multi-hit (3), charge (76), recharge (63), the user faints (153), no accuracy (129), a status move (45), the non-standard `shadow` type (10001), and a move whose `meta` is null (827) |
+
+22. **The move list has 938 entries.** 920 have ids from 1 upward; 18 have ids
+    from 10001 to 10018 and are all of type `shadow`, which is not one of the 18
+    standard types. No Pokémon learns any of those 18.
+23. **Every move answer has the same top-level keys**, among them `type`,
+    `damage_class`, `power`, `accuracy`, `meta` and `learned_by_pokemon`. The
+    damage class is `physical` for 395, `special` for 266 and `status` for 277.
+    No status move has a power. **There is no flag for moves that charge,
+    recharge or make the user faint**: no `flags` key exists, `meta` has no such
+    field, and `meta` is null for 111 moves (the newest ones).
+24. **`power` is null for 77 of the 661 damaging moves**: 4 one-hit knock-outs
+    and 73 whose damage is fixed or depends on something else (`seismic-toss`,
+    `low-kick`, `return`). **`accuracy` is null for 92 damaging moves** (moves
+    that do not check accuracy, such as `swift`), and is `0` for one,
+    `tachyon-cutter`.
+25. **573 damaging moves have a power and a standard type.** 514 of them have a
+    power of 120 or less; 59 are stronger, of which 44 are learned by some
+    Pokémon (`explosion` 250, `self-destruct` 200, the ten recharge moves at
+    150 and 160, `focus-punch` 150, and others in the census file). 27 counted
+    moves hit more than once (`min_hits` and `max_hits` set); their `power` is
+    for one hit.
+26. **A Pokémon's own `moves` array and the moves' `learned_by_pokemon` lists
+    agree.** For each of the 14 captured Pokémon answers, the set of moves in
+    its `moves` array equals the set of moves that name it, with no difference
+    either way. Across all moves, 1,317 of the 1,351 Pokémon are named by at
+    least one; the 34 that are not are the Gigantamax forms (ids 10195 to
+    10228). 7 default Pokémon learn moves but none that deals damage with a
+    stated power: Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku, Cosmog and
+    Cosmoem. There are 102,342 Pokémon-and-move pairs; the median Pokémon
+    learns 77 moves.
+27. **One pass over the moves is small and fast.** 938 requests at 4 in parallel
+    took 26 seconds (mean 0.10 s per request, slowest 0.58 s), 3.2 MB on the
+    wire with gzip, 31 MB decoded. No request was refused or throttled
+    (`census_moves_curl_log.txt`).
+
 ## Not verified by these captures
 
 - What `x-pokeapi-hash` / `x-pokeapi-deploy-date` actually track. They look like a
@@ -134,6 +177,9 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
   semantics are a guess until confirmed in PokéAPI's docs or source.
 - Whether the ETag changes whenever, and only when, the body changes. Fact 14
   shows a 304 is returned; it does not show what the ETag is computed from.
+- Which moves need a turn to charge or recharge, or have another drawback. The
+  move answer has no field for it (fact 23), and 73 of the 531 learnable moves
+  with a power have no English effect text to read it from.
 - PokéAPI rate limits. Fact 15 shows one pass at 4 in parallel was not
   throttled; it says nothing about higher rates or repeated passes.
 - Whether `raw.githubusercontent.com` throttles a browser that loads many
