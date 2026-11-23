@@ -1,6 +1,6 @@
 # Pokémon Team Builder
 
-[Live site](https://pokemon-team-builder-c97p.onrender.com) · [Setup](SETUP.md) · [Demo](DEMO.md) · [Demo video](demo/change-alert-demo.mp4) · [Security](SECURITY.md) · [Design notes](DESIGN.md)
+[Live site](https://pokemon-team-builder-c97p.onrender.com) · [Setup](SETUP.md) · [Demo](DEMO.md) · [Demo video](demo/change-alert-demo.mp4?raw=true) · [Security](SECURITY.md) · [Design notes](DESIGN.md)
 
 Build Pokémon teams, get the best counter team for each, and get an alert when PokéAPI changes something a team uses. It all runs as FastAPI, Postgres and React in one Docker image on Render.
 
