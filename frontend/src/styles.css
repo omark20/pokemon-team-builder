@@ -10,6 +10,10 @@
   --border-strong: #cfcdc4;
   --text: #1b1b19;
   --text-soft: #5f5e5a;
+  --win-tint: #eaf3de;
+  --win-text: #27500a;
+  --loss-tint: #fcebeb;
+  --loss-text: #791f1f;
 }
 
 * {
@@ -535,8 +539,6 @@ button:hover {
   padding: 1px 6px;
   overflow: hidden;
   border-radius: 8px;
-  background: #eaf3de;
-  color: #27500a;
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -574,52 +576,128 @@ button:disabled {
   font-size: 13px;
 }
 
-.pick-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-  gap: 0 18px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pick-list li {
-  padding: 6px 0;
-  border-top: 1px solid var(--border);
-}
-
-.muted {
-  font-weight: 400;
+.counter-details > p {
+  margin: 0 0 10px;
   color: var(--text-soft);
 }
 
-/* A pick's matchup label in the details. */
-.matchup {
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+/* How a fight ends: green for a win, neutral for a draw, red for a loss. */
+.outcome-win {
+  background: var(--win-tint);
+  color: var(--win-text);
 }
 
-/* Cells stand apart with a small gap, so two neighbours of the same colour
-   still read as two cells. */
-.matchups {
-  width: 100%;
+.outcome-draw {
+  background: var(--track);
+  color: var(--text-soft);
+}
+
+.outcome-loss {
+  background: var(--loss-tint);
+  color: var(--loss-text);
+}
+
+/* One scoreboard card per pick, at most three across. An open "Why?" block spans
+   the whole row; dense packing lets the cards after it fill the row above, so the
+   block sits under its card's row. */
+.pick-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  grid-auto-flow: row dense;
+  gap: 10px;
+}
+
+.pick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 6px;
+}
+
+.scoreboard-vs {
+  align-self: center;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.fighter {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.fighter-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fighter-turns strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.fighter-move {
+  font-size: 12px;
+}
+
+.why-toggle {
+  align-self: flex-end;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.pick-why {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--track);
+}
+
+.more-toggle {
   margin-top: 10px;
+  font-size: 13px;
+}
+
+.counter-more h3 {
+  margin: 14px 0 2px;
+  font-size: 14px;
+}
+
+.section-note {
+  margin: 0 0 6px;
+  color: var(--text-soft);
+}
+
+/* Every fight as a mark per cell. On a narrow screen the table scrolls sideways
+   inside its own box, never the page. */
+.fights-scroll {
+  overflow-x: auto;
+}
+
+.fights {
+  width: 100%;
   border-collapse: separate;
   border-spacing: 4px;
   table-layout: fixed;
 }
 
-.matchups caption {
-  margin-bottom: 4px;
-  color: var(--text-soft);
-  text-align: left;
-}
-
-.matchups th,
-.matchups td {
-  padding: 5px 3px;
+.fights th,
+.fights td {
+  padding: 0;
   overflow: hidden;
   font-size: 12px;
   text-align: center;
@@ -627,77 +705,52 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* In a cell the word sits above the number, so narrow columns keep both whole. */
-.matchups .matchup-cell {
-  border-radius: 6px;
-}
-
-.matchups td .matchup-word {
-  display: block;
-  font-size: 11px;
-}
-
-.matchups-scroll {
-  overflow-x: auto;
-}
-
-.how-chosen {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--track);
-}
-
-.how-chosen h3 {
-  margin: 0 0 4px;
-  font-size: 14px;
-}
-
-.how-chosen p {
-  margin: 4px 0 0;
-  color: var(--text-soft);
-}
-
-.matchups thead th {
+.fights thead th {
   font-weight: 400;
   color: var(--text-soft);
 }
 
-.matchups tbody th {
-  font-weight: 600;
+.fights th:first-child {
   text-align: left;
 }
 
-/* The matchup scale's colours come from colours.ts as custom properties. */
-.matchup,
-.matchup-cell {
-  background: var(--matchup-fill);
-  color: var(--matchup-text);
-}
-
-.row-sum {
+.fights tbody th {
   font-weight: 600;
 }
 
-.totals {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 12px;
-  margin: 12px 0 0;
+.fight {
+  border-radius: 6px;
 }
 
-.totals dt {
+.fight button {
+  width: 100%;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+}
+
+/* The cell of the opponent a counter was picked for. */
+.fight.own {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+.fight-total {
   color: var(--text-soft);
 }
 
-.totals dd {
+.fight-words {
+  min-height: 1.5em;
+  margin: 4px 0 0;
+  color: var(--text-soft);
+}
+
+.team-moves {
   margin: 0;
-  font-weight: 600;
-}
-
-.weaknesses {
-  margin: 8px 0 0;
-  color: var(--text-soft);
+  padding-left: 18px;
 }
 
 /* The change-alert panel ("marigold", from colours.ts): nothing white inside. */
@@ -952,16 +1005,4 @@ button:disabled {
   border-color: #a32d2d;
   background: #a32d2d;
   color: #ffffff;
-}
-
-/* A pick line's "Why?" button and the reason it shows under the line. */
-.why-toggle {
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
-.why {
-  margin: 4px 0 0;
-  color: var(--text-soft);
 }

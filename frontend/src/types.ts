@@ -49,25 +49,68 @@ export interface Team {
   pokemon_ids: number[];
 }
 
-// One counter in GET /api/teams/{id}/counter: the opponent it answers, its
-// matchup against that opponent and the sentence saying why it was picked.
+// Move names are written as words: "stone-edge" is "Stone Edge".
+export function moveName(name: string): string {
+  return name
+    .split("-")
+    .map((word) => displayName(word))
+    .join(" ");
+}
+
+// How a counter's one-on-one fight with an opponent ends, for the counter.
+export type Outcome = "wins" | "draws with" | "loses to";
+
+// GET /api/teams/{id}/counter, as far as the page reads it. A fight's damage,
+// accuracy and HP are stated in its pick's `reason`.
+
+// One side of a fight: the Pokémon, the move it uses (null when none of its four
+// damages the other side) and the turns it needs to knock the other out, 1 to 10,
+// where 10 means "10 or more".
+export interface FightSide {
+  id: number;
+  name: string;
+  move: string | null;
+  turns: number;
+}
+
+// One counter and the opponent it was picked for. `line` says how their fight ends
+// in one sentence; `reason` gives the numbers behind it.
 export interface CounterPick {
-  opponent: { id: number; name: string };
-  counter: { id: number; name: string };
-  matchup: number; // points: how hard it hits minus how hard it is hit, -5 to 5
+  counter: FightSide;
+  opponent: FightSide;
+  outcome: Outcome;
+  line: string;
   reason: string;
 }
 
-// The counter team, in the order of the team it answers. `grid[i][j]` is the
-// matchup of counter i against opponent j. `weakness_counts` gives, for each
-// opposing type, how many counters it hits for 2x or more.
+// One cell of the table of every fight.
+export interface FightCell {
+  outcome: Outcome;
+  counter_turns: number;
+  opponent_turns: number;
+}
+
+// The four moves one of the visitor's Pokémon is assumed to carry.
+export interface AssumedMoves {
+  name: string;
+  moves: string[];
+  moves_listed: boolean; // false when PokéAPI lists no moves for it at all
+}
+
+// Whether the team keeps the rule that no opposing type hits more than half the
+// counters for 2× or more: kept; no team could keep it; or the search for a team
+// that keeps it was cut short, so the best team regardless is shown.
+export type WeaknessRule = "kept" | "limit_raised" | "guard_reached";
+
+// The counter team, in the order of the team it answers. `grid[i][j]` is counter i
+// against opponent j; against the opponent it was picked for, a counter's cell is
+// the fight its pick describes.
 export interface CounterResult {
   picks: CounterPick[];
-  totals: { assigned_points: number; coverage: number; base_stats: number };
-  grid: number[][];
-  weakness_counts: Record<string, number>;
-  relaxed: boolean; // more than half the counters share a weakness: no team avoided it
-  stopped_early: boolean; // the search hit its step limit; a better team may exist
+  grid: FightCell[][];
+  opponent_moves: AssumedMoves[];
+  weakness_counts: Record<string, number>; // per opposing type, in name order: counters it hits for 2× or more
+  weakness_rule: WeaknessRule;
   pool_size: number;
   legendary_left_out: boolean; // the candidates excluded legendary and mythical Pokémon
 }

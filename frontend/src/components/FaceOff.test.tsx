@@ -1,13 +1,14 @@
 // The counter half, its details and the footer row, through the whole page
-// against a stand-in backend. The team is Charizard, Blastoise, Venusaur and
-// the counter answer is test/counterFixture.ts.
+// against a stand-in backend. The team is Charizard, Blastoise, Venusaur and the
+// counter answer is test/counterFixture.ts: Gyarados beats Charizard, Pikachu
+// loses to Blastoise, Dragonite draws with Venusaur.
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
 import App from "../App";
-import { MATCHUP_COLOURS } from "../colours";
+import { ruleNotice } from "../ruleNotice";
 import { COUNTER } from "../test/counterFixture";
 import { FakeServer } from "../test/fakeServer";
-import { NOTICES } from "./CounterHalf";
+import { INTRO } from "./CounterDetails";
 
 const TEAM = { id: 1, name: "Team 1", pokemon_ids: [6, 9, 3] };
 
@@ -40,11 +41,11 @@ test("after a build, counter i faces member i, and the footer reports the pool s
   const server = await start();
   await build();
   expect(server.calls.at(-1)?.path).toBe("/api/teams/1/counter");
-  expect(counterNames()).toEqual(["Archeops", "Hydrapple", "Celesteela"]);
-  const beats = [...document.querySelectorAll(".beats")].map((el) => el.textContent);
-  expect(beats).toEqual(["beats Charizard", "beats Blastoise", "beats Venusaur"]);
+  expect(counterNames()).toEqual(["Gyarados", "Pikachu", "Dragonite"]);
+  const chips = [...document.querySelectorAll(".beats")].map((el) => el.textContent);
+  expect(chips).toEqual(["beats Charizard", "loses to Blastoise", "draws with Venusaur"]);
   expect(counterHalf().queryByRole("button", { name: "Why?" })).toBeNull(); // the reasons are in the details
-  expect(footer().getByText("Best team out of 1,025 candidates.")).toBeTruthy();
+  expect(footer().getByText("Best team out of 3 candidates.")).toBeTruthy();
   expect(primary().textContent).toBe("Rebuild");
 });
 
@@ -69,46 +70,37 @@ test.each(CHANGES)("%s clears the counter team", async (_change, act) => {
   expect(primary().textContent).toBe("Build counter team");
 });
 
-test("the details open on request: each pick with its label but no reason, and a table whose rows add up", async () => {
+const fighter = (half: Element) =>
+  ["fighter-name", "fighter-turns", "fighter-move"].map((part) => half.querySelector(`.${part}`)!.textContent);
+
+test("the details show one scoreboard per pick, the winner's half tinted, and no reason yet", async () => {
   await start();
   await build();
   expect(document.querySelector(".counter-details")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-  expect([...document.querySelectorAll(".pick-list li")].map((line) => line.textContent)).toEqual([
-    "Archeops beats Charizard Strong +3 Why?",
-    "Hydrapple beats Blastoise Strong +3 Why?",
-    "Celesteela beats Venusaur Strong +3 Why?",
+  expect(screen.getByText(INTRO)).toBeTruthy();
+  const cards = [...document.querySelectorAll(".pick-card")].map((card) =>
+    [...card.querySelectorAll(".fighter")].map((half) => [...fighter(half), half.classList.contains("outcome-win")]),
+  );
+  expect(cards).toEqual([
+    [["Gyarados", "1 turn", "Aqua Tail", true], ["Charizard", "3 turns", "Outrage", false]], // a win
+    [["Pikachu", "2 turns", "Volt Tackle", false], ["Blastoise", "1 turn", "Earthquake", true]], // a loss
+    [["Dragonite", "2 turns", "Outrage", false], ["Venusaur", "2 turns", "Outrage", false]], // a draw
   ]);
   const details = document.querySelector(".counter-details")!.textContent;
-  expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]); // a reason shows only when its Why? is pressed
-  const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];
-  expect(rows.map((row) => row.querySelectorAll("td:not(.row-sum)").length)).toEqual([3, 3, 3]);
-  const sums = rows.map((row) => Number(row.querySelector(".row-sum")!.textContent));
-  expect(sums).toEqual([3, 1, 2]); // the fixture grid's rows: 3 - 1 + 1, -1 + 3 - 1, -1 + 0 + 3
-  // Each cell gives a word and the number; the fixture's first row is +3, -1, +1.
-  expect([...rows[0]!.querySelectorAll("td:not(.row-sum)")].map((cell) => cell.textContent)).toEqual([
-    "Strong +3", "Weak -1", "Good +1",
-  ]);
-  expect(screen.getByRole("heading", { name: "How this team was chosen" })).toBeTruthy();
-  // The colour follows the word: the "Strong" cell has the strong fill, the "Weak" one the weak fill.
-  const fills = [...rows[0]!.querySelectorAll<HTMLElement>("td:not(.row-sum)")].map((cell) =>
-    cell.style.getPropertyValue("--matchup-fill"),
-  );
-  expect(fills).toEqual([MATCHUP_COLOURS.strong.fill, MATCHUP_COLOURS.weak.fill, MATCHUP_COLOURS.good.fill]);
+  expect(COUNTER.picks.filter((pick) => details.includes(pick.reason))).toEqual([]);
+  expect(screen.queryByRole("table")).toBeNull(); // behind "Show more"
 });
 
-test.each([
-  { flag: "stopped_early", notice: NOTICES.stoppedEarly, status: "Best team found out of 1,025 candidates." },
-  { flag: "relaxed", notice: NOTICES.relaxed, status: "Best team out of 1,025 candidates." },
-])("a $flag result shows its notice without opening the details", async ({ flag, notice, status }) => {
+test.each(["kept", "limit_raised", "guard_reached"] as const)("the type-mix notice shows exactly when the rule is not kept (%s)", async (rule) => {
   const server = new FakeServer([TEAM]);
-  server.counter = { ...COUNTER, [flag]: true };
+  server.counter = { ...COUNTER, weakness_rule: rule };
+  const notice = ruleNotice(server.counter); // its wording is tested in ruleNotice.test.ts
   render(<App />);
   await screen.findByText(/^Showing /);
   await build();
-  expect(counterHalf().getByText(notice)).toBeTruthy();
-  expect(footer().getByText(status)).toBeTruthy();
-  expect(document.querySelector(".counter-details")).toBeNull();
+  const shown = [...document.querySelectorAll(".counter-notice")].map((el) => el.textContent);
+  expect(shown).toEqual(notice ? [notice] : []);
 });
 
 test("the legendary box has its label, starts unticked, and ticking it clears a shown team", async () => {
@@ -149,7 +141,7 @@ test("'Save as new team' makes a team of the three counters", async () => {
   await act(async () => fireEvent.click(footer().getByRole("button", { name: "Save as new team" })));
   expect(server.writes()).toEqual([
     ["POST /api/teams", { name: "Team 3" }],
-    ["PUT /api/teams/3/members", { pokemon_ids: [567, 1019, 797] }],
+    ["PUT /api/teams/3/members", { pokemon_ids: [130, 25, 149] }],
   ]);
   expect(screen.getByRole("button", { name: "Team 3", pressed: true })).toBeTruthy();
 });
@@ -159,19 +151,19 @@ test("a finished build is announced once, politely, with the counters' names", a
   const live = document.querySelector('.counter-live[aria-live="polite"]')!;
   expect(live.textContent).toBe("");
   await build();
-  expect(live.textContent).toBe("Counter team ready: Archeops, Hydrapple, Celesteela.");
+  expect(live.textContent).toBe("Counter team ready: Gyarados, Pikachu, Dragonite.");
 });
 
-const pickList = () => within(document.querySelector<HTMLElement>(".pick-list")!);
-const whyButtons = () => pickList().getAllByRole("button", { name: /^(Why\?|Hide why)$/ });
-const shownReasons = () => [...document.querySelectorAll(".why")].map((el) => el.textContent);
+const whyButtons = () => within(document.querySelector<HTMLElement>(".pick-cards")!).getAllByRole("button", { name: /^(Why\?|Hide why)$/ });
+const shownReasons = () => [...document.querySelectorAll(".pick-why")].map((el) => el.textContent);
+const moreButton = () => screen.getByRole("button", { name: /^Show (more|less)$/ });
 
 async function openDetails() {
   await build();
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
 }
 
-test("a pick line's Why? shows that pick's reason under it, and only that one, until pressed again", async () => {
+test("a card's Why? shows that pick's reason, and only that one, until pressed again", async () => {
   await start();
   await openDetails();
   const second = whyButtons()[1]!;
@@ -193,4 +185,59 @@ test("a rebuild hides every open reason", async () => {
   await screen.findByText("beats Charizard");
   fireEvent.click(screen.getByRole("button", { name: "Show details" }));
   expect(shownReasons()).toEqual([]);
+});
+
+const MORE_HEADINGS = ["All 9 fights", "Your team's moves", "How this team was chosen"];
+
+test("Show more reveals the three sections together, and Show less hides them", async () => {
+  await start();
+  await openDetails();
+  const details = within(document.querySelector<HTMLElement>(".counter-details")!);
+  const headings = () => details.queryAllByRole("heading").map((heading) => heading.textContent);
+  expect(headings()).toEqual([]);
+  fireEvent.click(moreButton());
+  expect(headings()).toEqual(MORE_HEADINGS);
+  expect(moreButton().getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText(/The three shown are the best three that are all different\.$/)).toBeTruthy();
+  fireEvent.click(moreButton());
+  expect(headings()).toEqual([]);
+});
+
+test("the table marks every fight, outlines each counter's own opponent and counts its wins", async () => {
+  await start();
+  await openDetails();
+  fireEvent.click(moreButton());
+  const rows = [...screen.getByRole("table").querySelectorAll("tbody tr")];
+  const marks = rows.map((row) => [...row.querySelectorAll(".fight")].map((cell) => cell.textContent));
+  expect(marks).toEqual([["✓", "✓", "✓"], ["✗", "✗", "✗"], ["✓", "✓", "–"]]);
+  const outlined = rows.map((row) => [...row.querySelectorAll(".fight")].findIndex((cell) => cell.classList.contains("own")));
+  expect(outlined).toEqual([0, 1, 2]);
+  expect(rows.map((row) => row.querySelector(".fight-total")!.textContent)).toEqual(["wins 3 of 3", "wins 0 of 3", "wins 2 of 3"]);
+});
+
+test("a mark's words are its name, and show under the table when it is pressed or focused", async () => {
+  await start();
+  await openDetails();
+  fireEvent.click(moreButton());
+  const mark = screen.getByRole("button", { name: "Pikachu loses: 4 turns against 1" });
+  expect(mark.getAttribute("title")).toBe("Pikachu loses: 4 turns against 1");
+  fireEvent.focus(mark);
+  expect(document.querySelector(".fight-words")!.textContent).toBe("Pikachu loses: 4 turns against 1");
+  fireEvent.click(screen.getByRole("button", { name: "Gyarados wins: 1 turn against 3" }));
+  expect(document.querySelector(".fight-words")!.textContent).toBe("Gyarados wins: 1 turn against 3");
+});
+
+test("your team's moves list each member's four, and say so where PokéAPI lists none", async () => {
+  const server = new FakeServer([TEAM]);
+  const unlisted = { name: "Venusaur-gmax", moves: [], moves_listed: false };
+  server.counter = { ...COUNTER, opponent_moves: [...COUNTER.opponent_moves.slice(0, 2), unlisted] };
+  render(<App />);
+  await screen.findByText(/^Showing /);
+  await openDetails();
+  fireEvent.click(moreButton());
+  expect([...document.querySelectorAll(".team-moves li")].map((line) => line.textContent)).toEqual([
+    "Charizard: Overheat, Earthquake, Hurricane, Outrage",
+    "Blastoise: Water Spout, Ice Beam, Outrage, Earthquake",
+    "Venusaur-gmax: PokéAPI lists no moves for this Pokémon",
+  ]);
 });

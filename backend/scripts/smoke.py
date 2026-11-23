@@ -3,6 +3,8 @@
 It starts the app on 127.0.0.1, on a port free at the time, against the local development
 database, runs the steps in order, prints "ok" or "FAIL" with what was expected and what
 came back, and stops the app however it ends. The scan in step 1 reads the live PokéAPI.
+Two steps also use that database directly: 0b empties the counter team's stored data,
+which step 1's scan stores again, and 1b counts what the scan stored.
 The host is a constant, so this script cannot be pointed at the public site; the token
 is the local one from the git-ignored .env, and no token or cookie is ever printed.
 """
@@ -14,6 +16,7 @@ from collections.abc import Callable
 
 import httpx
 from local_app import HOST, free_port, start_app, wait_until_up
+from smoke_counter import counter_a, counter_before_moves, duel_data_complete, legendary_filter
 from smoke_steps import (
     Smoke,
     SmokeFailure,
@@ -21,11 +24,9 @@ from smoke_steps import (
     alert_for_a,
     back_to_baseline,
     clean_up,
-    counter_a,
     delete_account_a,
     full_list,
     full_scan,
-    legendary_filter,
     no_alert_for_b,
     no_demo_active,
     patch_stored_alone,
@@ -36,7 +37,9 @@ from smoke_steps import (
 
 STEPS: list[tuple[str, Callable[[Smoke], None]]] = [
     ("0 no demo is active", no_demo_active),
+    ("0b a counter team before the moves are stored is 503", counter_before_moves),
     ("1 a full live scan ends ok", full_scan),
+    ("1b every Pokémon has its four and every field Pokémon a baseline", duel_data_complete),
     ("2 the list matches the captures", full_list),
     ("3 visitor A's team is stored in order", team_a),
     ("3b A's account keeps the team across signing out and in", account_a),

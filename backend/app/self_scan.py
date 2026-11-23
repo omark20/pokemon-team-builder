@@ -30,9 +30,11 @@ LOOK_EVERY_SECONDS = 10 * 60
 
 Decision = Literal["due", "not_due", "paused_for_demo"]
 
-# The start of the last full scan that finished, and of the last full scan of any outcome.
+# The start of the last full scan that finished, of the last full scan of any outcome,
+# and whether the counter team's data is missing.
 FACTS_QUERY = """
-    SELECT max(started_at) FILTER (WHERE status IN ('ok', 'incomplete')), max(started_at)
+    SELECT max(started_at) FILTER (WHERE status IN ('ok', 'incomplete')), max(started_at),
+           NOT EXISTS (SELECT 1 FROM duel_data)
     FROM scan_runs WHERE scope = 'full'
 """
 
@@ -42,12 +44,18 @@ class Facts:
     last_finished: datetime | None  # started_at of the last full ok or incomplete run
     last_attempt: datetime | None  # started_at of the last full run, whatever its outcome
     demo_active: bool
+    duel_data_missing: bool = False  # no fours or baselines stored, so counter teams are 503
 
 
 def decide(now: datetime, facts: Facts) -> Decision:
-    """Whether a scan is due at `now`: the last finished one started over 7 hours ago (or
-    there is none), no full scan started in the last hour, and no demo is active."""
-    stale = facts.last_finished is None or now - facts.last_finished > DUE_AFTER
+    """Whether a scan is due at `now`: the last finished one started over 7 hours ago, or
+    there is none, or the counter team's data is missing; and no full scan started in the
+    last hour, and no demo is active."""
+    stale = (
+        facts.last_finished is None
+        or now - facts.last_finished > DUE_AFTER
+        or facts.duel_data_missing
+    )
     tried = facts.last_attempt is not None and now - facts.last_attempt < RETRY_AFTER
     if not stale or tried:
         return "not_due"
@@ -88,8 +96,8 @@ async def keep_scanned(
 
 def _facts(conn: db.Conn) -> Facts:
     row = conn.execute(FACTS_QUERY).fetchone()
-    last_finished, last_attempt = row if row else (None, None)
-    return Facts(last_finished, last_attempt, demo.is_active(conn))
+    last_finished, last_attempt, missing = row if row else (None, None, True)
+    return Facts(last_finished, last_attempt, demo.is_active(conn), missing)
 
 
 def _age(now: datetime, facts: Facts) -> dict[str, int | str]:

@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS pokemon_moves (
     move_ids integer[] NOT NULL
 );
 
+-- What the counter team needs beyond the stored copy of PokéAPI, worked out from that
+-- copy at the end of every full scan (scan_duel.py). Replaced whole in one transaction;
+-- never diffed, never alerted on. The field size is the number of rows with a baseline.
+CREATE TABLE IF NOT EXISTS duel_data (
+    pokemon_id integer PRIMARY KEY REFERENCES pokemon (id),
+    move_ids integer[] NOT NULL CHECK (cardinality(move_ids) <= 4),  -- its four, in the order chosen
+    baseline integer  -- its duel margins against the whole field, added up; null outside the field
+);
+
 -- One row per changed field of a Pokémon, or per changed chart cell. Values are JSON,
 -- so a sprite going to or from none is the JSON value null, not SQL NULL.
 CREATE TABLE IF NOT EXISTS changes (

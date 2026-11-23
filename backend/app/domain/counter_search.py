@@ -1,234 +1,219 @@
-"""The two exact searches behind the counter team, and nothing else.
+"""Choosing the counter team exactly, given every slot's scored candidates.
 
-`counter.py` prepares, for every slot of the opposing team, the candidates worth
-considering, grouped by weakness pattern: the set of opposing types that hit a
-candidate for 2x or more. This module then finds the best team in two stages.
+The only rule tying slots together is that no Pokémon is used twice, so the best
+team is an assignment. Each slot keeps its n best candidates, n being the team size:
+if a best team used a candidate that was not kept, that slot's n kept candidates
+cannot all be on the other n - 1 slots, so a kept one is free and scores at least as
+much. A depth-first search then tries every hand-out of kept candidates, abandoning a
+branch that cannot beat the best team found.
 
-1. `search_patterns` gives each slot a pattern, depth first, never letting one
-   opposing type appear in more chosen patterns than the weakness limit allows.
-2. `hand_out` turns a complete choice of patterns into actual Pokémon, making sure
-   no Pokémon is used twice. Two slots can only want the same Pokémon if they
-   chose the same pattern, so only those slots need a search (`hand_out_shared`).
-
-Both searches count their steps and stop at the limit, so the work per request is
-bounded. `search_levels` runs them at each weakness limit in turn, strictest first.
-Candidates are known here by ID and score only.
+The shared-weakness rule says no opposing type may hit more than half the counters
+for 2× or more. If the best team keeps it, that team is the answer. Otherwise a
+second search runs in which each slot keeps its n best candidates of every weakness
+pattern (the set of opposing types that hit a candidate for 2×): swapping a candidate
+for a kept one of the same pattern changes no type's count, so again nothing is lost.
+It decides the narrowest slots first, which changes no possible team but reaches the
+slots that decide the rule early. If no team keeps the rule, the limit is raised by
+one until a team does. The second search has a step guard; if it is reached, the
+first team is the answer. Pure.
 """
 
-import math
 from collections import Counter
 from dataclasses import dataclass, field
 
-# Most search steps one strictness level may take.
-STEP_LIMIT = 250_000
+# Steps the second search may take, over every limit tried: about nine times the most
+# any of 40,000 random teams took (10,624), and under a second of search on the
+# deployed server at about 8 millionths of a second a step.
+STEP_GUARD = 100_000
+
+# How the answer stands with the shared-weakness rule.
+RULE_KEPT = "kept"
+LIMIT_RAISED = "limit_raised"  # no team keeps the rule, so the best at a higher limit
+GUARD_REACHED = "guard_reached"  # the second search was cut short: the first team stands
 
 
 @dataclass(frozen=True)
-class Scored:
-    """One candidate for one slot: its ID and its score in that slot."""
+class Candidate:
+    """One candidate for one slot."""
 
-    score: int
     id: int
+    score: int
+    margin: int  # its duel margin against this slot's opponent, the score's first level
+    weak_to: frozenset[str]  # the opposing types that hit it for 2× or more
 
 
-@dataclass(frozen=True)
-class PatternGroup:
-    """A slot's kept candidates that share one weakness pattern, best first."""
-
-    pattern: frozenset[str]
-    kept: tuple[Scored, ...]
-
-
-def best_first(candidate: Scored) -> tuple[int, int]:
+def best_first(candidate: Candidate) -> tuple[int, int]:
     """Sort key: higher score first, then lower ID."""
     return -candidate.score, candidate.id
 
 
 @dataclass
-class SearchState:
-    """Everything one strictness level of the search reads and updates."""
+class Search:
+    """One depth-first search: what it reads, and the team it is building."""
 
-    slots: list[list[PatternGroup]]  # per slot, its groups ordered by their best candidate
+    slots: list[list[Candidate]]  # per slot, its kept candidates, best first
     repeats_previous: list[bool]  # per slot: same opponent as the slot before it
-    weak_limit: int  # most chosen patterns that may contain one opposing type
-    step_limit: int
-    counts: Counter[str] = field(default_factory=Counter)  # chosen patterns per opposing type
-    chosen: list[int] = field(default_factory=list)  # group index chosen for each slot so far
-    chosen_score: int = 0  # best scores of the chosen groups, added up
+    weak_limit: int  # most counters one opposing type may hit for 2× or more
+    step_limit: int | None
+    reachable: list[int]  # per slot: the top score of it and every later slot, added up
     steps: int = 0
-    stopped: bool = False  # the step limit was reached
-    best_score: float = -math.inf
-    best_team: list[int] | None = None  # candidate ID per slot
+    stopped: bool = False
+    chosen: list[int] = field(default_factory=list)  # index chosen in each slot so far
+    team: list[Candidate] = field(default_factory=list)
+    counts: Counter[str] = field(default_factory=Counter)  # counters hit hard, per type
+    best_total: int | None = None
+    best_team: list[Candidate] | None = None
 
 
-@dataclass
-class Deal:
-    """One hand-out among the slots that chose the same pattern."""
+def reachable(slots: list[list[Candidate]]) -> list[int]:
+    """The bound: per slot, the best kept score of it and of every later slot, added up.
 
-    kept: list[tuple[Scored, ...]]  # per sharing slot, in slot order
-    reachable: list[int]  # per sharing slot: top kept score of it and every later one, added
-    picks: list[Scored] = field(default_factory=list)
-    best_total: float = -math.inf
-    best_picks: list[Scored] | None = None
+    A branch whose total plus this figure for the next slot cannot beat the best team
+    found is abandoned.
+    """
+    tops = [kept[0].score if kept else 0 for kept in slots]
+    return [sum(tops[slot:]) for slot in range(len(slots) + 1)]
 
 
-def take_step(state: SearchState) -> bool:
-    """Count one step; at the limit, mark the level stopped and count nothing."""
-    if state.steps >= state.step_limit:
-        state.stopped = True
+def repeats_previous(opponents: list[int]) -> list[bool]:
+    """Per slot: whether it faces the same opponent as the slot searched before it."""
+    return [i > 0 and opponent == opponents[i - 1] for i, opponent in enumerate(opponents)]
+
+
+def new_search(
+    slots: list[list[Candidate]], opponents: list[int], weak_limit: int, step_limit: int | None
+) -> Search:
+    return Search(slots, repeats_previous(opponents), weak_limit, step_limit, reachable(slots))
+
+
+def take_step(search: Search) -> bool:
+    """Count one step; at the limit, mark the search stopped instead."""
+    if search.step_limit is not None and search.steps >= search.step_limit:
+        search.stopped = True
         return False
-    state.steps += 1
+    search.steps += 1
     return True
 
 
-def fits(state: SearchState, group: PatternGroup) -> bool:
-    """Whether choosing this pattern keeps every opposing type within the limit."""
-    return all(state.counts[weak_to] < state.weak_limit for weak_to in group.pattern)
+def cannot_beat_best(search: Search, total: int) -> bool:
+    return search.best_total is not None and total <= search.best_total
 
 
-def allowed_patterns(state: SearchState, slot: int) -> list[int]:
-    """The slot's groups that may be chosen now, in order.
+def may_take(search: Search, candidate: Candidate) -> bool:
+    """Not on the team yet, and no type would then hit more counters than the limit."""
+    return all(c.id != candidate.id for c in search.team) and all(
+        search.counts[weak_to] < search.weak_limit for weak_to in candidate.weak_to
+    )
 
-    A slot facing the same opponent as the slot before it starts at that slot's
-    choice: the two are interchangeable, so earlier groups would repeat teams.
+
+def visit(search: Search, slot: int, total: int) -> None:
+    """Try the slot's kept candidates in order, then the later slots under each.
+
+    Where the slot faces the same opponent as the slot before, it only takes
+    candidates after that slot's choice, so the same team is not tried twice.
     """
-    groups = state.slots[slot]
-    first = state.chosen[slot - 1] if state.repeats_previous[slot] else 0
-    return [index for index in range(first, len(groups)) if fits(state, groups[index])]
-
-
-def later_slots_figure(state: SearchState, slot: int) -> int | None:
-    """The most the slots after `slot` could add, or None if one of them is stuck.
-
-    It must be taken before a pattern is chosen for `slot`, so that it is the same
-    for every pattern tried there; `search_patterns` relies on that to stop early.
-    """
-    figure = 0
-    for groups in state.slots[slot + 1 :]:
-        best = next((group.kept[0].score for group in groups if fits(state, group)), None)
-        if best is None:
-            return None
-        figure += best
-    return figure
-
-
-def search_patterns(state: SearchState, slot: int) -> None:
-    """One arrival at a slot: try its allowed patterns, best first.
-
-    The groups are ordered by best score and the later-slot figure is fixed, so
-    once one pattern cannot beat the best team found, none after it can.
-    """
-    if not take_step(state):
+    if not take_step(search):
         return
-    if slot == len(state.slots):
-        hand_out(state)
+    if slot == len(search.slots):
+        search.best_total, search.best_team = total, list(search.team)
         return
-    figure = later_slots_figure(state, slot)
-    if figure is None:
-        return
-    for index in allowed_patterns(state, slot):
-        group = state.slots[slot][index]
-        best = group.kept[0].score
-        if state.chosen_score + best + figure <= state.best_score:
-            return
-        state.chosen.append(index)
-        state.chosen_score += best
-        state.counts.update(group.pattern)
-        search_patterns(state, slot + 1)
-        state.counts.subtract(group.pattern)
-        state.chosen_score -= best
-        state.chosen.pop()
-        if state.stopped:
+    first = search.chosen[-1] + 1 if search.repeats_previous[slot] else 0
+    for index in range(first, len(search.slots[slot])):
+        candidate = search.slots[slot][index]
+        if cannot_beat_best(search, total + candidate.score + search.reachable[slot + 1]):
+            return  # candidates are best first, so no later one can do better
+        if may_take(search, candidate):
+            take(search, slot, index, total)
+        if search.stopped:
             return
 
 
-def hand_out(state: SearchState) -> None:
-    """Every slot has a pattern: choose the Pokémon and keep the team if it is the best.
+def take(search: Search, slot: int, index: int, total: int) -> None:
+    """Put one candidate on the team, search the later slots, and take it off again."""
+    candidate = search.slots[slot][index]
+    search.chosen.append(index)
+    search.team.append(candidate)
+    search.counts.update(candidate.weak_to)
+    visit(search, slot + 1, total + candidate.score)
+    search.counts.subtract(candidate.weak_to)
+    search.team.pop()
+    search.chosen.pop()
 
-    Patterns are handled in the order of the first slot that chose each. A pattern
-    with fewer different candidates than slots wanting it gives no team.
+
+def keep_best(candidates: list[Candidate], size: int) -> list[Candidate]:
+    return sorted(candidates, key=best_first)[:size]
+
+
+def keep_best_per_pattern(candidates: list[Candidate], size: int) -> list[Candidate]:
+    by_pattern: dict[frozenset[str], list[Candidate]] = {}
+    for candidate in candidates:
+        by_pattern.setdefault(candidate.weak_to, []).append(candidate)
+    kept = [c for group in by_pattern.values() for c in keep_best(group, size)]
+    return sorted(kept, key=best_first)
+
+
+def keeps_rule(team: list[Candidate], limit: int) -> bool:
+    counts = Counter(weak_to for candidate in team for weak_to in candidate.weak_to)
+    return all(count <= limit for count in counts.values())
+
+
+def narrowest_first(slots: list[list[Candidate]]) -> list[int]:
+    """Slot positions, fewest kept candidates sharing the slot's best margin first.
+
+    Ties keep team order, so neighbouring slots facing the same opponent, which tie,
+    stay neighbours.
     """
-    sharing: dict[frozenset[str], list[int]] = {}
-    for slot, index in enumerate(state.chosen):
-        sharing.setdefault(state.slots[slot][index].pattern, []).append(slot)
-    team = [0] * len(state.chosen)
-    total = 0
-    for slots in sharing.values():
-        kept = [state.slots[slot][state.chosen[slot]].kept for slot in slots]
-        picks = [kept[0][0]] if len(slots) == 1 else deal_shared(state, kept)
-        if picks is None:
-            return
-        for slot, pick in zip(slots, picks, strict=True):
-            team[slot] = pick.id
-            total += pick.score
-    if total > state.best_score:
-        state.best_score = total
-        state.best_team = team
+
+    def width(slot: int) -> int:
+        kept = slots[slot]
+        return sum(c.margin == kept[0].margin for c in kept) if kept else 0
+
+    return sorted(range(len(slots)), key=lambda slot: (width(slot), slot))
 
 
-def deal_shared(state: SearchState, kept: list[tuple[Scored, ...]]) -> list[Scored] | None:
-    """The best different candidates for slots sharing a pattern, or None.
+@dataclass(frozen=True)
+class TeamChoice:
+    """One candidate per slot in team order, empty if no team exists, and the rule's state."""
 
-    None means there are too few different candidates, or the step limit cut the
-    search off, in which case a partial answer is not trusted.
+    team: list[Candidate]
+    weakness_rule: str  # RULE_KEPT, LIMIT_RAISED or GUARD_REACHED
+
+
+def second_search(
+    kept: list[list[Candidate]], opponents: list[int], first_team: list[Candidate], step_guard: int
+) -> TeamChoice:
+    """The best team that keeps the rule, raising the limit while no team can.
+
+    At a limit of the whole team nothing is ruled out, so the answer there is the first
+    team; it is also the answer if the guard is reached.
     """
-    tops = [candidates[0].score for candidates in kept]
-    reachable = [sum(tops[position:]) for position in range(len(tops))]
-    deal = Deal(kept, reachable)
-    hand_out_shared(state, deal, 0, 0)
-    return None if state.stopped else deal.best_picks
+    order = narrowest_first(kept)
+    ordered, faced = [kept[i] for i in order], [opponents[i] for i in order]
+    size, steps = len(kept), 0
+    for weak_limit in range(size // 2, size):
+        search = new_search(ordered, faced, weak_limit, step_guard - steps)
+        visit(search, 0, 0)
+        steps += search.steps
+        if search.stopped:
+            return TeamChoice(first_team, GUARD_REACHED)
+        if search.best_team is not None:
+            team = [search.best_team[order.index(slot)] for slot in range(size)]
+            return TeamChoice(team, RULE_KEPT if weak_limit == size // 2 else LIMIT_RAISED)
+    return TeamChoice(first_team, LIMIT_RAISED)
 
 
-def hand_out_shared(state: SearchState, deal: Deal, position: int, total: int) -> None:
-    """One arrival at a sharing slot: try its kept candidates not already taken."""
-    if not take_step(state):
-        return
-    if position == len(deal.kept):
-        if total > deal.best_total:
-            deal.best_total = total
-            deal.best_picks = list(deal.picks)
-        return
-    if total + deal.reachable[position] <= deal.best_total:
-        return
-    for candidate in deal.kept[position]:
-        if any(candidate.id == pick.id for pick in deal.picks):
-            continue
-        deal.picks.append(candidate)
-        hand_out_shared(state, deal, position + 1, total + candidate.score)
-        deal.picks.pop()
-        if state.stopped:
-            return
+def choose_team(
+    slots: list[list[Candidate]], opponents: list[int], step_guard: int = STEP_GUARD
+) -> TeamChoice:
+    """The best team that keeps the shared-weakness rule, or the closest to it that exists.
 
-
-def last_resort(slots: list[list[PatternGroup]]) -> list[int] | None:
-    """Each slot in turn takes its best kept candidate not already taken."""
-    team: list[int] = []
-    for groups in slots:
-        free = [c for group in groups for c in group.kept if c.id not in team]
-        if not free:
-            return None
-        team.append(min(free, key=best_first).id)
-    return team
-
-
-def search_levels(
-    slots: list[list[PatternGroup]], repeats_previous: list[bool], step_limit: int
-) -> tuple[list[int] | None, int, bool]:
-    """Run the search at each weakness limit, strictest first, until a team is found.
-
-    Returns the team as candidate IDs, the steps taken, and whether any level hit
-    its step limit. If levels were cut off and none found a team, the last resort
-    fills the slots, at one more step per slot.
+    `opponents` names each slot's opponent, so slots facing the same one are searched
+    without repeating teams. Only tests change `step_guard`.
     """
     size = len(slots)
-    steps, stopped = 0, False
-    for weak_limit in range(size // 2, size + 1):
-        state = SearchState(slots, repeats_previous, weak_limit, step_limit)
-        search_patterns(state, 0)
-        steps += state.steps
-        stopped = stopped or state.stopped
-        if state.best_team is not None:
-            return state.best_team, steps, stopped
-    if stopped:
-        return last_resort(slots), steps + size, True
-    return None, steps, False
+    first = new_search([keep_best(s, size) for s in slots], opponents, size, None)
+    visit(first, 0, 0)
+    if first.best_team is None or keeps_rule(first.best_team, size // 2):
+        return TeamChoice(first.best_team or [], RULE_KEPT)
+    kept = [keep_best_per_pattern(s, size) for s in slots]
+    return second_search(kept, opponents, first.best_team, step_guard)

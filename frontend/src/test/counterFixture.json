@@ -1,0 +1,150 @@
+{
+  "picks": [
+    {
+      "counter": {
+        "id": 130,
+        "name": "gyarados",
+        "move": "aqua-tail",
+        "turns": 1
+      },
+      "opponent": {
+        "id": 6,
+        "name": "charizard",
+        "move": "outrage",
+        "turns": 3
+      },
+      "outcome": "wins",
+      "line": "Gyarados knocks out Charizard in 1 turn with Aqua Tail",
+      "reason": "Gyarados knocks out Charizard in 1 turn with Aqua Tail (water, 2×): 192 damage, 90% accurate, against 138 HP. Charizard needs 3 turns to knock out Gyarados with Outrage: 57 damage against 155 HP. Charizard is faster, so it strikes first."
+    },
+    {
+      "counter": {
+        "id": 25,
+        "name": "pikachu",
+        "move": "volt-tackle",
+        "turns": 2
+      },
+      "opponent": {
+        "id": 9,
+        "name": "blastoise",
+        "move": "earthquake",
+        "turns": 1
+      },
+      "outcome": "loses to",
+      "line": "Pikachu loses to Blastoise: Blastoise knocks it out in 1 turn, Pikachu needs 2",
+      "reason": "Pikachu needs 2 turns to knock out Blastoise with Volt Tackle (electric, 2×): 96 damage against 139 HP. Blastoise knocks out Pikachu in 1 turn with Earthquake: 176 damage against 95 HP. Pikachu is faster, so it strikes first."
+    },
+    {
+      "counter": {
+        "id": 149,
+        "name": "dragonite",
+        "move": "outrage",
+        "turns": 2
+      },
+      "opponent": {
+        "id": 3,
+        "name": "venusaur",
+        "move": "outrage",
+        "turns": 2
+      },
+      "outcome": "draws with",
+      "line": "Dragonite draws with Venusaur: each needs 2 turns",
+      "reason": "Dragonite needs 2 turns to knock out Venusaur with Outrage (dragon, 1×): 127 damage against 140 HP. Venusaur needs 2 turns to knock out Dragonite with Outrage: 94 damage against 151 HP. They are equally fast, so neither strikes first."
+    }
+  ],
+  "grid": [
+    [
+      {
+        "outcome": "wins",
+        "counter_turns": 1,
+        "opponent_turns": 3
+      },
+      {
+        "outcome": "wins",
+        "counter_turns": 2,
+        "opponent_turns": 3
+      },
+      {
+        "outcome": "wins",
+        "counter_turns": 2,
+        "opponent_turns": 2
+      }
+    ],
+    [
+      {
+        "outcome": "loses to",
+        "counter_turns": 2,
+        "opponent_turns": 1
+      },
+      {
+        "outcome": "loses to",
+        "counter_turns": 2,
+        "opponent_turns": 1
+      },
+      {
+        "outcome": "loses to",
+        "counter_turns": 4,
+        "opponent_turns": 1
+      }
+    ],
+    [
+      {
+        "outcome": "wins",
+        "counter_turns": 1,
+        "opponent_turns": 2
+      },
+      {
+        "outcome": "wins",
+        "counter_turns": 2,
+        "opponent_turns": 2
+      },
+      {
+        "outcome": "draws with",
+        "counter_turns": 2,
+        "opponent_turns": 2
+      }
+    ]
+  ],
+  "opponent_moves": [
+    {
+      "name": "Charizard",
+      "moves": [
+        "overheat",
+        "earthquake",
+        "hurricane",
+        "outrage"
+      ],
+      "moves_listed": true
+    },
+    {
+      "name": "Blastoise",
+      "moves": [
+        "water-spout",
+        "ice-beam",
+        "outrage",
+        "earthquake"
+      ],
+      "moves_listed": true
+    },
+    {
+      "name": "Venusaur",
+      "moves": [
+        "petal-dance",
+        "sludge-wave",
+        "earth-power",
+        "outrage"
+      ],
+      "moves_listed": true
+    }
+  ],
+  "weakness_counts": {
+    "fire": 0,
+    "flying": 0,
+    "grass": 0,
+    "poison": 0,
+    "water": 0
+  },
+  "weakness_rule": "kept",
+  "pool_size": 3,
+  "legendary_left_out": false
+}

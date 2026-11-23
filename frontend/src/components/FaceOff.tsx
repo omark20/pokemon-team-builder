@@ -23,9 +23,8 @@ const LEAVE_OUT_LABEL = "Leave out legendary and mythical Pokémon";
 function statusLine(team: Team, counter: CounterResult | null): string {
   if (counter) {
     const pool = counter.pool_size.toLocaleString("en-US");
-    const best = counter.stopped_early ? "Best team found" : "Best team";
     const leftOut = counter.legendary_left_out ? ", legendary and mythical left out" : "";
-    return `${best} out of ${pool} candidates${leftOut}.`;
+    return `Best team out of ${pool} candidates${leftOut}.`;
   }
   return team.pokemon_ids.length === 0
     ? "Add Pokémon from the grid below."

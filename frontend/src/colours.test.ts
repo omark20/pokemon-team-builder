@@ -2,7 +2,7 @@
 // (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), independently of the
 // product code, which only stores the colours.
 import { expect, test } from "vitest";
-import { ALERT_COLOURS, MATCHUP_COLOURS, TYPE_COLOURS, type MatchupLevel } from "./colours";
+import { ALERT_COLOURS, TYPE_COLOURS } from "./colours";
 import { TYPE_NAMES } from "./types";
 
 function channel(hex: string, start: number): number {
@@ -35,9 +35,4 @@ test("the formula reproduces known ratios", () => {
   expect(contrast(TYPE_COLOURS.grass.text, TYPE_COLOURS.grass.tint)).toBeCloseTo(5.43, 2);
   expect(contrast(TYPE_COLOURS.dark.text, TYPE_COLOURS.dark.tint)).toBeCloseTo(11.32, 2);
   expect(contrast(ALERT_COLOURS.struck, ALERT_COLOURS.fill)).toBeCloseTo(4.8, 2);
-});
-
-test.each(Object.keys(MATCHUP_COLOURS) as MatchupLevel[])("the %s matchup label has at least 4.5:1 contrast", (level) => {
-  const { fill, text } = MATCHUP_COLOURS[level];
-  expect(contrast(text, fill)).toBeGreaterThanOrEqual(4.5);
 });

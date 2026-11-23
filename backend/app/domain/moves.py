@@ -1,7 +1,7 @@
 """Moves as PokéAPI gives them: the move list, one move's answer, and a Pokémon's moves.
 
-All three are stored as fetched; which moves count in a matchup is decided elsewhere,
-when a counter team is built. Each parser refuses any answer that breaks a rule, naming
+All three are stored as fetched; which moves count in a duel is decided in
+domain/move_rules.py. Each parser refuses any answer that breaks a rule, naming
 the rule, so a half-read move or move list is never stored. Every rule rests on the
 captures in samples/ (samples/README.md, facts 22 to 26, and census_all_moves.tsv, one
 row per listed move). Pure: no web or database code.

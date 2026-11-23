@@ -2,7 +2,8 @@
 
 A run loads the type chart, then every move (full runs only, scan_moves.py), then the
 list of Pokémon, then each Pokémon's details, four requests at a time, and hands each
-result to scan_store to be compared and saved.
+result to scan_store to be compared and saved. A full run ends by working out what the
+counter team needs from the stored data (scan_duel.py).
 Failures never erase stored data or record a false change: a Pokémon that cannot be
 read is skipped and counted, and a bad chart or list leaves what is stored as it was.
 Every log line carries the run ID, so a run can be explained from its lines alone.
@@ -15,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from functools import partial
 
-from app import db, demo, logs, pokemon_list, scan_fetch, scan_moves, scan_store
+from app import db, demo, logs, pokemon_list, scan_duel, scan_fetch, scan_moves, scan_store
 from app.config import load_settings
 from app.db import Conn
 from app.domain.types import STANDARD_TYPES, ChartError, build_chart
@@ -119,7 +120,8 @@ def _scan_steps(conn: Conn, fetch: Fetch, run: Run, pokemon_ids: Sequence[int] |
     if pokemon_ids is None:
         run.missing += scan_store.stored_not_listed(conn, listed)
     scan_store.apply_removals(conn, run)
-    whole = chart_ok and moves_ok and run.complete and run.failed == 0
+    duel_ok = scan_duel.refresh(conn, run) if pokemon_ids is None else True
+    whole = chart_ok and moves_ok and duel_ok and run.complete and run.failed == 0
     return "ok" if whole else "incomplete"
 
 

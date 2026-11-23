@@ -20,17 +20,8 @@ DEFAULT_FORMS = 1025
 WITHOUT_SPRITE = 9
 CHARIZARD = {"name": "charizard", "types": ["fire", "flying"], "stats": [78, 84, 78, 109, 85, 100]}
 PIKACHU = {"name": "pikachu", "types": ["electric"]}
-# Visitor A's team and its expected counter team on the full pool, the same answer an
-# independently written search returns.
+# Visitor A's team: Charizard, Blastoise, Venusaur (its counter team: smoke_counter.py).
 TEAM_A = [6, 9, 3]
-COUNTERS_A = ["archeops", "hydrapple", "celesteela"]
-TOTALS_A = {"assigned_points": 9, "coverage": 6, "base_stats": 1677}
-POOL_SIZE = DEFAULT_FORMS
-# Two Charizard: the full-pool answer includes Diancie, which is mythical
-# (census_all_species.tsv). Leaving out the 94 flagged default forms leaves 931 (fact 20).
-TEAM_C = [6, 6]
-MYTHICAL_PICK = "diancie"
-POOL_WITHOUT_LEGENDARIES = 931
 # The demo patch: Charizard's attack, 84 in the capture, as if PokéAPI now said 94.
 PATCH = {"pokemon": {"6": {"attack": 94}}, "type_chart": []}
 ATTACK_BEFORE, ATTACK_AFTER = 84, 94
@@ -178,28 +169,6 @@ def account_a(smoke: Smoke) -> None:
 
 def _team_ids(smoke: Smoke, visitor: str) -> list[int]:
     return [team["id"] for team in smoke.as_visitor(visitor, "GET", "/api/teams").json()]
-
-
-def counter_a(smoke: Smoke) -> None:
-    body = smoke.as_visitor("A", "GET", f"/api/teams/{smoke.teams['A']}/counter").json()
-    names = [pick["counter"]["name"] for pick in body["picks"]]
-    check(names == COUNTERS_A, f"counters {COUNTERS_A} in slot order", names)
-    check(body["totals"] == TOTALS_A, f"totals {TOTALS_A}", body["totals"])
-    flags = (body["pool_size"], body["stopped_early"], body["relaxed"])
-    check(flags == (POOL_SIZE, False, False), "pool 1025, not stopped early or relaxed", flags)
-
-
-def legendary_filter(smoke: Smoke) -> None:
-    smoke.new_team("C", "Smoke C", TEAM_C)
-    path = f"/api/teams/{smoke.teams['C']}/counter"
-    default = [p["counter"]["name"] for p in smoke.as_visitor("C", "GET", path).json()["picks"]]
-    check(MYTHICAL_PICK in default, f"{MYTHICAL_PICK} among the default picks", default)
-    options = {"params": {"leave_out_legendary": "true"}}
-    body = smoke.as_visitor("C", "GET", path, **options).json()
-    names = [pick["counter"]["name"] for pick in body["picks"]]
-    seen = (body["pool_size"], body["legendary_left_out"], MYTHICAL_PICK in names)
-    expected = (POOL_WITHOUT_LEGENDARIES, True, False)
-    check(seen == expected, f"pool 931, legendary_left_out, no {MYTHICAL_PICK}", seen)
 
 
 def patch_stored_alone(smoke: Smoke) -> None:

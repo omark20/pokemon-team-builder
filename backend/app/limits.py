@@ -32,7 +32,10 @@ LIMITS = {
     "write": Limit(120, 60),  # team and alert writes
     "new_visitor": Limit(20, 3600),  # visitor records created, one per first team
     "new_visitor_total": Limit(10, 60),  # the same, all addresses together (one shared key)
-    "counter": Limit(20, 60),  # counter-team searches: 250,000 steps a strictness level
+    # Counter teams: an exact assignment (for six opponents at most 36 kept candidates and
+    # 720 hand-outs), then, only for a team that breaks the shared-weakness rule, a second
+    # search that stops at 100,000 steps (domain/counter_search.py, STEP_GUARD).
+    "counter": Limit(20, 60),
     "admin": Limit(30, 60),  # scan trigger and demo controls, counted before the token check
     # Accounts: every attempt counts, whether it succeeds or not, before any password check.
     "sign_in_pair": Limit(10, 900),  # sign-ins for one username (lower case) from one address

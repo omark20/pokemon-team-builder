@@ -1,17 +1,13 @@
 // The right half of the face-off card: the counter team, three per row, each
 // counter in the same position as the team member it answers, with a short
-// "beats X" line. Before a team is built it is an empty dashed box. The two
-// notices that limit what the result claims are shown here, not hidden in
-// the details.
+// line saying how their fight ends. Before a team is built it is an empty
+// dashed box. When the team breaks the shared-weakness rule, one notice says so
+// here, where it is seen without opening the details.
 import { typeStyle } from "../colours";
-import { displayName, type CounterResult, type Pokemon } from "../types";
+import { OUTCOME_CLASS } from "../outcomes";
+import { ruleNotice } from "../ruleNotice";
+import { displayName, type CounterPick, type CounterResult, type Pokemon } from "../types";
 import { Sprite } from "./Sprite";
-
-export const NOTICES = {
-  stoppedEarly: "The search hit its step limit. This is the best team found. A better one may exist.",
-  relaxed:
-    "No team avoids a shared weakness here, so the rule was loosened: more than half of this team is weak to one of your types.",
-};
 
 interface CounterProps {
   counter: CounterResult | null;
@@ -19,20 +15,27 @@ interface CounterProps {
   pokemonById: Map<number, Pokemon>;
 }
 
+// "beats Charizard", "draws with Venusaur" or "loses to Blastoise".
+function resultChip(pick: CounterPick): string {
+  const verb = pick.outcome === "wins" ? "beats" : pick.outcome;
+  return `${verb} ${displayName(pick.opponent.name)}`;
+}
+
 export function CounterHalf({ counter, error, pokemonById }: CounterProps) {
+  const notice = counter && ruleNotice(counter);
   return (
     <section className="half" aria-label="Counter team">
       <h2 className="half-title">Counter team</h2>
       {counter ? (
         <ol className="slots">
-          {counter.picks.map(({ counter: pick, opponent }, index) => {
-            const known = pokemonById.get(pick.id);
-            const name = displayName(pick.name);
+          {counter.picks.map((pick, index) => {
+            const known = pokemonById.get(pick.counter.id);
+            const name = displayName(pick.counter.name);
             return (
               <li key={index} className="slot" style={known && typeStyle(known.types[0]!)}>
                 <Sprite url={known?.sprite_url ?? null} name={name} size={48} />
                 <span className="slot-name">{name}</span>
-                <span className="beats">beats {displayName(opponent.name)}</span>
+                <span className={`beats ${OUTCOME_CLASS[pick.outcome]}`}>{resultChip(pick)}</span>
               </li>
             );
           })}
@@ -45,8 +48,7 @@ export function CounterHalf({ counter, error, pokemonById }: CounterProps) {
       <p className="visually-hidden counter-live" aria-live="polite">
         {counter ? `Counter team ready: ${counter.picks.map((pick) => displayName(pick.counter.name)).join(", ")}.` : error}
       </p>
-      {counter?.stopped_early && <p className="counter-notice">{NOTICES.stoppedEarly}</p>}
-      {counter?.relaxed && <p className="counter-notice">{NOTICES.relaxed}</p>}
+      {notice && <p className="counter-notice">{notice}</p>}
     </section>
   );
 }

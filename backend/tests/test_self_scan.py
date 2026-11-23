@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 from conftest import SCAN_TOKEN
-from fake_pokeapi import POKEMON_LIST, FakePokeApi
+from fake_pokeapi import POKEMON_LIST, FakePokeApi, run_fake_scan
 from fastapi.testclient import TestClient
 
 from app import scan, self_scan
@@ -34,6 +34,9 @@ HOUR, MINUTE = timedelta(hours=1), timedelta(minutes=1)
         (Facts(NOW - 8 * HOUR, NOW - 30 * MINUTE, False), "not_due"),
         (Facts(NOW - 8 * HOUR, NOW - 61 * MINUTE, False), "due"),
         (Facts(NOW - 8 * HOUR, NOW - 8 * HOUR, True), "paused_for_demo"),
+        (Facts(NOW - 2 * HOUR, NOW - 2 * HOUR, False, True), "due"),
+        (Facts(NOW - 30 * MINUTE, NOW - 30 * MINUTE, False, True), "not_due"),
+        (Facts(NOW - 2 * HOUR, NOW - 2 * HOUR, True, True), "paused_for_demo"),
     ],
     ids=[
         "never-scanned",
@@ -42,9 +45,12 @@ HOUR, MINUTE = timedelta(hours=1), timedelta(minutes=1)
         "failed-30-minutes-ago",
         "failed-61-minutes-ago",
         "demo-active",
+        "no-duel-data-after-a-recent-scan",
+        "no-duel-data-tried-30-minutes-ago",
+        "no-duel-data-in-a-demo",
     ],
 )
-def test_a_scan_is_due_after_7_hours_at_most_once_an_hour_and_never_in_a_demo(
+def test_a_scan_is_due_after_7_hours_or_without_duel_data_hourly_at_most_never_in_a_demo(
     facts: Facts, decision: str
 ) -> None:
     assert decide(NOW, facts) == decision
@@ -73,11 +79,8 @@ def test_a_due_look_runs_a_scan_started_by_the_app(
 def test_a_look_when_not_due_starts_nothing(
     client: TestClient, conn: psycopg.Connection, source: FakePokeApi
 ) -> None:
-    conn.execute(
-        "INSERT INTO scan_runs (status, scope, started_at) VALUES ('ok', 'full', %s)",
-        (utc_now() - HOUR,),
-    )
-    assert look(client, conn, source, utc_now()) is None
+    run_fake_scan(conn, source)  # a finished full scan, which stores the duel data too
+    assert look(client, conn, source, utc_now() + HOUR) is None
     assert len(runs(conn)) == 1
 
 

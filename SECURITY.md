@@ -65,7 +65,7 @@ The documentation routes are off and the server does not announce itself. *Tests
 |---|---|
 | Reads (every GET under `/api`) | 600 a minute per address |
 | Writes | 120 a minute per address |
-| Counter teams | 20 a minute per address; two searched at once; 250,000 steps per strictness level |
+| Counter teams | 20 a minute per address; two searched at once. The search is exact with no step limit (for six opponents, at most 36 kept candidates and 720 ways to hand them out); a second search, run only when the best team breaks the shared-weakness rule, stops at 100,000 steps and then answers with the first search's team and a notice |
 | New visitors | 20 an hour per address; 10 a minute from all addresses together |
 | Visitors in all, accounts included | 50,000 |
 | Sign-in attempts, real names or not, successes included | 10 in 15 minutes for one username from one address; 20 in 15 minutes from one address, whatever the names; 100 in 15 minutes for one username from all addresses together |

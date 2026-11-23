@@ -1,148 +1,82 @@
-// What "Show details" opens under the face-off: the view of the team as a
-// whole. How the team was chosen, each pick with its matchup, every counter's
-// matchup against every member of the team, the team's three totals, and how
-// many counters each of the team's types hits hard. Each pick's line has a
-// "Why?" button that shows the sentence saying why it was picked.
-//
-// A matchup is how hard the counter hits that Pokémon minus how hard it is
-// hit back, in points (one per doubling of damage), from -5 to 5. The last
-// column, vs whole team, is a counter's row of the table added up.
+// What "Show details" opens under the face-off: one card per pick showing the
+// turns each side needs to knock the other out, then, behind "Show more", every
+// fight in one table, the moves your team is assumed to carry, and how the team
+// was chosen.
 import { useState } from "react";
-import { matchupStyle, matchupWord, signed } from "../matchupWords";
-import { displayName, type CounterPick, type CounterResult } from "../types";
+import { displayName, moveName, type AssumedMoves, type CounterResult } from "../types";
+import { FightTable } from "./FightTable";
+import { PickCard } from "./PickCard";
 
+export const INTRO =
+  "Each counter was picked to win a one-on-one fight against one of your Pokémon. The numbers are the turns each needs to knock out the other; fewer wins.";
 
-// The scoring is this app's own, not the game's, so it is explained first.
-// The points follow the table in backend/app/domain/counter.py: 4× +2, 2× +1, 1× 0, ½× -1, ¼× -2, no effect -3.
-const HOW_CHOSEN = [
-  "Best matchup against its own opponent first, then against your whole team, then base stats. No Pokémon twice, and no type of yours may hit more than half the counters hard.",
-  "Points are ours: one per doubling of damage, given minus taken. 4× is +2, 2× is +1, 1× is 0, ½× is -1, ¼× is -2, and no effect is -3.",
-];
+const SIZE_WORDS = ["", "one", "two", "three", "four", "five", "six"];
 
-function HowChosen() {
-  return (
-    <section className="how-chosen" aria-labelledby="how-chosen-title">
-      <h3 id="how-chosen-title">How this team was chosen</h3>
-      {HOW_CHOSEN.map((text) => (
-        <p key={text}>{text}</p>
-      ))}
-    </section>
-  );
+// The last sentence names the team's size: "The six shown are the best six that are all different."
+function howChosen(size: number): string[] {
+  const words = SIZE_WORDS[size];
+  const shown =
+    size === 1 ? "The one shown is the best one." : `The ${words} shown are the best ${words} that are all different.`;
+  return [
+    "Each counter fights each of your Pokémon at level 50, each using the best of its four moves.",
+    "A counter is judged first on its own opponent, then on how much better it does against your team than against Pokémon in general, then on its base stats.",
+    shown,
+  ];
 }
 
-// A matchup as a word and its number: "Strong +3", "Weak -1".
-function Matchup({ points }: { points: number }) {
-  return (
-    <>
-      <span className="matchup-word">{matchupWord(points)}</span> {signed(points)}
-    </>
-  );
-}
-
-// One pick: "Rhyperior beats Charizard", its matchup, and a "Why?" button
-// that shows the reason under the line. The open state lives here, so it
-// starts hidden whenever the details are opened again; a new counter team
-// always closes the details first.
-function PickLine({ pick, slot }: { pick: CounterPick; slot: number }) {
-  const [open, setOpen] = useState(false);
-  const reasonId = `pick-why-${slot}`;
+function MovesLine({ member }: { member: AssumedMoves }) {
+  const moves = member.moves.map(moveName).join(", ");
   return (
     <li>
-      <strong>{displayName(pick.counter.name)}</strong> <span className="muted">beats</span>{" "}
-      <strong>{displayName(pick.opponent.name)}</strong>{" "}
-      <span className="matchup" style={matchupStyle(pick.matchup)}>
-        <Matchup points={pick.matchup} />
-      </span>{" "}
-      <button type="button" className="why-toggle" aria-expanded={open} aria-controls={reasonId} onClick={() => setOpen(!open)}>
-        {open ? "Hide why" : "Why?"}
-      </button>
-      {open && (
-        <p id={reasonId} className="why">
-          {pick.reason}
-        </p>
-      )}
+      <strong>{displayName(member.name)}</strong>:{" "}
+      {member.moves_listed ? moves || "No damaging move" : "PokéAPI lists no moves for this Pokémon"}
     </li>
   );
 }
 
-function PickList({ counter }: { counter: CounterResult }) {
+// What "Show more" reveals: three sections, each under a small heading.
+function MoreDetails({ counter }: { counter: CounterResult }) {
+  const fights = counter.picks.length * counter.opponent_moves.length;
   return (
-    <ul className="pick-list">
-      {counter.picks.map((pick, slot) => (
-        <PickLine key={slot} pick={pick} slot={slot} />
-      ))}
-    </ul>
-  );
-}
-
-// The narrowest a column may get before the table scrolls inside its box
-// instead: enough for "Strong" above its number.
-const MIN_COLUMN_WIDTH = 50;
-
-// Each cell carries its word and number; the colour, greener the stronger,
-// only repeats them.
-function MatchupTable({ counter }: { counter: CounterResult }) {
-  return (
-    // On a narrow screen the table scrolls sideways inside its own box, never the page.
-    <div className="matchups-scroll">
-      <table className="matchups" style={{ minWidth: (counter.picks.length + 2) * MIN_COLUMN_WIDTH }}>
-        <caption>Every counter against every one of your Pokémon</caption>
-        <thead>
-          <tr>
-            <th scope="col">Counter</th>
-            {counter.picks.map((pick, index) => (
-              <th key={index} scope="col" title={displayName(pick.opponent.name)}>
-                {displayName(pick.opponent.name)}
-              </th>
-            ))}
-            <th scope="col">vs whole team</th>
-          </tr>
-        </thead>
-        <tbody>
-          {counter.grid.map((row, index) => (
-            <tr key={index}>
-              <th scope="row" title={displayName(counter.picks[index]!.counter.name)}>
-                {displayName(counter.picks[index]!.counter.name)}
-              </th>
-              {row.map((value, column) => (
-                <td key={column} className="matchup-cell" style={matchupStyle(value)}>
-                  <Matchup points={value} />
-                </td>
-              ))}
-              <td className="row-sum">{signed(row.reduce((sum, value) => sum + value, 0))}</td>
-            </tr>
+    <div id="counter-more" className="counter-more">
+      <section aria-labelledby="fights-title">
+        <h3 id="fights-title">All {fights} fights</h3>
+        <p className="section-note">A tick means the counter wins that one-on-one fight. Outlined: the opponent it was picked for.</p>
+        <FightTable counter={counter} />
+      </section>
+      <section aria-labelledby="moves-title">
+        <h3 id="moves-title">Your team's moves</h3>
+        <p className="section-note">
+          The four each of your Pokémon is assumed to carry: the four that together hit the most Pokémon hardest.
+        </p>
+        <ul className="team-moves">
+          {counter.opponent_moves.map((member, index) => (
+            <MovesLine key={index} member={member} />
           ))}
-        </tbody>
-      </table>
+        </ul>
+      </section>
+      <section aria-labelledby="chosen-title">
+        <h3 id="chosen-title">How this team was chosen</h3>
+        <p className="section-note">{howChosen(counter.picks.length).join(" ")}</p>
+      </section>
     </div>
   );
 }
 
-function Totals({ counter }: { counter: CounterResult }) {
-  const { totals, weakness_counts: weak } = counter;
-  const weaknesses = Object.entries(weak).map(([type, count]) => `${type} ${count}`);
-  return (
-    <>
-      <dl className="totals">
-        <dt>Matchup points against assigned opponents</dt>
-        <dd>{signed(totals.assigned_points)}</dd>
-        <dt>Against your whole team, all matchups added up</dt>
-        <dd>{signed(totals.coverage)}</dd>
-        <dt>Base stats, added up</dt>
-        <dd>{totals.base_stats.toLocaleString("en-US")}</dd>
-      </dl>
-      <p className="weaknesses">Counters each of your types hits for 2× or more: {weaknesses.join(", ")}.</p>
-    </>
-  );
-}
-
 export function CounterDetails({ counter }: { counter: CounterResult }) {
+  const [more, setMore] = useState(false);
   return (
     <div className="counter-details">
-      <HowChosen />
-      <PickList counter={counter} />
-      <MatchupTable counter={counter} />
-      <Totals counter={counter} />
+      <p>{INTRO}</p>
+      <div className="pick-cards">
+        {counter.picks.map((pick, slot) => (
+          <PickCard key={slot} pick={pick} slot={slot} />
+        ))}
+      </div>
+      <button type="button" className="more-toggle" aria-expanded={more} aria-controls="counter-more" onClick={() => setMore(!more)}>
+        {more ? "Show less" : "Show more"}
+      </button>
+      {more && <MoreDetails counter={counter} />}
     </div>
   );
 }

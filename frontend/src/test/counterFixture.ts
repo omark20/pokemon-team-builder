@@ -1,34 +1,11 @@
-// A counter response for the team Charizard, Blastoise, Venusaur. Its picks and
-// totals are the full-pool reference result worked out for this team
-// (Archeops, Hydrapple, Celesteela; 9, 6, 1677); the remaining numbers are what
-// backend/app/domain/counter.py returns for it, which its tests check against brute force.
+// A counter response for the team Charizard, Blastoise, Venusaur, as the backend's
+// counter core (backend/app/domain/counter.py) answers it. counterFixture.json is
+// that answer, unedited: every Pokémon carries the four moves the core gives it from
+// its captured move list in samples/, the baselines are taken over the 18 default
+// Pokémon whose move lists are captured, and the candidates are limited to Gyarados,
+// Pikachu and Dragonite so the three picks end in a win, a loss and a draw. None of
+// the three hits Venusaur for 2×, so that rule is waived for Dragonite's pick.
 import type { CounterResult } from "../types";
+import answer from "./counterFixture.json";
 
-const pick = (opponent: [number, string], counter: [number, string], matchup: number, reason: string) => ({
-  opponent: { id: opponent[0], name: opponent[1] },
-  counter: { id: counter[0], name: counter[1] },
-  matchup,
-  reason,
-});
-
-export const COUNTER: CounterResult = {
-  picks: [
-    pick([6, "charizard"], [567, "archeops"], 3,
-      "Archeops (rock, flying) hits Charizard for 4× with rock attacks. Charizard's best attack back does ½×. Across the whole opposing team its matchups add up to +3."),
-    pick([9, "blastoise"], [1019, "hydrapple"], 3,
-      "Hydrapple (grass, dragon) hits Blastoise for 2× with grass attacks. Blastoise's best attack back does ¼×. Across the whole opposing team its matchups add up to +1."),
-    pick([3, "venusaur"], [797, "celesteela"], 3,
-      "Celesteela (steel, flying) hits Venusaur for 2× with flying attacks. Venusaur's best attack back does ¼×. Across the whole opposing team its matchups add up to +2."),
-  ],
-  totals: { assigned_points: 9, coverage: 6, base_stats: 1677 },
-  grid: [
-    [3, -1, 1],
-    [-1, 3, -1],
-    [-1, 0, 3],
-  ],
-  weakness_counts: { fire: 1, flying: 1, grass: 0, poison: 1, water: 1 },
-  relaxed: false,
-  stopped_early: false,
-  pool_size: 1025,
-  legendary_left_out: false,
-};
+export const COUNTER = answer as CounterResult;

@@ -42,21 +42,6 @@ export const ALERT_COLOURS = {
   struck: "#77601F",
 };
 
-// The matchup scale in the details panel, greener the stronger: deep green,
-// light green, neutral, light red, deep red. The two deep ends are solid fills
-// with white text, and the light steps are cooler than the grass and fire type
-// pills, so a green label does not read as a grass type. Every text colour
-// keeps a 4.5 to 1 contrast on its fill.
-export type MatchupLevel = "strong" | "good" | "even" | "weak" | "bad";
-
-export const MATCHUP_COLOURS: Record<MatchupLevel, { fill: string; text: string }> = {
-  strong: { fill: "#1E6B3A", text: "#FFFFFF" },
-  good: { fill: "#CDEBD5", text: "#14532D" },
-  even: { fill: "#ECECEA", text: "#46463F" },
-  weak: { fill: "#F9D5D5", text: "#7F1D1D" },
-  bad: { fill: "#A11D1D", text: "#FFFFFF" },
-};
-
 // The custom properties --type-tint, --type-text and --type-bar for one type,
 // set as a React style so the stylesheet can use them.
 export function typeStyle(type: TypeName): CSSProperties {
