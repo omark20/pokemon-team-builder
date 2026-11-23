@@ -1,8 +1,8 @@
 """The counter-team endpoint: wiring stored teams, Pokémon and chart to the counter search.
 
 The search itself (app/domain/counter.py) is tested in test_counter.py. The stored
-Pokémon are the 15 captured in samples/; 12 of them are default forms (ids below 10000),
-so the candidate pool has 12.
+Pokémon are the 21 captured in samples/; 18 of them are default forms (ids below 10000),
+so the candidate pool has 18.
 """
 
 import psycopg
@@ -32,7 +32,7 @@ def test_a_saved_team_of_three_gets_one_counter_per_slot(visitor: TestClient) ->
     body = visitor.get(f"{TEAMS}/{team_id}/counter").json()
     assert body["size"] == 3
     assert [pick["opponent"]["id"] for pick in body["picks"]] == [6, 9, 3]
-    assert body["pool_size"] == 12
+    assert body["pool_size"] == 18
     assert body["stopped_early"] is False
 
 
@@ -80,12 +80,12 @@ def test_leaving_out_legendaries_removes_them_from_the_pool_and_the_picks(
     run_fake_scan(conn, source)
     team_id = team_with(client, [6, 9, 3])
     body = client.get(f"{TEAMS}/{team_id}/counter", params={"leave_out_legendary": "true"}).json()
-    assert (body["legendary_left_out"], body["pool_size"]) == (True, 11)
+    assert (body["legendary_left_out"], body["pool_size"]) == (True, 17)
     picks = [pick["counter"] for pick in body["picks"]]
     assert len(picks) == 3
     assert not any(c["is_legendary"] or c["is_mythical"] for c in picks)
     default = client.get(f"{TEAMS}/{team_id}/counter").json()
-    assert (default["legendary_left_out"], default["pool_size"]) == (False, 12)
+    assert (default["legendary_left_out"], default["pool_size"]) == (False, 18)
 
 
 def test_leaving_out_legendaries_before_the_flags_are_read_is_503(

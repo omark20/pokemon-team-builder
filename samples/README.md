@@ -133,7 +133,7 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
 |---|---|
 | `move_list_full.json` | `GET /move?limit=100000`, fetched with `curl -s --compressed`, saved unmodified |
 | `census_moves_curl_log.txt` | `curl -w "{id} %{http_code} %{time_total} %{size_download}"` output for one `GET /move/{id}` per listed move, 4 in parallel (`xargs -P 4`) |
-| `census_all_moves.tsv` | **Derived, not raw.** One row per move, extracted from the 938 bodies of that sweep: id, name, type, damage class, power, accuracy, pp, priority, target, generation, the fields of `meta` (category, hit counts, turn counts, drain, healing), and how many Pokémon its `learned_by_pokemon` list names |
+| `census_all_moves.tsv` | **Derived, not raw.** One row per move, extracted from the 938 bodies of that sweep: id, name, type, damage class, power, accuracy, pp, priority, target, generation, the fields of `meta` (category, hit counts, turn counts, drain, healing), how many Pokémon its `learned_by_pokemon` list names, and `short_effect_en`: the `short_effect` of the body's English entry in `effect_entries`, with runs of whitespace written as one space, empty where the body has no English entry |
 | `move_{id}_{name}.json` (14 files) | 14 bodies of that sweep, saved unmodified, one for each kind the rules mention: ordinary special and physical moves (53, 89, 444, 411), fixed damage (69), one-hit knock-out (90), multi-hit (3), charge (76), recharge (63), the user faints (153), no accuracy (129), a status move (45), the non-standard `shadow` type (10001), and a move whose `meta` is null (827) |
 
 22. **The move list has 938 entries.** 920 have ids from 1 upward; 18 have ids
@@ -191,6 +191,16 @@ listed twice, which the first full scan with moves found.
     null; the census file shows 17 moves with a power of 0, 16 of them status
     moves. `scale-shot` lists two English entries in `effect_entries`, with the
     same `short_effect` word for word. `venusaur-gmax` has `"moves": []`.
+
+## Added 2026-11-22 (about 21:18 Eastern): six more Pokémon
+
+Fetched with `curl -sS --compressed` and saved unmodified, for the move lists of
+well-known Pokémon that the tests of the default four moves use.
+
+| File | Request |
+|---|---|
+| `pokemon_{65,68,94,142,143,445}_{name}.json` | `GET /pokemon/{id}` for Alakazam, Machamp, Gengar, Aerodactyl, Snorlax and Garchomp |
+| `species_{65,68,94,142,143,445}_{name}.json` | `GET /pokemon-species/{id}`, the species each of those six names |
 
 ## Not verified by these captures
 
