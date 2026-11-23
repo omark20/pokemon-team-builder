@@ -38,9 +38,11 @@ test("'Show 60 more' adds the next 60 cards after the last one and the count fol
 
 test("pressing the button until it goes puts every one of the 1,351 on screen", () => {
   const { cardNames } = renderGrid();
-  for (let presses = 1; presses < 22; presses++) fireEvent.click(showMore()!);
-  expect(showMore()?.textContent).toBe("Show 31 more"); // the last batch is smaller
-  fireEvent.click(showMore()!);
+  // Found once and kept: a role query on every press would scan more than a thousand buttons each time.
+  const button = showMore()!;
+  for (let presses = 1; presses < 22; presses++) fireEvent.click(button);
+  expect(button.textContent).toBe("Show 31 more"); // the last batch is smaller
+  fireEvent.click(button);
   expect(cardNames()).toHaveLength(1351);
   expect(showMore()).toBeNull();
 });
