@@ -190,8 +190,8 @@ def test_a_failing_scan_is_explained_by_its_log_lines(
     row = conn.execute(
         "SELECT status, scanned, changed, failed FROM scan_runs WHERE id = %s", (run_id,)
     ).fetchone()
-    assert row == ("incomplete", 11, 0, 3)
-    summary = "status=incomplete scanned=11 changed=0 failed=3 filled=0"
+    assert row == ("incomplete", 12, 0, 3)
+    summary = "status=incomplete scanned=12 changed=0 failed=3 filled=0"
     assert summary in lines[-1] and lines[-1].startswith(f"scan_finished run_id={run_id}")
 
 

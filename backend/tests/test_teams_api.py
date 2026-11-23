@@ -1,7 +1,7 @@
 """A visitor's teams through the API: what is stored, who may see it, what is refused.
 
-The stored Pokémon are the 14 captured in samples/ (ids 3, 6, 9, 25, 34, 59, 76, 130,
-131, 135, 149, 248, 10034, 10264); 7 is not among them.
+The stored Pokémon are the 15 captured in samples/ (ids 3, 6, 9, 25, 34, 59, 76, 130,
+131, 135, 149, 248, 10034, 10195, 10264); 7 is not among them.
 """
 
 from typing import Any

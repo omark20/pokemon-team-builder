@@ -54,11 +54,11 @@ def test_first_run_stores_everything_and_records_no_change(
 ) -> None:
     run_id, status = run_fake_scan(conn, source)
     assert status == "ok"
-    assert len(pokemon_rows(conn)) == 14
+    assert len(pokemon_rows(conn)) == 15
     assert len(chart_rows(conn)) == 324
     assert change_rows(conn) == []
     run = conn.execute("SELECT scanned, changed, failed FROM scan_runs WHERE id = %s", (run_id,))
-    assert run.fetchone() == (14, 0, 0)
+    assert run.fetchone() == (15, 0, 0)
 
 
 def test_second_run_on_the_same_data_writes_nothing(
@@ -163,7 +163,7 @@ def _count_disagrees(source: FakePokeApi) -> None:
 
 
 def _list_shrinks(source: FakePokeApi) -> None:
-    # 12 of 14 stored is under 90%.
+    # 13 of 15 stored is under 90%.
     del source.answers[POKEMON_LIST]["results"][:2]
     source.answers[POKEMON_LIST]["count"] -= 2
 

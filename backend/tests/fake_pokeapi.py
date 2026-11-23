@@ -1,9 +1,9 @@
 """A stand-in for PokéAPI answering from the captured responses in samples/.
 
-It serves the captured type list and all 21 type responses, a move list holding the 14
-moves whose answers were captured and those 14 answers, a Pokémon list holding the 14
+It serves the captured type list and all 21 type responses, a move list holding the 17
+moves whose answers were captured and those 17 answers, a Pokémon list holding the 15
 Pokémon whose detail responses were captured, each at its real listed URL, and the
-captured species responses those 14 name.
+captured species responses those 15 name.
 Tests change `answers` to make PokéAPI say something else: a payload, None for a 404,
 or an exception to raise.
 """

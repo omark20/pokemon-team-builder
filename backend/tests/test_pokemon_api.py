@@ -40,7 +40,7 @@ def test_list_holds_every_stored_row(
     response = client.get("/api/pokemon")
     assert response.headers["content-encoding"] == "gzip"
     entries = {entry["id"]: entry for entry in response.json()}
-    assert len(entries) == 14
+    assert len(entries) == 15
     assert entries[6] == CHARIZARD_ENTRY
     assert entries[10264]["sprite_url"] is None
     assert entries[25]["removed"] is True

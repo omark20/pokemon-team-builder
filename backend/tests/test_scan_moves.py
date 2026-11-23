@@ -1,6 +1,6 @@
 """The scan's moves step against a fake PokéAPI built from samples/, on the test database.
 
-The fake lists the 14 captured moves and the 14 captured Pokémon. Expected moves come
+The fake lists the 17 captured moves and the 15 captured Pokémon. Expected moves come
 from census_all_moves.tsv, read separately from the code under test.
 """
 
@@ -20,7 +20,7 @@ from fake_pokeapi import (
 
 from app.pokeapi import UpstreamError
 
-STONE_EDGE, FLAMETHROWER, CHARIZARD = 444, 53, 6
+STONE_EDGE, FLAMETHROWER, CHARIZARD, VENUSAUR_GMAX = 444, 53, 6, 10195
 CENSUS = census_moves()
 
 
@@ -44,15 +44,21 @@ def test_a_full_run_stores_every_listed_move_and_every_move_list_with_no_change(
     conn: psycopg.Connection, source: FakePokeApi
 ) -> None:
     run_id, status = run_fake_scan(conn, source)
-    assert (status, run_status(conn, run_id)) == ("ok", ("ok", 14, 0, 0))
+    assert (status, run_status(conn, run_id)) == ("ok", ("ok", 15, 0, 0))
     expected = {move_id: tuple(vars(CENSUS[move_id]).values())[:-1] for move_id in move_rows(conn)}
-    assert len(expected) == 14
+    assert len(expected) == 17
     assert move_rows(conn) == expected
-    texts = dict(conn.execute("SELECT id, short_effect FROM moves WHERE id IN (153, 827)"))
-    assert texts == {153: "User faints.", 827: None}  # dire-claw has no English text
+    texts = dict(conn.execute("SELECT id, short_effect FROM moves WHERE id IN (153, 799, 827)"))
+    assert texts == {
+        153: "User faints.",
+        799: "Boosts the user’s Speed and lowers their Defense by one stage after inflicting"
+        " damage two to five times in a row.",  # scale-shot lists this English entry twice
+        827: None,  # dire-claw has no English text
+    }
     lists = move_lists(conn)
-    assert len(lists) == 14
+    assert len(lists) == 15
     assert STONE_EDGE in lists[248] and FLAMETHROWER in lists[CHARIZARD]  # Tyranitar, Charizard
+    assert lists[VENUSAUR_GMAX] == []  # PokéAPI lists no moves for it
     assert conn.execute("SELECT count(*) FROM changes").fetchone() == (0,)
 
 
@@ -80,9 +86,9 @@ def test_a_move_that_cannot_be_read_keeps_its_stored_row_and_the_run_is_incomple
     source.answers[move_path(FLAMETHROWER)] = answer
     with caplog.at_level(logging.INFO):
         run_id, status = run_fake_scan(conn, source)
-    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 14, 0, 0))
+    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 15, 0, 0))
     rows = move_rows(conn)
-    assert len(rows) == 14
+    assert len(rows) == 17
     assert rows[FLAMETHROWER][4] == 1  # left as stored, not refreshed, blanked or deleted
     assert rows[STONE_EDGE][4] == 100  # a move that was read is refreshed
     texts = dict(conn.execute("SELECT id, short_effect FROM moves WHERE id IN (53, 444)"))
@@ -100,7 +106,7 @@ def test_a_move_list_that_cannot_be_read_skips_the_step_and_the_pokemon_still_ru
     source.requested.clear()
     with caplog.at_level(logging.INFO):
         run_id, status = run_fake_scan(conn, source)
-    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 14, 0, 0))
+    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 15, 0, 0))
     assert move_rows(conn) == stored
     assert {path for path in source.requested if path.startswith("move")} == {MOVE_LIST}
     expected = f"move_list_rejected run_id={run_id} reason=timeout"
@@ -117,7 +123,7 @@ def test_a_pokemon_whose_move_list_breaks_a_rule_keeps_its_stored_list_and_count
     charizard["stats"][1]["base_stat"] = 90  # the rest of the answer is still saved
     with caplog.at_level(logging.INFO):
         run_id, status = run_fake_scan(conn, source)
-    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 14, 1, 1))
+    assert (status, run_status(conn, run_id)) == ("incomplete", ("incomplete", 15, 1, 1))
     assert move_lists(conn)[CHARIZARD] == stored
     expected = f"moves_unread run_id={run_id} pokemon_id={CHARIZARD} rule=move_url"
     assert [line for line in caplog.messages if "moves_unread" in line] == [expected]

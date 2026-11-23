@@ -26,6 +26,5 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      # Tests first: they install the frontend's packages, which its lint needs.
-      - run: make test
       - run: make lint
+      - run: make test

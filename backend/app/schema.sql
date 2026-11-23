@@ -54,8 +54,9 @@ CREATE TABLE IF NOT EXISTS type_effectiveness (
 );
 
 -- Every move PokéAPI lists, as fetched (domain/moves.py); power and accuracy are null
--- where PokéAPI gives none, and short_effect, the English one, where it has none. Not part of a Pokémon's record, so a change here is not
--- diffed and raises no alert. Rows are never deleted.
+-- where PokéAPI gives none, and short_effect, the English one, where it has none.
+-- Not part of a Pokémon's record, so a change here is not diffed and raises no alert.
+-- Rows are never deleted.
 CREATE TABLE IF NOT EXISTS moves (
     id integer PRIMARY KEY,
     name text NOT NULL,

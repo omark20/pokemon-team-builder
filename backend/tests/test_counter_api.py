@@ -1,7 +1,7 @@
 """The counter-team endpoint: wiring stored teams, Pokémon and chart to the counter search.
 
 The search itself (app/domain/counter.py) is tested in test_counter.py. The stored
-Pokémon are the 14 captured in samples/; 12 of them are default forms (ids below 10000),
+Pokémon are the 15 captured in samples/; 12 of them are default forms (ids below 10000),
 so the candidate pool has 12.
 """
 

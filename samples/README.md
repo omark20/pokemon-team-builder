@@ -142,9 +142,11 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
 23. **Every move answer has the same top-level keys**, among them `type`,
     `damage_class`, `power`, `accuracy`, `meta` and `learned_by_pokemon`. The
     damage class is `physical` for 395, `special` for 266 and `status` for 277.
-    No status move has a power. **There is no flag for moves that charge,
-    recharge or make the user faint**: no `flags` key exists, `meta` has no such
-    field, and `meta` is null for 111 moves (the newest ones).
+    No status move has a power above 0, but 16 of them have a power of `0`
+    rather than null, and so does one physical move, `hard-press` (fact 28).
+    **There is no flag for moves that charge, recharge or make the user
+    faint**: no `flags` key exists, `meta` has no such field, and `meta` is
+    null for 111 moves (the newest ones).
 24. **`power` is null for 77 of the 661 damaging moves**: 4 one-hit knock-outs
     and 73 whose damage is fixed or depends on something else (`seismic-toss`,
     `low-kick`, `return`). **`accuracy` is null for 92 damaging moves** (moves
@@ -161,7 +163,8 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     its `moves` array equals the set of moves that name it, with no difference
     either way. Across all moves, 1,317 of the 1,351 Pokémon are named by at
     least one; the 34 that are not are the Gigantamax forms (ids 10195 to
-    10228). 7 default Pokémon learn moves but none that deals damage with a
+    10228), and the answer for 10195 has an empty `moves` array (fact 28).
+    7 default Pokémon learn moves but none that deals damage with a
     stated power: Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku, Cosmog and
     Cosmoem. There are 102,342 Pokémon-and-move pairs; the median Pokémon
     learns 77 moves.
@@ -169,6 +172,25 @@ Raw bodies below were fetched with `curl -s --compressed` and saved unmodified.
     took 26 seconds (mean 0.10 s per request, slowest 0.58 s), 3.2 MB on the
     wire with gzip, 31 MB decoded. No request was refused or throttled
     (`census_moves_curl_log.txt`).
+
+## Added 2026-11-22 (about 19:00 Eastern): moves, four more answers
+
+Fetched with `curl -sS --compressed` and saved unmodified, to confirm three shapes: a
+power of 0 and no moves, which the census file shows or implies, and an English entry
+listed twice, which the first full scan with moves found.
+
+| File | Request |
+|---|---|
+| `move_912_hard_press_physical_zero_power.json` | `GET /move/912` |
+| `move_829_power_shift_status_zero_power.json` | `GET /move/829` |
+| `move_799_scale_shot_english_twice.json` | `GET /move/799` |
+| `pokemon_10195_venusaur_gmax_no_moves.json` | `GET /pokemon/10195` |
+
+28. **A power of 0, an English entry listed twice, and no moves at all.**
+    `hard-press` (physical) and `power-shift` (status) have `"power": 0`, not
+    null; the census file shows 17 moves with a power of 0, 16 of them status
+    moves. `scale-shot` lists two English entries in `effect_entries`, with the
+    same `short_effect` word for word. `venusaur-gmax` has `"moves": []`.
 
 ## Not verified by these captures
 
